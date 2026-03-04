@@ -164,48 +164,9 @@ Configure your current annual expenses by category. Set individual growth rates 
 ### Retirement Tab
 Define your expected retirement spending. Set the Safe Withdrawal Rate and enable/disable drawdown simulation.
 
-## Financial Health Metrics Explained
-
-### Savings Rate
-- ≥20%: Green (wealth-building pace)
-- 10-19%: Amber (adequate)
-- <10%: Red (at risk)
-
-### Debt Ratio
-- <30%: Green (healthy leverage)
-- 30-49%: Amber (moderate)
-- ≥50%: Red (high leverage)
-
-### Emergency Fund (months of expenses)
-- ≥6 months: Green
-- 3-5 months: Amber
-- <3 months: Red
-
-### Investment Mix (% of total assets)
-- ≥40%: Green
-- 20-39%: Amber
-- <20%: Red
-
-### Retirement Funding
-- ≥100%: Green (fully funded)
-- 85-99%: Light green (approaching)
-- 50-84%: Amber
-- <50%: Red
-
-### Income Replacement Ratio
-- 70-120%: Green (adequate replacement)
-- >120%: Amber (lifestyle upgrade)
-- <70%: Red (significant lifestyle reduction)
-
 ## License
 
 MIT License - Feel free to use this for personal or commercial projects.
-
-## Acknowledgments
-
-- Financial planning methodologies inspired by standard personal finance frameworks
-- UI design influenced by modern dashboard aesthetics
-- Built with React and Recharts
 
 ---
 
