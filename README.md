@@ -16,8 +16,6 @@ A comprehensive personal financial planning and retirement projection applicatio
 
 **Analyze Financial Health** - Seven scorecard tiles benchmark your finances against standard personal finance thresholds: savings rate, net worth multiple (vs. Fidelity age targets), debt ratio, emergency fund months, investment mix, retirement funding, and income replacement ratio.
 
-![NetWorth Navigator Dashboard](https://via.placeholder.com/800x400?text=NetWorth+Navigator+Dashboard)
-
 ## Features
 
 ### Core Functionality
