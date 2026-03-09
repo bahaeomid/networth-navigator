@@ -738,26 +738,30 @@ const NetWorthNavigator = () => {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [expenseViewMode, setExpenseViewMode] = useState('annual'); // 'annual' | 'monthly'
 
+  // Fetch live FX rates
+  const fetchFxRates = async () => {
+    try {
+      const response = await fetch('https://open.er-api.com/v6/latest/AED');
+      if (!response.ok) throw new Error('API error');
+      const data = await response.json();
+      if (data.rates) {
+        setExchangeRates({
+          AED: 1,
+          USD: 1 / data.rates.USD,
+          CAD: 1 / data.rates.CAD,
+          EUR: 1 / data.rates.EUR,
+        });
+        setFxStatus('live');
+        return true;
+      }
+    } catch (err) {
+      console.log('FX fetch failed, using cached rates');
+    }
+    return false;
+  };
+
   // Fetch live FX rates on mount
   useEffect(() => {
-    const fetchFxRates = async () => {
-      try {
-        const response = await fetch('https://open.er-api.com/v6/latest/AED');
-        if (!response.ok) throw new Error('API error');
-        const data = await response.json();
-        if (data.rates) {
-          setExchangeRates({
-            AED: 1,
-            USD: 1 / data.rates.USD,
-            CAD: 1 / data.rates.CAD,
-            EUR: 1 / data.rates.EUR,
-          });
-          setFxStatus('live');
-        }
-      } catch (err) {
-        console.log('FX fetch failed, using cached rates');
-      }
-    };
     fetchFxRates();
   }, []);
 
@@ -7394,7 +7398,7 @@ new Chart(document.getElementById('allocChart'),{
                 onClick={() => {
                   // Reset ALL state to defaults — must include every useState
                   setCurrency(DEFAULT_STATE.currency);
-                  setExchangeRates(DEFAULT_STATE.exchangeRates);
+                  fetchFxRates();
                   setProfile(DEFAULT_STATE.profile);
                   setAssets(DEFAULT_STATE.assets);
                   setLiabilities(DEFAULT_STATE.liabilities);
