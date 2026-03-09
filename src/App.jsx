@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceArea, Dot } from 'recharts';
 
 // Currency definitions
@@ -680,6 +680,7 @@ const NetWorthNavigator = () => {
 
   const [currency, setCurrency] = useState(DEFAULT_STATE.currency);
   const [exchangeRates, setExchangeRates] = useState(DEFAULT_STATE.exchangeRates);
+  const [fxStatus, setFxStatus] = useState('cached');
   const [activeTab, setActiveTab] = useState('profile');
   const [hiddenLines, setHiddenLines] = useState({});
   const [nestEggSwr, setNestEggSwr] = useState(4);
@@ -736,6 +737,29 @@ const NetWorthNavigator = () => {
   const [ribbonMenuOpen, setRibbonMenuOpen] = useState(false);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [expenseViewMode, setExpenseViewMode] = useState('annual'); // 'annual' | 'monthly'
+
+  // Fetch live FX rates on mount
+  useEffect(() => {
+    const fetchFxRates = async () => {
+      try {
+        const response = await fetch('https://open.er-api.com/v6/latest/AED');
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        if (data.rates) {
+          setExchangeRates({
+            AED: 1,
+            USD: 1 / data.rates.USD,
+            CAD: 1 / data.rates.CAD,
+            EUR: 1 / data.rates.EUR,
+          });
+          setFxStatus('live');
+        }
+      } catch (err) {
+        console.log('FX fetch failed, using cached rates');
+      }
+    };
+    fetchFxRates();
+  }, []);
 
   // Export data as JSON file
   const exportData = () => {
@@ -2649,7 +2673,7 @@ new Chart(document.getElementById('allocChart'),{
   };
   
   // Exchange Rate Input with proper formatting
-  const ExchangeRateInput = ({ currency, exchangeRates, setExchangeRates }) => {
+  const ExchangeRateInput = ({ currency, exchangeRates, setExchangeRates, fxStatus }) => {
     const [displayValue, setDisplayValue] = useState(exchangeRates[currency].toFixed(2));
     const [isFocused, setIsFocused] = useState(false);
     
@@ -2699,6 +2723,13 @@ new Chart(document.getElementById('allocChart'),{
           }}
         />
         <span style={{ color: '#9ca3af' }}>AED/{currency}</span>
+        <span style={{
+          fontSize: '0.6rem',
+          fontWeight: '600',
+          color: fxStatus === 'live' ? '#34d399' : '#6b7280',
+        }}>
+          {fxStatus === 'live' ? '●' : '○'}
+        </span>
       </div>
     );
   };
@@ -2980,9 +3011,12 @@ new Chart(document.getElementById('allocChart'),{
                       onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                     >📄 Export Full Report</button>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '0.4rem 0' }} />
-                    <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem' }}>Exchange Rate</div>
+                    <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      Exchange Rate
+                      <InfoTooltip text="Live rates update once daily from open.er-api.com. Green dot = live rates. Grey = fallback rates." />
+                    </div>
                     <div style={{ padding: '0 0.25rem 0.5rem' }}>
-                      <ExchangeRateInput currency={currency} exchangeRates={exchangeRates} setExchangeRates={setExchangeRates} />
+                      <ExchangeRateInput currency={currency} exchangeRates={exchangeRates} setExchangeRates={setExchangeRates} fxStatus={fxStatus} />
                     </div>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '0.4rem 0' }} />
                     <button onClick={() => { resetToDefaults(); setRibbonMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.5rem 0.6rem', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', textAlign: 'left' }}
