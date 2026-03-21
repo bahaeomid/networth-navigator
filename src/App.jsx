@@ -1955,7 +1955,109 @@ new Chart(document.getElementById('allocChart'),{
     reader.readAsText(file);
     event.target.value = ''; // Reset file input
   };
-  
+
+  // Import pre-retirement expenses from CSV
+  const importExpensesCSV = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        // Find the header row (must contain "Category" and "Monthly Estimate")
+        let headerIdx = -1;
+        let categoryCol = -1;
+        let monthlyCol = -1;
+        for (let i = 0; i < Math.min(lines.length, 5); i++) {
+          const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+          const cIdx = cols.findIndex(c => c.toLowerCase() === 'category');
+          const mIdx = cols.findIndex(c => c.toLowerCase().includes('monthly estimate'));
+          if (cIdx !== -1 && mIdx !== -1) {
+            headerIdx = i;
+            categoryCol = cIdx;
+            monthlyCol = mIdx;
+            break;
+          }
+        }
+
+        if (headerIdx === -1) {
+          alert('CSV format not recognised.\n\nExpected columns: "Category" and "Monthly Estimate (BASE CURRENCY)".\nPlease check the file format and try again.');
+          event.target.value = '';
+          return;
+        }
+
+        // Parse data rows
+        const dataRows = lines.slice(headerIdx + 1);
+        const CAT_COLORS = [
+          '#ef4444','#f97316','#eab308','#84cc16','#22c55e',
+          '#14b8a6','#fbbf24','#f43f5e','#8b5cf6','#a78bfa',
+          '#c084fc','#60a5fa','#38bdf8','#34d399','#fb923c',
+        ];
+
+        const newCats = [];
+        const newCalc = {};
+        const newRetBudget = {};
+        const newGrowthRates = {};
+        const newRetGrowthRates = {};
+        const newTags = {};
+        let colorIndex = 0;
+
+        dataRows.forEach(line => {
+          const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+          const label = cols[categoryCol];
+          const rawAmt = cols[monthlyCol];
+          if (!label || !rawAmt) return;
+          // Skip summary/total rows
+          if (/^(total|subtotal|grand total)$/i.test(label.trim())) return;
+
+          const monthlyAmt = parseFloat(rawAmt.replace(/[^0-9.\-]/g, ''));
+          if (isNaN(monthlyAmt)) return;
+
+          const annualAmt = Math.round(monthlyAmt * 12);
+          // Build a stable key from the label
+          const key = 'csv_' + label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+
+          const icon = '📋';
+          const color = CAT_COLORS[colorIndex % CAT_COLORS.length];
+          colorIndex++;
+
+          newCats.push({ key, label, color, group: 'essential', icon, tooltip: `Imported from CSV` });
+          newCalc[key] = annualAmt;
+          newRetBudget[key] = annualAmt; // Use same figure as retirement placeholder
+          newGrowthRates[key] = 3.0;
+          newRetGrowthRates[key] = 3.0;
+          newTags[key] = 'essential';
+        });
+
+        if (newCats.length === 0) {
+          alert('No valid expense rows found in the CSV. Please check your file and try again.');
+          event.target.value = '';
+          return;
+        }
+
+        // Replace expense categories & amounts entirely with CSV data
+        setExpenseCategories(newCats);
+        setExpenseCalculator(newCalc);
+        setRetirementBudget(newRetBudget);
+        setExpenseGrowthRates(newGrowthRates);
+        setRetExpenseGrowthRates(newRetGrowthRates);
+        setExpenseTags(newTags);
+        setExpensePhaseOutYears({});
+        setRetExpensePhaseOutYears({});
+
+        alert(`✅ CSV imported successfully!\n\n${newCats.length} expense categories loaded.\n\n• Pre-retirement amounts set to the monthly figures × 12.\n• Retirement amounts pre-filled with the same values as a starting placeholder — adjust them in the Retirement tab.\n• Growth rates default to 3% per year; update them per category as needed.`);
+      } catch (err) {
+        console.error('CSV import error:', err);
+        alert('Error reading CSV. Please ensure the file is a valid comma-separated file and try again.');
+      }
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   // Reset to default values
   const resetToDefaults = () => {
     setShowResetConfirm(true);
@@ -2998,22 +3100,40 @@ new Chart(document.getElementById('allocChart'),{
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                   }}>
                     <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem' }}>Data</div>
-                    <button onClick={() => { exportData(); setRibbonMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.5rem 0.6rem', background: 'transparent', border: 'none', color: '#34d399', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.15rem', textAlign: 'left' }}
-                      onMouseOver={e => e.currentTarget.style.background = 'rgba(52,211,153,0.1)'}
-                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                    >📥 Export JSON</button>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.5rem 0.6rem', background: 'transparent', color: '#60a5fa', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.15rem', boxSizing: 'border-box' }}
-                      onMouseOver={e => e.currentTarget.style.background = 'rgba(96,165,250,0.1)'}
-                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                    >📤 Import JSON
-                      <input type="file" accept=".json" onChange={(e) => { importData(e); setRibbonMenuOpen(false); }} style={{ display: 'none' }} />
-                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.15rem' }}>
+                      <button onClick={() => { exportData(); setRibbonMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, padding: '0.5rem 0.6rem', background: 'transparent', border: 'none', color: '#34d399', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', textAlign: 'left' }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(52,211,153,0.1)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                      >📥 Export JSON</button>
+                      <InfoTooltip text="Saves your entire plan — all inputs, categories, assumptions and projections — as a single JSON file. Use this to back up your data or transfer it to another device. Load it back with Import JSON." />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.15rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, padding: '0.5rem 0.6rem', background: 'transparent', color: '#60a5fa', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', boxSizing: 'border-box' }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(96,165,250,0.1)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                      >📤 Import JSON
+                        <input type="file" accept=".json" onChange={(e) => { importData(e); setRibbonMenuOpen(false); }} style={{ display: 'none' }} />
+                      </label>
+                      <InfoTooltip text="Restores a previously exported JSON file. This will overwrite all current data with the saved snapshot — income, expenses, assets, liabilities, assumptions and projections. Best used to reload a backup or continue a session started on another device." />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.15rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, padding: '0.5rem 0.6rem', background: 'transparent', color: '#fb923c', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', boxSizing: 'border-box' }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(251,146,60,0.1)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                      >📊 Import Expenses CSV
+                        <input type="file" accept=".csv" onChange={(e) => { importExpensesCSV(e); setRibbonMenuOpen(false); }} style={{ display: 'none' }} />
+                      </label>
+                      <InfoTooltip text={'Import pre-retirement expense categories from a CSV file.\n\nRequired columns (exact names):\n• Category — the expense label (e.g. "Groceries")\n• Monthly Estimate (BASE CURRENCY) — the monthly amount in your base currency\n\nAll other columns are ignored. The first row with both column names is treated as the header. Amounts are multiplied by 12 to produce annual figures.\n\nImporting replaces all existing expense categories. Retirement amounts are pre-filled with the same values as a placeholder — adjust them in the Retirement tab. Growth rates default to 3%/yr.\n\nTip: export a template by downloading the sample CSV from the project README.'} />
+                    </div>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '0.4rem 0' }} />
                     <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem' }}>Reports</div>
-                    <button onClick={() => { exportHTMLReport(); setRibbonMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.5rem 0.6rem', background: 'transparent', border: 'none', color: '#a78bfa', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.15rem', textAlign: 'left' }}
-                      onMouseOver={e => e.currentTarget.style.background = 'rgba(167,139,250,0.1)'}
-                      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                    >📄 Export Full Report</button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.15rem' }}>
+                      <button onClick={() => { exportHTMLReport(); setRibbonMenuOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, padding: '0.5rem 0.6rem', background: 'transparent', border: 'none', color: '#a78bfa', cursor: 'pointer', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '600', textAlign: 'left' }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(167,139,250,0.1)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                      >📄 Export Full Report</button>
+                      <InfoTooltip text="Generates a self-contained HTML report of your full financial plan — net worth, projections, income, expenses, retirement scenarios and charts. The file can be saved locally, printed, or shared. No internet connection required to view it." />
+                    </div>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '0.4rem 0' }} />
                     <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       Exchange Rate

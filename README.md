@@ -169,3 +169,73 @@ MIT License - Feel free to use this for personal or commercial projects.
 ---
 
 **Disclaimer**: This application provides illustrative projections based on user-defined assumptions. It does not constitute financial, legal, tax, or investment advice. Past performance does not guarantee future results. Consult qualified professionals for financial decisions.
+
+---
+
+## Data Import & Export
+
+Access all import/export options from the **`···` menu** in the top-right corner of the app. Each option has an inline tooltip (ⓘ) explaining its behaviour.
+
+### 📥 Export JSON
+
+Saves your entire financial plan as a single `.json` file — all inputs, categories, assumptions, and projections are included. Use this to:
+
+- **Back up your data** before making major changes
+- **Transfer your plan** to another browser or device
+- **Archive a point-in-time snapshot** of your finances
+
+The exported file is named `net-worth-navigator-YYYY-MM-DD.json`. All monetary values are stored in AED regardless of the display currency you have selected.
+
+### 📤 Import JSON
+
+Loads a previously exported JSON file and **fully restores** your plan — income, expenses, assets, liabilities, categories, assumptions, and projections. Use this to:
+
+- Reload a saved backup
+- Continue a session started on another device
+- Restore data after a browser reset
+
+> ⚠️ Importing **replaces all current data** with the contents of the file. Export first if you want to keep your current state.
+
+### 📊 Import Expenses CSV
+
+Replaces the pre-retirement expense categories and monthly amounts with data from a CSV file — useful when you already track spending in a spreadsheet or budgeting tool and want to seed the app quickly.
+
+#### Required CSV format
+
+The file must be comma-separated (`.csv`) and contain **at least these two column headers** (exact names, case-insensitive):
+
+| Column | Description |
+|--------|-------------|
+| `Category` | Name of the expense category (e.g. `Groceries`) |
+| `Monthly Estimate (BASE CURRENCY)` | Monthly amount in your base currency (numeric) |
+
+All other columns are ignored. The header row can appear anywhere within the first five lines. A sample from a valid file:
+
+```
+# All amounts in AED
+Category,Monthly Estimate (BASE CURRENCY),Annual Estimate (AED)
+Housing,23333,280000
+Groceries,4000,48000
+School & Education,6667,80000
+```
+
+#### What happens on import
+
+1. All existing expense categories are **replaced** with the CSV rows.
+2. Monthly amounts are multiplied by 12 to produce annual figures used by the app.
+3. **Retirement amounts** are pre-filled with the same annual figures as a placeholder — review and adjust them in the **Retirement** tab.
+4. Growth rates default to **3% per year** per category — update them individually in the Pre-Retirement tab as needed.
+5. A confirmation message is shown listing how many categories were loaded.
+
+> ⚠️ Importing a CSV replaces all expense categories. Export a JSON backup first if you want to preserve your current setup.
+
+### 📄 Export Full Report
+
+Generates a self-contained **HTML report** of your complete financial plan. The report includes:
+
+- Net worth snapshot and key health metrics
+- Income, expense, and savings breakdown
+- Wealth projection charts (pre- and post-retirement)
+- Retirement scenario analysis and Monte Carlo survival odds
+
+The file requires no internet connection to view — open it in any browser and it renders fully offline. Use it to share your plan with a financial advisor, save a printable record, or embed in a document.
