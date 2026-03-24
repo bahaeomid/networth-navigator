@@ -1965,20 +1965,45 @@ new Chart(document.getElementById('allocChart'),{
     reader.onload = (e) => {
       try {
         const text = e.target.result;
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        // RFC 4180-compliant CSV row parser — handles quoted fields containing commas/newlines
+        const parseCSVRow = (line) => {
+          const fields = [];
+          let cur = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (inQuotes) {
+              if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+              else if (ch === '"') { inQuotes = false; }
+              else { cur += ch; }
+            } else {
+              if (ch === '"') { inQuotes = true; }
+              else if (ch === ',') { fields.push(cur.trim()); cur = ''; }
+              else { cur += ch; }
+            }
+          }
+          fields.push(cur.trim());
+          return fields;
+        };
+
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
 
         // Find the header row (must contain "Category" and "Monthly Estimate")
         let headerIdx = -1;
         let categoryCol = -1;
         let monthlyCol = -1;
+        let descriptionCol = -1;
         for (let i = 0; i < Math.min(lines.length, 5); i++) {
-          const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+          const cols = parseCSVRow(lines[i]);
           const cIdx = cols.findIndex(c => c.toLowerCase() === 'category');
           const mIdx = cols.findIndex(c => c.toLowerCase().includes('monthly estimate'));
           if (cIdx !== -1 && mIdx !== -1) {
             headerIdx = i;
             categoryCol = cIdx;
             monthlyCol = mIdx;
+            // Description column is optional
+            descriptionCol = cols.findIndex(c => c.toLowerCase() === 'description');
             break;
           }
         }
@@ -2006,7 +2031,7 @@ new Chart(document.getElementById('allocChart'),{
         let colorIndex = 0;
 
         dataRows.forEach(line => {
-          const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+          const cols = parseCSVRow(line);
           const label = cols[categoryCol];
           const rawAmt = cols[monthlyCol];
           if (!label || !rawAmt) return;
@@ -2020,11 +2045,16 @@ new Chart(document.getElementById('allocChart'),{
           // Build a stable key from the label
           const key = 'csv_' + label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 
+          // Use Description column as tooltip if present, else fall back to label
+          const tooltip = (descriptionCol !== -1 && cols[descriptionCol])
+            ? cols[descriptionCol]
+            : label;
+
           const icon = '📋';
           const color = CAT_COLORS[colorIndex % CAT_COLORS.length];
           colorIndex++;
 
-          newCats.push({ key, label, color, group: 'essential', icon, tooltip: `Imported from CSV` });
+          newCats.push({ key, label, color, group: 'essential', icon, tooltip });
           newCalc[key] = annualAmt;
           newRetBudget[key] = annualAmt; // Use same figure as retirement placeholder
           newGrowthRates[key] = 3.0;
@@ -2048,7 +2078,8 @@ new Chart(document.getElementById('allocChart'),{
         setExpensePhaseOutYears({});
         setRetExpensePhaseOutYears({});
 
-        alert(`✅ CSV imported successfully!\n\n${newCats.length} expense categories loaded.\n\n• Pre-retirement amounts set to the monthly figures × 12.\n• Retirement amounts pre-filled with the same values as a starting placeholder — adjust them in the Retirement tab.\n• Growth rates default to 3% per year; update them per category as needed.`);
+        const withDesc = newCats.filter(c => c.tooltip && c.tooltip !== c.label).length;
+        alert(`✅ CSV imported successfully!\n\n${newCats.length} expense categories loaded${withDesc > 0 ? ` (${withDesc} with descriptions as tooltips)` : ''}.\n\n• Pre-retirement amounts set to the monthly figures × 12.\n• Retirement amounts pre-filled with the same values as a starting placeholder — adjust them in the Retirement tab.\n• Growth rates default to 3% per year; update them per category as needed.`);
       } catch (err) {
         console.error('CSV import error:', err);
         alert('Error reading CSV. Please ensure the file is a valid comma-separated file and try again.');
@@ -3123,7 +3154,7 @@ new Chart(document.getElementById('allocChart'),{
                       >📊 Import Expenses CSV
                         <input type="file" accept=".csv" onChange={(e) => { importExpensesCSV(e); setRibbonMenuOpen(false); }} style={{ display: 'none' }} />
                       </label>
-                      <InfoTooltip text={'Import pre-retirement expense categories from a CSV file.\n\nRequired columns (exact names):\n• Category — the expense label (e.g. "Groceries")\n• Monthly Estimate (BASE CURRENCY) — the monthly amount in your base currency\n\nAll other columns are ignored. The first row with both column names is treated as the header. Amounts are multiplied by 12 to produce annual figures.\n\nImporting replaces all existing expense categories. Retirement amounts are pre-filled with the same values as a placeholder — adjust them in the Retirement tab. Growth rates default to 3%/yr.\n\nTip: export a template by downloading the sample CSV from the project README.'} />
+                      <InfoTooltip text={'Import pre-retirement expense categories from a CSV file.\n\nRequired columns:\n• Category — the expense label (e.g. "Groceries")\n• Monthly Estimate (BASE CURRENCY) — monthly amount in your base currency\n\nOptional column:\n• Description — plain-text description of the category; imported as the tooltip shown on the ⓘ icon next to each category in the Pre-Retirement and Retirement tabs\n\nAll other columns are ignored. The first row containing both required column names is treated as the header. Amounts are multiplied by 12 to produce annual figures.\n\nImporting replaces all existing expense categories. Retirement amounts are pre-filled with the same values as a placeholder — adjust them in the Retirement tab. Growth rates default to 3%/yr.'} />
                     </div>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '0.4rem 0' }} />
                     <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem' }}>Reports</div>
