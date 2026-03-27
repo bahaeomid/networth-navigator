@@ -219,6 +219,8 @@ Groceries,4000,48000
 School & Education,6667,80000
 ```
 
+A ready-made example file is included in this repository as `sample_csv_import.csv` — use it to test the import flow or as a template to format your own CSV. The sample demonstrates additional monthly columns and descriptions that the importer will ignore (only the required headers are used).
+
 #### What happens on import
 
 1. All existing expense categories are **replaced** with the CSV rows.
