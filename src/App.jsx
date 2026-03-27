@@ -1994,6 +1994,7 @@ new Chart(document.getElementById('allocChart'),{
         let categoryCol = -1;
         let monthlyCol = -1;
         let descriptionCol = -1;
+        let expenseTypeCol = -1;
         for (let i = 0; i < Math.min(lines.length, 5); i++) {
           const cols = parseCSVRow(lines[i]);
           const cIdx = cols.findIndex(c => c.toLowerCase() === 'category');
@@ -2002,8 +2003,9 @@ new Chart(document.getElementById('allocChart'),{
             headerIdx = i;
             categoryCol = cIdx;
             monthlyCol = mIdx;
-            // Description column is optional
+            // Optional columns
             descriptionCol = cols.findIndex(c => c.toLowerCase() === 'description');
+            expenseTypeCol = cols.findIndex(c => c.toLowerCase().replace(/\s+/g, ' ') === 'expense type');
             break;
           }
         }
@@ -2050,16 +2052,25 @@ new Chart(document.getElementById('allocChart'),{
             ? cols[descriptionCol]
             : label;
 
+          // Resolve expense type — optional column; defaults to 'essential' if absent or unrecognised
+          let group = 'essential';
+          if (expenseTypeCol !== -1 && cols[expenseTypeCol]) {
+            const rawType = cols[expenseTypeCol].trim().toLowerCase();
+            if (rawType === 'discretionary' || rawType === 'disc' || rawType === 'd') {
+              group = 'disc';
+            }
+          }
+
           const icon = '📋';
           const color = CAT_COLORS[colorIndex % CAT_COLORS.length];
           colorIndex++;
 
-          newCats.push({ key, label, color, group: 'essential', icon, tooltip });
+          newCats.push({ key, label, color, group, icon, tooltip });
           newCalc[key] = annualAmt;
           newRetBudget[key] = annualAmt; // Use same figure as retirement placeholder
           newGrowthRates[key] = 3.0;
           newRetGrowthRates[key] = 3.0;
-          newTags[key] = 'essential';
+          newTags[key] = group;
         });
 
         if (newCats.length === 0) {
@@ -2079,7 +2090,12 @@ new Chart(document.getElementById('allocChart'),{
         setRetExpensePhaseOutYears({});
 
         const withDesc = newCats.filter(c => c.tooltip && c.tooltip !== c.label).length;
-        alert(`✅ CSV imported successfully!\n\n${newCats.length} expense categories loaded${withDesc > 0 ? ` (${withDesc} with descriptions as tooltips)` : ''}.\n\n• Pre-retirement amounts set to the monthly figures × 12.\n• Retirement amounts pre-filled with the same values as a starting placeholder — adjust them in the Retirement tab.\n• Growth rates default to 3% per year; update them per category as needed.`);
+        const discCount = newCats.filter(c => c.group === 'disc').length;
+        const essCount = newCats.length - discCount;
+        const typeNote = expenseTypeCol !== -1
+          ? `\n• Expense types applied: ${essCount} Essential, ${discCount} Discretionary.`
+          : '\n• Expense Type column not found — all categories defaulted to Essential. Add an "Expense Type" column with "Essential" or "Discretionary" to set E/D tags on import.';
+        alert(`✅ CSV imported successfully!\n\n${newCats.length} expense categories loaded${withDesc > 0 ? ` (${withDesc} with descriptions as tooltips)` : ''}.\n\n• Pre-retirement amounts set to the monthly figures × 12.\n• Retirement amounts pre-filled with the same values as a starting placeholder — adjust them in the Retirement tab.\n• Growth rates default to 3% per year; update them per category as needed.${typeNote}`);
       } catch (err) {
         console.error('CSV import error:', err);
         alert('Error reading CSV. Please ensure the file is a valid comma-separated file and try again.');
@@ -3154,7 +3170,7 @@ new Chart(document.getElementById('allocChart'),{
                       >📊 Import Expenses CSV
                         <input type="file" accept=".csv" onChange={(e) => { importExpensesCSV(e); setRibbonMenuOpen(false); }} style={{ display: 'none' }} />
                       </label>
-                      <InfoTooltip text={'Import pre-retirement expense categories from a CSV file.\n\nRequired columns:\n• Category — the expense label (e.g. "Groceries")\n• Monthly Estimate (BASE CURRENCY) — monthly amount in your base currency\n\nOptional column:\n• Description — plain-text description of the category; imported as the tooltip shown on the ⓘ icon next to each category in the Pre-Retirement and Retirement tabs\n\nAll other columns are ignored. The first row containing both required column names is treated as the header. Amounts are multiplied by 12 to produce annual figures.\n\nImporting replaces all existing expense categories. Retirement amounts are pre-filled with the same values as a placeholder — adjust them in the Retirement tab. Growth rates default to 3%/yr.'} />
+                      <InfoTooltip text={'Import pre-retirement expense categories from a CSV file.\n\nRequired columns:\n• Category — the expense label (e.g. "Groceries")\n• Monthly Estimate (BASE CURRENCY) — monthly amount in your base currency\n\nOptional columns:\n• Description — plain-text description; shown as the ⓘ tooltip next to each category in the Pre-Retirement and Retirement tabs\n• Expense Type — "Essential" or "Discretionary"; sets the E/D pill shown on each category. Defaults to Essential if the column is absent or the value is unrecognised.\n\nAll other columns are ignored. The first row containing both required column names is treated as the header. Amounts are multiplied by 12 to produce annual figures.\n\nImporting replaces all existing expense categories. Retirement amounts are pre-filled with the same values as a placeholder — adjust them in the Retirement tab. Growth rates default to 3%/yr.'} />
                     </div>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '0.4rem 0' }} />
                     <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem' }}>Reports</div>
