@@ -7,6 +7,7 @@ const CURRENCIES = {
   USD: { symbol: 'USD', rate: 3.67 },
   CAD: { symbol: 'CAD', rate: 2.72 },
   EUR: { symbol: 'EUR', rate: 4.01 },
+  GBP: { symbol: 'GBP', rate: 4.87 },
 };
 
 // Milestone colors
@@ -590,7 +591,7 @@ const NetWorthNavigator = () => {
   const _defs = buildDefaultExpenseState(DEFAULT_EXPENSE_CATEGORIES);
   const DEFAULT_STATE = {
     currency: 'AED',
-    exchangeRates: { AED: 1, USD: 3.67, CAD: 2.72, EUR: 4.01 },
+    exchangeRates: { AED: 1, USD: 3.67, CAD: 2.72, EUR: 4.01, GBP: 4.87 },
     profile: { 
       currentAge: 35, 
       retirementAge: 55, 
@@ -750,6 +751,7 @@ const NetWorthNavigator = () => {
           USD: 1 / data.rates.USD,
           CAD: 1 / data.rates.CAD,
           EUR: 1 / data.rates.EUR,
+          GBP: 1 / data.rates.GBP,
         });
         setFxStatus('live');
         return true;
@@ -1995,6 +1997,7 @@ new Chart(document.getElementById('allocChart'),{
         let monthlyCol = -1;
         let descriptionCol = -1;
         let expenseTypeCol = -1;
+        let csvCurrency = 'AED'; // detected from "Monthly Estimate (XXX)" header, fallback AED
         for (let i = 0; i < Math.min(lines.length, 5); i++) {
           const cols = parseCSVRow(lines[i]);
           const cIdx = cols.findIndex(c => c.toLowerCase() === 'category');
@@ -2003,6 +2006,13 @@ new Chart(document.getElementById('allocChart'),{
             headerIdx = i;
             categoryCol = cIdx;
             monthlyCol = mIdx;
+            // Detect currency from header e.g. "Monthly Estimate (EUR)" → "EUR"
+            const currMatch = cols[mIdx].match(/\(([A-Z]{3})\)/i);
+            if (currMatch) {
+              const detected = currMatch[1].toUpperCase();
+              // Accept if it's a known currency in exchangeRates, otherwise fall back to AED
+              csvCurrency = exchangeRates[detected] !== undefined ? detected : 'AED';
+            }
             // Optional columns
             descriptionCol = cols.findIndex(c => c.toLowerCase() === 'description');
             expenseTypeCol = cols.findIndex(c => c.toLowerCase().replace(/\s+/g, ' ') === 'expense type');
@@ -2040,9 +2050,13 @@ new Chart(document.getElementById('allocChart'),{
           // Skip summary/total rows
           if (/^(total|subtotal|grand total)$/i.test(label.trim())) return;
 
-          const monthlyAmt = parseFloat(rawAmt.replace(/[^0-9.\-]/g, ''));
-          if (isNaN(monthlyAmt)) return;
+          const monthlyAmtInCsvCurrency = parseFloat(rawAmt.replace(/[^0-9.\-]/g, ''));
+          if (isNaN(monthlyAmtInCsvCurrency)) return;
 
+          // Convert from CSV currency to AED for internal storage
+          // exchangeRates[X] = how many AED per 1 unit of X (e.g. EUR: 4.01 means 1 EUR = 4.01 AED)
+          const csvRate = exchangeRates[csvCurrency] || 1;
+          const monthlyAmt = monthlyAmtInCsvCurrency * csvRate;
           const annualAmt = Math.round(monthlyAmt * 12);
           // Build a stable key from the label
           const key = 'csv_' + label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
@@ -2089,13 +2103,21 @@ new Chart(document.getElementById('allocChart'),{
         setExpensePhaseOutYears({});
         setRetExpensePhaseOutYears({});
 
+        // Switch the app display currency to match the CSV base currency
+        if (CURRENCIES[csvCurrency]) {
+          setCurrency(csvCurrency);
+        }
+
         const withDesc = newCats.filter(c => c.tooltip && c.tooltip !== c.label).length;
         const discCount = newCats.filter(c => c.group === 'disc').length;
         const essCount = newCats.length - discCount;
         const typeNote = expenseTypeCol !== -1
           ? `\n• Expense types applied: ${essCount} Essential, ${discCount} Discretionary.`
           : '\n• Expense Type column not found — all categories defaulted to Essential. Add an "Expense Type" column with "Essential" or "Discretionary" to set E/D tags on import.';
-        alert(`✅ CSV imported successfully!\n\n${newCats.length} expense categories loaded${withDesc > 0 ? ` (${withDesc} with descriptions as tooltips)` : ''}.\n\n• Pre-retirement amounts set to the monthly figures × 12.\n• Retirement amounts pre-filled with the same values as a starting placeholder — adjust them in the Retirement tab.\n• Growth rates default to 3% per year; update them per category as needed.${typeNote}`);
+        const currencyNote = csvCurrency !== 'AED'
+          ? `\n• Detected base currency: ${csvCurrency} — amounts converted to AED internally; display switched to ${csvCurrency}.`
+          : `\n• Detected base currency: AED — amounts stored as-is.`;
+        alert(`✅ CSV imported successfully!\n\n${newCats.length} expense categories loaded${withDesc > 0 ? ` (${withDesc} with descriptions as tooltips)` : ''}.\n\n• Pre-retirement amounts set to the monthly figures × 12.\n• Retirement amounts pre-filled with the same values as a starting placeholder — adjust them in the Retirement tab.\n• Growth rates default to 3% per year; update them per category as needed.${currencyNote}${typeNote}`);
       } catch (err) {
         console.error('CSV import error:', err);
         alert('Error reading CSV. Please ensure the file is a valid comma-separated file and try again.');
