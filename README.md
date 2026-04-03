@@ -207,21 +207,21 @@ The file must be comma-separated (`.csv`) and contain **at least these two colum
 | Column | Description |
 |--------|-------------|
 | `Category` | Name of the expense category (e.g. `Groceries`) |
-| `Monthly Estimate (CURRENCY)` | Monthly amount in the stated currency (e.g. `Monthly Estimate (EUR)`) |
+| `Monthly Planning Budget (CURRENCY)` | Monthly amount in the stated currency (e.g. `Monthly Planning Budget (EUR)`) |
 
-The currency code in the `Monthly Estimate` header is detected automatically. For example:
+The currency code in the `Monthly Planning Budget` header is detected automatically. For example:
 
-- `Monthly Estimate (AED)` → amounts treated as AED (no conversion)
-- `Monthly Estimate (EUR)` → amounts converted from EUR to AED using the current exchange rate, and the app display switches to EUR
-- `Monthly Estimate (USD)` → same, converted from USD
-- `Monthly Estimate (CAD)` → same, converted from CAD
+- `Monthly Planning Budget (AED)` → amounts treated as AED (no conversion)
+- `Monthly Planning Budget (EUR)` → amounts converted from EUR to AED using the current exchange rate, and the app display switches to EUR
+- `Monthly Planning Budget (USD)` → same, converted from USD
+- `Monthly Planning Budget (CAD)` → same, converted from CAD
 
 If the header contains no currency code, or the code is not one of the app's supported currencies (AED, USD, EUR, CAD), the amounts are assumed to be **AED** with no conversion applied.
 
-All other columns are ignored. The header row can appear anywhere within the first five lines. A sample from a valid file:
+All other columns are either optional or ignored. The header row can appear anywhere within the first five lines. A sample from a valid file:
 
 ```
-Category,Monthly Estimate (EUR),Description
+Category,Monthly Planning Budget (EUR),Description
 Housing,5815,Monthly rent
 Groceries,997,Supermarkets and food delivery
 School & Education,64,School fees and supplies
@@ -232,7 +232,7 @@ A ready-made example file is included in this repository as `sample_csv_import.c
 #### What happens on import
 
 1. All existing expense categories are **replaced** with the CSV rows.
-2. The **base currency is detected** from the `Monthly Estimate (CURRENCY)` column header. Amounts are converted to AED internally at the current exchange rate, and the app's display currency is switched to match.
+2. The **base currency is detected** from the `Monthly Planning Budget (CURRENCY)` column header. Amounts are converted to AED internally at the current exchange rate, and the app's display currency is switched to match.
 3. Monthly amounts are multiplied by 12 to produce annual figures used by the app.
 4. **Retirement amounts** are pre-filled with the same annual figures as a placeholder — review and adjust them in the **Retirement** tab.
 5. Growth rates default to **3% per year** per category — update them individually in the Pre-Retirement tab as needed.
