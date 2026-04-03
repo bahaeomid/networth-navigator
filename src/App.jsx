@@ -1991,7 +1991,7 @@ new Chart(document.getElementById('allocChart'),{
 
         const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
 
-        // Find the header row (must contain "Category" and "Monthly Estimate")
+        // Find the header row (must contain "Category" and "Monthly Planning Budget (AED)")
         let headerIdx = -1;
         let categoryCol = -1;
         let monthlyCol = -1;
@@ -2001,7 +2001,11 @@ new Chart(document.getElementById('allocChart'),{
         for (let i = 0; i < Math.min(lines.length, 5); i++) {
           const cols = parseCSVRow(lines[i]);
           const cIdx = cols.findIndex(c => c.toLowerCase() === 'category');
-          const mIdx = cols.findIndex(c => c.toLowerCase().includes('monthly estimate'));
+          // Match either "Monthly Planning Budget (AED)" or variants for backward compat
+const mIdx = cols.findIndex(c =>
+  c.toLowerCase().replace(/\s+/g, ' ').includes('monthly planning budget') ||
+  c.toLowerCase().includes('monthly estimate')
+); // allow old files too
           if (cIdx !== -1 && mIdx !== -1) {
             headerIdx = i;
             categoryCol = cIdx;
@@ -2021,7 +2025,7 @@ new Chart(document.getElementById('allocChart'),{
         }
 
         if (headerIdx === -1) {
-          alert('CSV format not recognised.\n\nExpected columns: "Category" and "Monthly Estimate (BASE CURRENCY)".\nPlease check the file format and try again.');
+          alert('CSV format not recognised.\n\nExpected columns: "Category" and "Monthly Planning Budget (AED)".\nPlease check the file format and try again.');
           event.target.value = '';
           return;
         }
@@ -3192,7 +3196,7 @@ new Chart(document.getElementById('allocChart'),{
                       >📊 Import Expenses CSV
                         <input type="file" accept=".csv" onChange={(e) => { importExpensesCSV(e); setRibbonMenuOpen(false); }} style={{ display: 'none' }} />
                       </label>
-                      <InfoTooltip text={'Import pre-retirement expense categories from a CSV file.\n\nRequired columns:\n• Category — the expense label (e.g. "Groceries")\n• Monthly Estimate (BASE CURRENCY) — monthly amount in your base currency\n\nOptional columns:\n• Description — plain-text description; shown as the ⓘ tooltip next to each category in the Pre-Retirement and Retirement tabs\n• Expense Type — "Essential" or "Discretionary"; sets the E/D pill shown on each category. Defaults to Essential if the column is absent or the value is unrecognised.\n\nAll other columns are ignored. The first row containing both required column names is treated as the header. Amounts are multiplied by 12 to produce annual figures.\n\nImporting replaces all existing expense categories. Retirement amounts are pre-filled with the same values as a placeholder — adjust them in the Retirement tab. Growth rates default to 3%/yr.'} />
+                      <InfoTooltip text={'Import pre-retirement expense categories from a CSV file.\n\nRequired columns:\n• Category — the expense label (e.g. "Groceries")\n• Monthly Planning Budget (AED) — monthly budget amount in AED\n\nOptional columns:\n• Description — plain-text description; shown as the ⓘ tooltip next to each category in the Pre-Retirement and Retirement tabs\n• Expense Type — "Essential" or "Discretionary"; sets the E/D pill shown on each category. Defaults to Essential if the column is absent or the value is unrecognised.\n\nAll other columns are ignored. The first row containing both required column names is treated as the header. Amounts are multiplied by 12 to produce annual figures.\n\nImporting replaces all existing expense categories. Retirement amounts are pre-filled with the same values as a placeholder — adjust them in the Retirement tab. Growth rates default to 3%/yr.'} />
                     </div>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '0.4rem 0' }} />
                     <div style={{ fontSize: '0.65rem', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem', paddingLeft: '0.25rem' }}>Reports</div>
