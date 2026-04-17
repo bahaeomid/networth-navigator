@@ -40,13 +40,13 @@
 
 | File | Phase | Tests | Status |
 |------|-------|-------|--------|
-| [monte_carlo_test.js](monte_carlo_test.js) | 3 | Box-Muller, Success, Cash | ✅ Pass |
-| [projection_test.js](projection_test.js) | 2 | Growth, Amortization, Drawdown | ✅ Pass |
-| [scorecard_test.js](scorecard_test.js) | 4 | Savings, NW Multiple, IRR | Ready |
-| [gap_levers_test.js](gap_levers_test.js) | 5 | All 3 levers, surplus | Ready |
-| [run_all_tests.js](run_all_tests.js) | All | Test runner | Ready |
+| [auditor2_monte_carlo.js](../../../tests/auditor2_monte_carlo.js) | 3 | Box-Muller, Success, Cash | ✅ Pass |
+| [auditor2_projection.js](../../../tests/auditor2_projection.js) | 2 | Growth, Amortization, Drawdown | ✅ Pass |
+| [auditor2_scorecard.js](../../../tests/auditor2_scorecard.js) | 4 | Savings, NW Multiple, IRR | Ready |
+| [auditor2_gap_levers.js](../../../tests/auditor2_gap_levers.js) | 5 | All 3 levers, surplus | Ready |
+| [auditor2_run_all.js](../../../tests/auditor2_run_all.js) | All | Test runner | Ready |
 
-**Run Tests:** `node run_all_tests.js`
+**Run Tests:** `node _dev/tests/auditor2_run_all.js`
 
 ---
 

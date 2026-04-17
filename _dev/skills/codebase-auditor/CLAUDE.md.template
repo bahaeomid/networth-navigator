@@ -1,0 +1,83 @@
+# Project Context for Codebase Audit
+
+## About This Project
+
+<!-- Fill in before starting the audit -->
+
+**Project name:** [name]
+**What it does:** [one sentence]
+**Primary output users rely on:** [what the codebase produces]
+**Tech stack:** [languages, frameworks, key libraries]
+**Current state:** [e.g. "pre-production", "in production", "major refactor"]
+
+---
+
+## Skill Location
+
+Read `skills/codebase-auditor/SKILL.md` and follow its instructions.
+
+<!-- The skill is vendored in this project at skills/codebase-auditor/.
+     No external path dependencies — this project is fully self-contained.
+     To update the skill, copy a new version from ai-skills-library. -->
+
+---
+
+## Available Commands
+
+```
+codebase-auditor full           → complete audit, all phases
+codebase-auditor docs-sync      → scan + documentation sync only
+codebase-auditor dead-code      → scan + dead code removal only
+codebase-auditor hardcoding     → scan + universality/hardcoding check only
+codebase-auditor logic          → scan + formula/logic verification only
+codebase-auditor parity         → scan + parity audit only
+codebase-auditor edge-cases     → scan + edge case testing only
+codebase-auditor test-audit     → scan + test suite review only
+codebase-auditor security       → scan + security baseline only
+codebase-auditor output-quality → scan + output quality review only
+codebase-auditor efficacy       → scan + efficacy review only
+```
+
+---
+
+## Audit History
+
+<!-- Updated after each audit session -->
+
+| Date | Command | Findings | Status |
+|------|---------|----------|--------|
+| — | — | — | No audits yet |
+
+---
+
+## Known Sensitive Areas
+
+<!-- Optional: flag areas that need extra attention -->
+
+- [e.g. "Payment calculation logic in src/billing.py — double-check all formulas"]
+- [e.g. "User authentication in auth/ — security audit priority"]
+
+---
+
+## Test Suite Location
+
+<!-- Where tests live, how to run them -->
+
+- Test directory: [e.g. `tests/`]
+- Run command: [e.g. `pytest tests/`]
+
+---
+
+## Production Readiness Constraints
+
+<!-- What "production ready" means for this specific project -->
+
+- [e.g. "Must handle 10k concurrent users"]
+- [e.g. "Zero tolerance for calculation errors — financial data"]
+- [e.g. "GDPR compliance required — EU user data"]
+
+---
+
+## Notes for the Auditor
+
+<!-- Any context that helps the audit -->

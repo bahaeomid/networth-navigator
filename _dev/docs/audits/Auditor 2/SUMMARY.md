@@ -45,10 +45,10 @@
 
 1. **AUDIT_FINDINGS_REPORT.md** - Master findings
 2. **calculation_verification.md** - Phase 1-4 tests
-3. **monte_carlo_test.js** - Phase 3 tests
-4. **scorecard_test.js** - Phase 4 tests
-5. **projection_test.js** - Phase 2 tests
-6. **gap_levers_test.js** - Phase 5 tests
+3. **auditor2_monte_carlo.js** - Phase 3 tests (in `_dev/tests/`)
+4. **auditor2_scorecard.js** - Phase 4 tests (in `_dev/tests/`)
+5. **auditor2_projection.js** - Phase 2 tests (in `_dev/tests/`)
+6. **auditor2_gap_levers.js** - Phase 5 tests (in `_dev/tests/`)
 7. **coherence_audit.md** - Phase 9 analysis
 8. **first_principles.md** - Phase 10 evaluation
 9. **disagreements_detailed.md** - Disagreements doc

@@ -9,6 +9,9 @@ build/
 
 # Testing
 coverage/
+playwright-report/
+test-results/
+test-output.txt
 
 # Environment files
 .env

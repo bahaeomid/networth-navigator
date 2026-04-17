@@ -25,7 +25,7 @@ A comprehensive personal financial planning and retirement projection applicatio
 - **Wealth Milestones** - Track progress toward $1M, $5M, $10M, and $25M USD thresholds
 
 ### Financial Planning Tools
-- **Multi-Currency Support** - View all figures in AED, USD, CAD, or EUR with real-time conversion
+- **Multi-Currency Support** - View all figures in AED, USD, CAD, EUR, or GBP with real-time conversion
 - **Detailed Expense Tracking** - 15 pre-configured expense categories (essential and discretionary) with customizable growth rates
 - **Income Projection** - Track salary, passive income, and other income streams with individual growth rates
 - **Asset/Liability Management** - Add sub-items for detailed tracking of each asset and liability category
@@ -40,7 +40,7 @@ A comprehensive personal financial planning and retirement projection applicatio
   - Emergency Fund (target: 6+ months)
   - Investment Mix (target: 40%+)
   - Retirement Funding (% of required nest egg)
-  - Income Replacement Ratio (target: 70-120%)
+  - Income Replacement Ratio (target: 80-120% strong, 70-79% caution)
 
 - **Gap-Closing Levers** - When retirement gaps exist, see actionable recommendations:
   - Save More: Additional monthly savings needed
@@ -91,17 +91,41 @@ npm run build
 
 Production files will be in the `dist` folder.
 
+### Verification
+
+```bash
+# Static checks for app code and smoke-test specs
+npm run lint
+
+# Formula and audit harnesses under _dev/tests
+npm run test:audits
+
+# Production-build smoke test in a real browser
+npm run test:smoke
+
+# Full release verification chain
+npm run test:release
+```
+
+`npm run test:smoke` uses Playwright against the production preview server. The smoke spec lives under `_dev/e2e/`. Run `npx playwright install chromium` once on a new machine before using it.
+
 ## Project Structure
 
 ```
 networth-navigator/
 ├── index.html          # Entry HTML file
 ├── package.json        # Dependencies and scripts
+├── eslint.config.js    # Focused lint config for app and smoke tests
+├── playwright.config.js # Browser smoke-test configuration
 ├── vite.config.js      # Vite configuration
 ├── src/
 │   ├── main.jsx        # React entry point
 │   ├── App.jsx         # Main application component
 │   └── index.css      # Global styles
+├── _dev/
+│   ├── e2e/            # Browser-level release smoke tests
+│   ├── tests/          # Formula and audit verification harnesses
+│   └── docs/           # Audit and architecture reference docs
 └── README.md          # This file
 ```
 
@@ -216,7 +240,7 @@ The currency code in the `Monthly Planning Budget` header is detected automatica
 - `Monthly Planning Budget (USD)` → same, converted from USD
 - `Monthly Planning Budget (CAD)` → same, converted from CAD
 
-If the header contains no currency code, or the code is not one of the app's supported currencies (AED, USD, EUR, CAD), the amounts are assumed to be **AED** with no conversion applied.
+If the header contains no currency code, or the code is not one of the app's supported currencies (AED, USD, EUR, CAD, GBP), the amounts are assumed to be **AED** with no conversion applied.
 
 All other columns are either optional or ignored. The header row can appear anywhere within the first five lines. A sample from a valid file:
 

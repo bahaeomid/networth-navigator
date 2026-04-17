@@ -69,10 +69,10 @@ This independent audit examined every calculation, metric, and assumption in the
 
 1. **AUDIT_FINDINGS_REPORT.md** - Master findings
 2. **calculation_verification.md** - Phase 1-4 results
-3. **monte_carlo_test.js** - Phase 3 tests ✅
-4. **scorecard_test.js** - Phase 4 tests
-5. **projection_test.js** - Phase 2 tests ✅
-6. **gap_levers_test.js** - Phase 5 tests
+3. **auditor2_monte_carlo.js** - Phase 3 tests ✅
+4. **auditor2_scorecard.js** - Phase 4 tests
+5. **auditor2_projection.js** - Phase 2 tests ✅
+6. **auditor2_gap_levers.js** - Phase 5 tests
 7. **coherence_audit.md** - Phase 9 analysis
 8. **first_principles.md** - Phase 10 evaluation
 9. **disagreements_detailed.md** - Disagreements doc
@@ -83,10 +83,10 @@ This independent audit examined every calculation, metric, and assumption in the
 
 | Test File | Status | Coverage |
 |-----------|--------|----------|
-| monte_carlo_test.js | ✅ Pass | Box-Muller, Success, Cash |
-| projection_test.js | ✅ Pass | Growth, Amortization, Drawdown |
-| scorecard_test.js | Ready | Savings, NW Multiple, IRR |
-| gap_levers_test.js | Ready | Save More, Retire Later |
+| auditor2_monte_carlo.js | ✅ Pass | Box-Muller, Success, Cash |
+| auditor2_projection.js | ✅ Pass | Growth, Amortization, Drawdown |
+| auditor2_scorecard.js | Ready | Savings, NW Multiple, IRR |
+| auditor2_gap_levers.js | Ready | Save More, Retire Later |
 
 ---
 
@@ -96,10 +96,10 @@ This independent audit examined every calculation, metric, and assumption in the
 |-------|--------|-------|-------------|
 | 0. Codebase Read | ✅ | README.md | Mental model complete |
 | 1. Calculations | ✅ | calculation_verification.md | 6 formulas verified |
-| 2. Projection | ✅ | projection_test.js | End-to-end correct |
-| 3. Monte Carlo | ✅ | monte_carlo_test.js | Cash exclusion found |
-| 4. Scorecard | ✅ | scorecard_test.js | 7 metrics analyzed |
-| 5. Gap Levers | ✅ | gap_levers_test.js | 3 levers + surplus |
+| 2. Projection | ✅ | auditor2_projection.js | End-to-end correct |
+| 3. Monte Carlo | ✅ | auditor2_monte_carlo.js | Cash exclusion found |
+| 4. Scorecard | ✅ | auditor2_scorecard.js | 7 metrics analyzed |
+| 5. Gap Levers | ✅ | auditor2_gap_levers.js | 3 levers + surplus |
 | 6. I/O | Partial | - | Export/import reviewed |
 | 7. Edge Cases | Partial | - | Selected cases |
 | 8. UX | Partial | - | Selected tooltips |

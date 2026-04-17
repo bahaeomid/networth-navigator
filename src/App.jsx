@@ -23,9 +23,20 @@ const formatNumber = (num) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
+// HTML-escape user-controlled strings before interpolation into HTML templates
+const escapeHtml = (str) => {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+};
+
 // Currency formatting with commas
 const formatCurrency = (amountInAED, currency, exchangeRates) => {
-  const rate = exchangeRates[currency];
+  const rate = exchangeRates[currency] || 1;
   const amount = amountInAED / rate;
   const cfg = CURRENCIES[currency];
   
@@ -41,7 +52,7 @@ const formatCurrency = (amountInAED, currency, exchangeRates) => {
 
 // Currency formatting with 1 decimal for K values
 const formatCurrencyDecimal = (amountInAED, currency, exchangeRates) => {
-  const rate = exchangeRates[currency];
+  const rate = exchangeRates[currency] || 1;
   const amount = amountInAED / rate;
   const cfg = CURRENCIES[currency];
   const absAmount = Math.abs(amount);
@@ -62,7 +73,7 @@ const formatCurrencyDecimal = (amountInAED, currency, exchangeRates) => {
 // Currency conversion helpers for input fields
 // All values stored internally as AED. These convert for display/entry.
 const toDisplay = (aedVal, rate) => {
-  if (!rate || rate === 1) return aedVal;
+  if (!rate || rate <= 0 || rate === 1) return aedVal;
   return Math.round((aedVal / rate) * 100) / 100;
 };
 const fromDisplay = (displayVal, rate) => {
@@ -100,7 +111,7 @@ const TOOLTIPS = {
   investmentReturn: "Expected annual return on investments (stocks/bonds). Historical avg: 7-8%. Enter your after-tax return — if your gains are subject to capital gains or dividend tax, subtract the drag (typically 0.5–1.5pp) from your gross expected return.",
   investmentStdDev: "Volatility of investment returns. Used in Monte Carlo simulation. Typical: 12-15%.",
   realEstateAppreciation: "Annual property value growth %. Typical range: 3–6% depending on market and location.",
-  savingsRate: "Annual savings as % of gross income. This surplus is undeployed by default — use Surplus Deployment in the Outlook tab to model investing it or paying down debt. Target: 10% minimum · 20% healthy · 30%+ accelerates wealth building.",
+  savingsRate: "Annual savings as % of gross income. This surplus is undeployed by default — use Surplus Deployment in the Dashboard tab to model investing it or paying down debt. Target: 10% minimum · 20% healthy · 30%+ accelerates wealth building.",
   netWorth: "Total assets minus total liabilities. Liabilities amortize linearly to their end year — set end years on mortgages and loans in the Finances tab to reflect scheduled payoffs. Without an end year: mortgages default to a 25-year term, loans and other liabilities to 5 years.",
   retirementReadiness: "Survival odds: % of 1,000 market scenarios where your money lasts through your life expectancy. Above 80% = strong plan. Below 60% = review your retirement budget or savings rate. Uses your Retirement Budget (entered in today's terms, inflated to retirement day) as the annual withdrawal amount.",
   yearsToRetirement: "Years until your planned retirement age. FI Age (in the Retirement Health card) shows the earliest you could theoretically retire based on current savings — ideally it lands before or at this date.",
@@ -408,11 +419,26 @@ const runMonteCarloSimulation = (portfolioAssets, yearsToProject, annualContribu
         const rate = ((rgr && rgr[cat.key]) || 0) / 100;
         return s + base * Math.pow(1 + rate, ytr + year);
       }, 0);
-      // Net passive + other income against withdrawal — same logic as wealthProjection drawdown
-      const passiveOffset = pis ? (
-        (pis.passive || 0) * Math.pow(1 + (pis.passiveGrowth || 0), ytr + year) +
-        (pis.other   || 0) * Math.pow(1 + (pis.otherGrowth   || 0), ytr + year)
-      ) : 0;
+      // Net passive + other income against withdrawal — resolve sub-items with endYear
+      const passiveOffset = pis ? (() => {
+        const calYear = safeRetCalYear + year;
+        const pGrowth = pis.passiveGrowth || 0;
+        const oGrowth = pis.otherGrowth || 0;
+        const yearsFromNow = ytr + year;
+        const passiveAmt = pis.passiveItems
+          ? pis.passiveItems.reduce((sum, item) => {
+              if (item.endYear && calYear >= item.endYear) return sum;
+              return sum + (item.amount || 0) * Math.pow(1 + pGrowth, yearsFromNow);
+            }, 0)
+          : (pis.passive || 0) * Math.pow(1 + pGrowth, yearsFromNow);
+        const otherAmt = pis.otherItems
+          ? pis.otherItems.reduce((sum, item) => {
+              if (item.endYear && calYear >= item.endYear) return sum;
+              return sum + (item.amount || 0) * Math.pow(1 + oGrowth, yearsFromNow);
+            }, 0)
+          : (pis.other || 0) * Math.pow(1 + oGrowth, yearsFromNow);
+        return passiveAmt + otherAmt;
+      })() : 0;
       withdrawal = Math.max(0, grossWithdrawal - passiveOffset);
     } else {
       withdrawal = annualWithdrawal;
@@ -586,6 +612,199 @@ const buildDefaultExpenseState = (cats) => {
   return { expenseCalculator, retirementBudget, expenseGrowthRates, retExpenseGrowthRates, expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, currentTotal, retirementTotal };
 };
 
+// Extracted to module scope to prevent re-creation on every render
+const MilestoneLegend = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap', marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
+    {Object.entries(MILESTONE_COLORS).filter(([key]) => key !== 'retirement' && key !== 'expense').map(([key, { color, label }]) => (
+      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, border: '2px solid white' }} />
+        <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>{label}</span>
+      </div>
+    ))}
+  </div>
+);
+
+// Extracted to module scope to prevent re-creation on every render
+const ExchangeRateInput = ({ currency, exchangeRates, setExchangeRates, fxStatus }) => {
+  const [displayValue, setDisplayValue] = useState(exchangeRates[currency].toFixed(2));
+  const [isFocused, setIsFocused] = useState(false);
+
+  React.useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(exchangeRates[currency].toFixed(2));
+    }
+  }, [exchangeRates, currency, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setDisplayValue(exchangeRates[currency].toString());
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const numValue = parseFloat(displayValue) || 1;
+    setExchangeRates({...exchangeRates, [currency]: numValue});
+    setDisplayValue(numValue.toFixed(2));
+  };
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+      setDisplayValue(val);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.85rem' }}>
+      <span style={{ color: '#9ca3af' }}>Rate:</span>
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        style={{
+          width: '70px',
+          padding: '0.25rem 0.5rem',
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '4px',
+          color: '#e8e9ed',
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: '0.85rem',
+        }}
+      />
+      <span style={{ color: '#9ca3af' }}>AED/{currency}</span>
+      <span style={{
+        fontSize: '0.6rem',
+        fontWeight: '600',
+        color: fxStatus === 'live' ? '#34d399' : '#6b7280',
+      }}>
+        {fxStatus === 'live' ? '●' : '○'}
+      </span>
+    </div>
+  );
+};
+
+const SubItemAmountInput = ({ value, onChange, rate, width, style }) => {
+  const _rate = rate || 1;
+  const toDisplayStr = (aed) => {
+    const d = toDisplay(aed, _rate);
+    return d % 1 === 0
+      ? d.toLocaleString()
+      : d.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+  const [displayVal, setDisplayVal] = React.useState(toDisplayStr(value));
+  const [focused, setFocused] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!focused) setDisplayVal(toDisplayStr(value));
+  }, [value, focused, _rate]);
+
+  return (
+    <input
+      type="text"
+      value={displayVal}
+      onFocus={() => {
+        setFocused(true);
+        setDisplayVal(displayVal.replace(/,/g, ''));
+      }}
+      onChange={(e) => {
+        const v = e.target.value.replace(/,/g, '');
+        if (v === '' || /^[\d.]*$/.test(v)) setDisplayVal(v);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const aed = fromDisplay(displayVal.replace(/,/g, ''), _rate);
+        onChange(aed);
+        setDisplayVal(toDisplayStr(aed));
+      }}
+      placeholder="Amount"
+      style={{
+        padding: '0.4rem 0.5rem',
+        background: 'rgba(255, 255, 255, 0.05)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '6px',
+        color: '#e8e9ed',
+        fontSize: '0.82rem',
+        fontFamily: 'JetBrains Mono, monospace',
+        width: width || '95px',
+        ...(style || {})
+      }}
+    />
+  );
+};
+
+const NumberInput = ({ label, value, onChange, prefix, suffix, step, tooltip, rate }) => {
+  const _rate = rate || 1;
+  const _prefix = prefix !== undefined ? prefix : '';
+  const _suffix = suffix !== undefined ? suffix : '';
+  const _step = step !== undefined ? step : 1000;
+  const toDisplayStr = (aedVal) => {
+    const d = toDisplay(aedVal, _rate);
+    return d % 1 === 0 ? formatNumber(d) : d.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+  const [displayValue, setDisplayValue] = useState(toDisplayStr(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  React.useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(toDisplayStr(value));
+    }
+  }, [value, isFocused, _rate]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setDisplayValue(toDisplay(value, _rate).toString());
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const aedValue = fromDisplay(displayValue.replace(/,/g, ''), _rate);
+    onChange(aedValue);
+    setDisplayValue(toDisplayStr(aedValue));
+  };
+
+  const handleChange = (e) => {
+    const val = e.target.value.replace(/,/g, '');
+    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+      setDisplayValue(val);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
+      <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.9rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500' }}>
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </label>
+      <div style={{ position: 'relative' }}>
+        {_prefix && <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', pointerEvents: 'none', zIndex: 1 }}>{_prefix}</span>}
+        <input
+          type="text"
+          value={displayValue}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          style={{
+            width: '100%',
+            padding: '0.75rem 1rem',
+            paddingLeft: prefix ? '3.5rem' : '1rem',
+            paddingRight: suffix ? '3rem' : '1rem',
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
+            color: '#e8e9ed',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: '1rem',
+          }}
+        />
+        {_suffix && <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', pointerEvents: 'none', zIndex: 1 }}>{_suffix}</span>}
+      </div>
+    </div>
+  );
+};
+
 const NetWorthNavigator = () => {
   // Default state values
   const _defs = buildDefaultExpenseState(DEFAULT_EXPENSE_CATEGORIES);
@@ -629,7 +848,7 @@ const NetWorthNavigator = () => {
         { id: 1, name: 'Primary Home Mortgage', amount: 600000, endYear: new Date().getFullYear() + 25 }
       ],
       loanItems: [
-        { id: 1, name: 'Car Loan', amount: 20000, endYear: 2031 }
+        { id: 1, name: 'Car Loan', amount: 20000, endYear: new Date().getFullYear() + 5 }
       ],
       otherLiabilityItems: [{ id: 1, name: 'Other', amount: 0 }]
     },
@@ -739,25 +958,105 @@ const NetWorthNavigator = () => {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [expenseViewMode, setExpenseViewMode] = useState('annual'); // 'annual' | 'monthly'
 
+  // Auto-save state to localStorage (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const dataToSave = {
+          version: '2.0',
+          currency,
+          exchangeRates,
+          profile,
+          assets,
+          liabilities,
+          income,
+          expenses,
+          expenseCategories,
+          expenseCalculator,
+          retirementBudget,
+          expenseGrowthRates,
+          expenseTags,
+          expensePhaseOutYears,
+          retExpensePhaseOutYears,
+          retExpenseGrowthRates,
+          lifeEvents,
+          assumptions,
+          oneTimeExpenses,
+          nestEggSwr,
+          surplusSplitInvest,
+          surplusSplitDebt,
+        };
+        localStorage.setItem('nwn_autosave', JSON.stringify(dataToSave));
+      } catch (e) {
+        // localStorage full or unavailable — silent fail
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [currency, exchangeRates, profile, assets, liabilities, income, expenses,
+      expenseCategories, expenseCalculator, retirementBudget, expenseGrowthRates,
+      expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retExpenseGrowthRates,
+      lifeEvents, assumptions, oneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt]);
+
+  // Auto-restore from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nwn_autosave');
+      if (!saved) return;
+      const data = JSON.parse(saved);
+      if (!data || data.version !== '2.0') return;
+      if (data.currency) setCurrency(data.currency);
+      if (data.exchangeRates) setExchangeRates(data.exchangeRates);
+      if (data.profile) setProfile(data.profile);
+      if (data.assets) setAssets(data.assets);
+      if (data.liabilities) setLiabilities(data.liabilities);
+      if (data.income) setIncome(data.income);
+      if (data.expenses) setExpenses(data.expenses);
+      if (data.expenseCategories) setExpenseCategories(data.expenseCategories);
+      if (data.expenseCalculator) setExpenseCalculator(data.expenseCalculator);
+      if (data.retirementBudget) setRetirementBudget(data.retirementBudget);
+      if (data.expenseGrowthRates) setExpenseGrowthRates(data.expenseGrowthRates);
+      if (data.expenseTags) setExpenseTags(data.expenseTags);
+      if (data.expensePhaseOutYears) setExpensePhaseOutYears(data.expensePhaseOutYears);
+      if (data.retExpensePhaseOutYears) setRetExpensePhaseOutYears(data.retExpensePhaseOutYears);
+      if (data.retExpenseGrowthRates) setRetExpenseGrowthRates(data.retExpenseGrowthRates);
+      if (data.lifeEvents) setLifeEvents(data.lifeEvents);
+      if (data.assumptions) setAssumptions(data.assumptions);
+      if (data.oneTimeExpenses) setOneTimeExpenses(data.oneTimeExpenses);
+      if (data.nestEggSwr !== undefined) setNestEggSwr(data.nestEggSwr);
+      if (data.surplusSplitInvest !== undefined) setSurplusSplitInvest(data.surplusSplitInvest);
+      if (data.surplusSplitDebt !== undefined) setSurplusSplitDebt(data.surplusSplitDebt);
+    } catch (e) {
+      // Corrupted or unavailable — start with defaults
+    }
+  }, []);
+
   // Fetch live FX rates
   const fetchFxRates = async () => {
     try {
-      const response = await fetch('https://open.er-api.com/v6/latest/AED');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch('https://open.er-api.com/v6/latest/AED', { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (!response.ok) throw new Error('API error');
       const data = await response.json();
       if (data.rates) {
+        const usd = data.rates.USD;
+        const cad = data.rates.CAD;
+        const eur = data.rates.EUR;
+        const gbp = data.rates.GBP;
+        if (!usd || !cad || !eur || !gbp) throw new Error('Missing or zero FX rate');
         setExchangeRates({
           AED: 1,
-          USD: 1 / data.rates.USD,
-          CAD: 1 / data.rates.CAD,
-          EUR: 1 / data.rates.EUR,
-          GBP: 1 / data.rates.GBP,
+          USD: 1 / usd,
+          CAD: 1 / cad,
+          EUR: 1 / eur,
+          GBP: 1 / gbp,
         });
         setFxStatus('live');
         return true;
       }
     } catch (err) {
-      console.log('FX fetch failed, using cached rates');
+      // FX fetch failed — cached/default rates will be used
     }
     return false;
   };
@@ -839,9 +1138,38 @@ const NetWorthNavigator = () => {
     const retNominalExpense = getRetNominalForYear(currentYear + yearsToRet);
     const requiredNestEgg = nestEggSwr>0 ? retNominalExpense/(nestEggSwr/100) : 0;
     const fundingPct = requiredNestEgg>0 ? (retirementWealth/requiredNestEgg)*100 : 0;
-    const irrPct = totalAnnualIncome>0 && retNominalExpense>0 ? (retNominalExpense/totalAnnualIncome)*100 : 0;
+    const irrPct = totalAnnualIncome>0 && totalRetExpenses>0 ? (totalRetExpenses/totalAnnualIncome)*100 : 0;
     const investmentMixPct = totalAssets>0 ? (assets.investments/totalAssets)*100 : 0;
     const exhaustionAge = wealthProjection.exhaustionAge || null;
+    let nwTarget = null;
+    let nwRatio = null;
+    if (totalSalary > 0) {
+      const age = profile.currentAge;
+      if (age <= 30) {
+        nwTarget = age / 30;
+      } else if (age >= profile.retirementAge) {
+        nwTarget = 10;
+      } else {
+        const brackets = [
+          { age: 30, target: 1 },
+          { age: 40, target: 3 },
+          { age: 55, target: 7 },
+          { age: profile.retirementAge, target: 10 },
+        ];
+        let lo = brackets[0];
+        let hi = brackets[brackets.length - 1];
+        for (let i = 0; i < brackets.length - 1; i++) {
+          if (age >= brackets[i].age && age <= brackets[i + 1].age) {
+            lo = brackets[i];
+            hi = brackets[i + 1];
+            break;
+          }
+        }
+        const t = (age - lo.age) / (hi.age - lo.age);
+        nwTarget = lo.target + t * (hi.target - lo.target);
+      }
+      nwRatio = nwTarget > 0 ? nwMultiple / nwTarget : null;
+    }
 
     // ── Helpers ──
     const fmt = (v) => formatCurrency(v, currency, exchangeRates);
@@ -875,9 +1203,9 @@ const NetWorthNavigator = () => {
       if (isRet) tags.push('<span class="tag ret">Retirement</span>');
       if (isFI) tags.push('<span class="tag fi">FI Age</span>');
       if (isDebt) tags.push('<span class="tag debt">Debt Free</span>');
-      if (milestone) tags.push(`<span class="tag ms">${milestone.label}</span>`);
-      if (lifeEv) tags.push(`<span class="tag ev">${lifeEv.description}</span>`);
-      ote.forEach(e => tags.push(`<span class="tag ote">${e.description}</span>`));
+      if (milestone) tags.push(`<span class="tag ms">${escapeHtml(milestone.label)}</span>`);
+      if (lifeEv) tags.push(`<span class="tag ev">${escapeHtml(lifeEv.description)}</span>`);
+      ote.forEach(e => tags.push(`<span class="tag ote">${escapeHtml(e.description)}</span>`));
       const rowBg = isRet ? 'background:#f5f3ff;font-weight:600;' : '';
       const savings = (d.income||0)-(d.expenses||0);
       const savColor = savings>=0 ? '#16a34a' : '#dc2626';
@@ -914,7 +1242,7 @@ const NetWorthNavigator = () => {
       const retPhaseOut = retExpensePhaseOutYears[c.key];
       const label = getCatLabel(c.key);
       return `<tr>
-        <td><span style="display:inline-block;width:18px;height:18px;border-radius:3px;background:${c.color};margin-right:6px;vertical-align:middle;opacity:0.8;"></span>${label}</td>
+        <td><span style="display:inline-block;width:18px;height:18px;border-radius:3px;background:${c.color};margin-right:6px;vertical-align:middle;opacity:0.8;"></span>${escapeHtml(label)}</td>
         <td style="text-align:center;"><span style="font-size:0.68rem;font-weight:700;color:${tagColor};border:1px solid ${tagColor};border-radius:3px;padding:1px 4px;">${tag}</span></td>
         <td class="num">${fmt(preAmt)}</td>
         <td class="num dim">${preGr}%/yr${phaseOut?` · ends ${phaseOut}`:''}</td>
@@ -924,28 +1252,29 @@ const NetWorthNavigator = () => {
     }).join('');
 
     // ── Income sub-items ──
-    const salaryRows = (income.salaryItems||[]).map(i=>`<tr><td>${i.name||'Salary'}</td><td class="num">${fmt(i.amount||0)}</td><td class="dim">+${assumptions.salaryGrowth}%/yr${i.endYear?` · ends ${i.endYear}`:''}</td></tr>`).join('');
-    const passiveRows = (income.passiveItems||[]).map(i=>`<tr><td>${i.name||'Passive'}</td><td class="num">${fmt(i.amount||0)}</td><td class="dim">+${assumptions.passiveGrowth||0}%/yr${i.endYear?` · ends ${i.endYear}`:''}</td></tr>`).join('');
-    const otherRows = (income.otherIncomeItems||[]).map(i=>`<tr><td>${i.name||'Other'}</td><td class="num">${fmt(i.amount||0)}</td><td class="dim">+${assumptions.otherIncomeGrowth||0}%/yr${i.endYear?` · ends ${i.endYear}`:''}</td></tr>`).join('');
+    const salaryRows = (income.salaryItems||[]).map(i=>`<tr><td>${escapeHtml(i.name||'Salary')}</td><td class="num">${fmt(i.amount||0)}</td><td class="dim">+${assumptions.salaryGrowth}%/yr${i.endYear?` · ends ${i.endYear}`:''}</td></tr>`).join('');
+    const passiveRows = (income.passiveItems||[]).map(i=>`<tr><td>${escapeHtml(i.name||'Passive')}</td><td class="num">${fmt(i.amount||0)}</td><td class="dim">+${assumptions.passiveGrowth||0}%/yr${i.endYear?` · ends ${i.endYear}`:''}</td></tr>`).join('');
+    const otherRows = (income.otherIncomeItems||[]).map(i=>`<tr><td>${escapeHtml(i.name||'Other')}</td><td class="num">${fmt(i.amount||0)}</td><td class="dim">+${assumptions.otherIncomeGrowth||0}%/yr${i.endYear?` · ends ${i.endYear}`:''}</td></tr>`).join('');
 
     // ── Liability sub-items ──
-    const mortgageRows = (liabilities.mortgageItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${i.name||'Mortgage'}</td><td class="num red">${fmt(i.amount||0)}</td><td class="dim">${i.endYear?`ends ${i.endYear}`:'no end year'}</td></tr>`).join('');
-    const loanRows = (liabilities.loanItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${i.name||'Loan'}</td><td class="num red">${fmt(i.amount||0)}</td><td class="dim">${i.endYear?`ends ${i.endYear}`:'no end year'}</td></tr>`).join('');
-    const otherLiabRows = (liabilities.otherLiabilityItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${i.name||'Other'}</td><td class="num red">${fmt(i.amount||0)}</td><td class="dim">${i.endYear?`ends ${i.endYear}`:'no end year'}</td></tr>`).join('');
+    const mortgageRows = (liabilities.mortgageItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${escapeHtml(i.name||'Mortgage')}</td><td class="num red">${fmt(i.amount||0)}</td><td class="dim">${i.endYear?`ends ${i.endYear}`:'no end year'}</td></tr>`).join('');
+    const loanRows = (liabilities.loanItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${escapeHtml(i.name||'Loan')}</td><td class="num red">${fmt(i.amount||0)}</td><td class="dim">${i.endYear?`ends ${i.endYear}`:'no end year'}</td></tr>`).join('');
+    const otherLiabRows = (liabilities.otherLiabilityItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${escapeHtml(i.name||'Other')}</td><td class="num red">${fmt(i.amount||0)}</td><td class="dim">${i.endYear?`ends ${i.endYear}`:'no end year'}</td></tr>`).join('');
 
     // ── OTE rows ──
     const oteRows = oneTimeExpenses.length>0 ? oneTimeExpenses.map(e=>`<tr>
       <td>${e.year}${e.endYear&&e.endYear>e.year?` – ${e.endYear}`:''}</td>
-      <td>${e.description||'—'}</td>
+      <td>${escapeHtml(e.description||'—')}</td>
       <td class="num">${fmt(e.amount)}</td>
-      <td class="dim">${e.category&&e.category!=='none'?getCatLabel(e.category):e.category==='none'?'Uncategorised':'Uncategorised'}</td>
+      <td class="dim">${e.category&&e.category!=='none'?escapeHtml(getCatLabel(e.category)):e.category==='none'?'Uncategorised':'Uncategorised'}</td>
     </tr>`).join('') : '<tr><td colspan="4" class="dim" style="text-align:center;">No planned expenses entered</td></tr>';
 
     // ── Life events ──
-    const lifeEventRows = lifeEvents.length>0 ? lifeEvents.map(e=>`<tr><td>${e.year}</td><td>${e.age}</td><td>${e.description}</td><td class="dim">${e.stage||''}</td></tr>`).join('') : '<tr><td colspan="4" class="dim" style="text-align:center;">No life events entered</td></tr>';
+    const lifeEventRows = lifeEvents.length>0 ? lifeEvents.map(e=>`<tr><td>${e.year}</td><td>${e.age}</td><td>${escapeHtml(e.description)}</td><td class="dim">${escapeHtml(e.stage||'')}</td></tr>`).join('') : '<tr><td colspan="4" class="dim" style="text-align:center;">No life events entered</td></tr>';
 
     // ── Health metric helpers ──
     const srColor = savingsRate>=20?'#16a34a':savingsRate>=10?'#d97706':'#dc2626';
+    const nwColor = nwRatio === null ? '#64748b' : nwRatio >= 1 ? '#16a34a' : nwRatio >= 0.75 ? '#d97706' : '#dc2626';
     const drColor = debtRatio<30?'#16a34a':debtRatio<50?'#d97706':'#dc2626';
     const efColor = emergencyMonths>=6?'#16a34a':emergencyMonths>=3?'#d97706':'#dc2626';
     const imColor = investmentMixPct>=40?'#16a34a':investmentMixPct>=20?'#d97706':'#dc2626';
@@ -1259,12 +1588,12 @@ const NetWorthNavigator = () => {
         <div class="health-card-bench">${fundingPct>=100?'✓ On track':fundingPct>=85?'↑ Approaching target':fundingPct>=50?'↑ On a reasonable path':'⚠ Significant gap'} of ${fmt(requiredNestEgg)}</div>
       </div>
     </div>
-    <div class="health-card" style="border-color:${mcColor}33;background:${mcColor}08;">
-      <div class="health-card-icon">🎲</div>
+    <div class="health-card" style="border-color:${nwColor}33;background:${nwColor}08;">
+      <div class="health-card-icon">📈</div>
       <div class="health-card-body">
-        <div class="health-card-label">Monte Carlo</div>
-        <div class="health-card-value" style="color:${mcColor};">${successProb}%</div>
-        <div class="health-card-bench">${successProb>=80?'✓ Strong plan':successProb===0?'⚠ 0 of 1,000 scenarios succeed — critical gap':successProb>=60?'↑ Caution zone — review assumptions':'⚠ High risk of running out of money'}</div>
+        <div class="health-card-label">NW Multiple</div>
+        <div class="health-card-value" style="color:${nwColor};">${nwMultiple!==null?`${nwMultiple.toFixed(1)}×`:'—'}</div>
+        <div class="health-card-bench">${nwMultiple!==null?(nwRatio>=1?'✓ At or above target':nwRatio>=0.75?'↑ Close to target':'⚠ Behind target') + ` · target ${nwTarget.toFixed(1)}×`:'Requires non-zero salary'}</div>
       </div>
     </div>
     <div class="health-card" style="border-color:${irrColor}33;background:${irrColor}08;">
@@ -1272,7 +1601,7 @@ const NetWorthNavigator = () => {
       <div class="health-card-body">
         <div class="health-card-label">Income Replacement</div>
         <div class="health-card-value" style="color:${irrColor};">${Math.round(irrPct)}%</div>
-        <div class="health-card-bench">${irrPct>120?'⚠ Retirement costs more than current income — budget may be unsustainable':irrPct>=80?'✓ Adequate replacement ratio · target 70–100%':irrPct>=70?'↑ Borderline — target 80%+ replacement':'⚠ Lifestyle gap below 70%'}</div>
+        <div class="health-card-bench">${irrPct>120?'⚠ Retirement costs exceed current income — review budget':irrPct>=80?'✓ Replacement ratio in the strong range · target 80–120%':irrPct>=70?'↑ Caution — below the strong 80% threshold':'⚠ Lifestyle gap below 70%'}</div>
       </div>
     </div>
   </div>
@@ -1446,7 +1775,7 @@ const NetWorthNavigator = () => {
     <div class="kpi ${irrPct>=80&&irrPct<=120?'green':irrPct>120?'amber':'red'}">
       <div class="kpi-label">Income Replacement</div>
       <div class="kpi-value">${Math.round(irrPct)}%</div>
-      <div class="kpi-sub">${irrPct>120?'Retirement budget exceeds current income — review retirement spending':irrPct>=80?'Retirement budget ÷ current income · target 70–100%':'Retirement budget ÷ current income · below 70% target'}</div>
+      <div class="kpi-sub">${irrPct>120?'Retirement budget exceeds current income — review retirement spending':irrPct>=80?'Retirement budget ÷ current income · target 80–120%':irrPct>=70?'Retirement budget ÷ current income · below the strong 80% threshold':'Retirement budget ÷ current income · below 70% target'}</div>
     </div>
   </div>
   <div class="sub-head">Drawdown Structure</div>
@@ -1606,7 +1935,7 @@ const NetWorthNavigator = () => {
       <ul>
         <li><strong>No tax modelling.</strong> Income, capital gains, inheritance, and withholding taxes are not modelled. Users should enter after-tax income figures and consult a tax adviser for jurisdiction-specific obligations.</li>
         <li><strong>No currency risk.</strong> Exchange rates are held static at the export-date snapshot. Multi-currency portfolios may be materially affected by rate fluctuations not reflected here.</li>
-        <li><strong>No sequence-of-returns risk beyond Monte Carlo.</strong> The base-case projection applies a constant annual return. The Monte Carlo simulation (Note 6) partially addresses sequence risk but assumes normally distributed returns, which may understate tail risk in severe market dislocations.</li>
+        <li><strong>No sequence-of-returns risk beyond Monte Carlo.</strong> The base-case projection applies a constant annual return. The Monte Carlo simulation (Note 6) partially addresses sequence risk but assumes independent, identically distributed (IID) normally distributed returns — each year's return is drawn independently with no modelling of return correlation, momentum, or autocorrelation. This may understate tail risk in severe market dislocations.</li>
         <li><strong>Illiquid assets excluded from retirement drawdown.</strong> Real estate and other illiquid assets grow passively in the model and are not drawn upon in retirement. Only the investment portfolio services retirement withdrawals.</li>
         <li><strong>Liability amortisation defaults.</strong> Where no end year is specified on a liability sub-item, mortgages are amortised linearly over 25 years and all other liabilities over 5 years from today. Actual amortisation schedules may differ.</li>
       </ul>
@@ -1690,7 +2019,7 @@ const NetWorthNavigator = () => {
         <li><strong>Emergency Fund.</strong> Formula: Cash Balance ÷ (Current Annual Expenses ÷ 12). Expressed in months of expenses covered. Thresholds: ≥6 months = green; 3–5 months = amber; &lt;3 months = red. Uses the cash asset field only — other liquid assets are excluded.</li>
         <li><strong>Investment Mix.</strong> Formula: Investments ÷ Total Assets. Thresholds: ≥40% = green; 20–39% = amber; &lt;20% = red. Measures the proportion of wealth held in liquid, growth-oriented investments versus real estate and other assets. A low mix may indicate concentration in illiquid assets.</li>
         <li><strong>Retirement Funding.</strong> Formula: Projected Investments at Retirement ÷ Required Nest Egg. Thresholds: ≥100% = green (fully funded); 85–99% = light green (approaching); 50–84% = amber; &lt;50% = red. The Required Nest Egg formula is defined in Note 9.</li>
-        <li><strong>Income Replacement Ratio.</strong> Formula: Nominal Retirement Expenses on Day 1 ÷ Current Annual Income. The target range is 70–120% — broadly replacing pre-retirement income. Above 120% = amber (lifestyle upgrade in retirement); below 70% = red (significant lifestyle reduction). This ratio uses nominal retirement expenses, so expense growth assumptions directly affect it.</li>
+        <li><strong>Income Replacement Ratio.</strong> Formula: Retirement Budget (today's terms) ÷ Current Annual Income. Both values are in today's dollars for a like-for-like comparison. Thresholds: 80–120% = green (strong fit), 70–79% = amber (lean replacement), above 120% = amber (retirement lifestyle exceeds current income), below 70% = red (significant lifestyle reduction).</li>
       </ul>
     </div>
   </div>
@@ -1707,7 +2036,7 @@ const NetWorthNavigator = () => {
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
         <li><strong>Save More.</strong> The additional monthly investment required to accumulate the gap amount by retirement, assuming contributions compound at the investment return using a future-value annuity formula. Your existing monthly surplus partially offsets this requirement.</li>
-        <li><strong>Retire Later.</strong> The number of additional years (beyond planned retirement) for existing investments to compound — at the current investment return — to the per-year required nest egg. Surplus is assumed undeployed (conservative). Displays "Gap too large" if not achievable within 30 extra years.</li>
+        <li><strong>Retire Later.</strong> The number of additional working years (beyond planned retirement) needed for your investments to reach the required nest egg. During each extra year, existing investments compound at the current return AND net savings (projected income minus expenses, if positive) are added. Income grows at the configured growth rates. Displays "Gap too large" if not achievable within 30 extra years.</li>
         <li><strong>Higher Return.</strong> The CAGR required for existing investments alone (no new contributions) to reach the required nest egg by retirement, solved via: (Required Nest Egg ÷ Current Investments)^(1 ÷ Years) − 1. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
       <p>All three levers are illustrative. A combination strategy will always close the gap more efficiently than any single lever in isolation.</p>
@@ -1989,7 +2318,8 @@ new Chart(document.getElementById('allocChart'),{
           return fields;
         };
 
-        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        const cleanText = text.replace(/^\uFEFF/, ''); // strip UTF-8 BOM if present
+        const lines = cleanText.split(/\r?\n/).filter(l => l.trim().length > 0);
 
         // Find the header row (must contain "Category" and "Monthly Planning Budget (AED)")
         let headerIdx = -1;
@@ -2054,7 +2384,7 @@ const mIdx = cols.findIndex(c =>
           // Skip summary/total rows
           if (/^(total|subtotal|grand total)$/i.test(label.trim())) return;
 
-          const monthlyAmtInCsvCurrency = parseFloat(rawAmt.replace(/[^0-9.\-]/g, ''));
+          const monthlyAmtInCsvCurrency = parseFloat(rawAmt.replace(/[^0-9.-]/g, ''));
           if (isNaN(monthlyAmtInCsvCurrency)) return;
 
           // Convert from CSV currency to AED for internal storage
@@ -2271,25 +2601,6 @@ const mIdx = cols.findIndex(c =>
     }
   };
   
-  // Sync totals when sub-items change
-  const syncCategoryTotal = (category, mainKey, itemsKey) => {
-    const items = category === 'assets' ? assets[itemsKey] : 
-                 category === 'liabilities' ? liabilities[itemsKey] : 
-                 income[itemsKey];
-    
-    if (!items || items.length === 0) return;
-    
-    const total = items.reduce((sum, item) => sum + (item.amount || 0), 0);
-    
-    if (category === 'assets') {
-      setAssets({ ...assets, [mainKey]: total });
-    } else if (category === 'liabilities') {
-      setLiabilities({ ...liabilities, [mainKey]: total });
-    } else if (category === 'income') {
-      setIncome({ ...income, [mainKey]: total });
-    }
-  };
-  
   const currentNetWorth = useMemo(() => {
     const totalAssets = (assets.cash || 0) + (assets.investments || 0) + (assets.realEstate || 0) + (assets.other || 0);
     const totalLiabilities = (liabilities.mortgage || 0) + (liabilities.loans || 0) + (liabilities.other || 0);
@@ -2311,7 +2622,7 @@ const mIdx = cols.findIndex(c =>
   }, [income]);
   
   const annualSavings = useMemo(() => {
-    return Math.max(0, annualIncome - (expenses.current || 0));
+    return annualIncome - (expenses.current || 0);
   }, [annualIncome, expenses.current]);
   
   const savingsRate = useMemo(() => {
@@ -2422,7 +2733,7 @@ const mIdx = cols.findIndex(c =>
   
   const wealthProjection = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    const projectionYears = profile.lifeExpectancy - profile.currentAge;
+    const projectionYears = Math.max(0, profile.lifeExpectancy - profile.currentAge);
     const data = [];
     
     let investmentBalance = assets.investments;
@@ -2592,7 +2903,7 @@ const mIdx = cols.findIndex(c =>
         drawdownAmount = Math.max(0, inflationAdjustedExpense + oneTimeExpense - postRetIncome);
       }
       // Surplus (yearSavings) is NOT automatically reinvested — it is undeployed until the user acts.
-      // To model surplus deployment, use the Surplus Deployment section in the Outlook tab.
+      // To model surplus deployment, use the Surplus Deployment section in the Dashboard tab.
       investmentBalance = Math.max(0, investmentBalance * (1 + assumptions.investmentReturn / 100) - drawdownAmount);
       realEstateValue = realEstateValue * (1 + assumptions.realEstateAppreciation / 100);
       otherAssetValue = otherAssetValue * (1 + (assumptions.otherAssetGrowth || 0) / 100);
@@ -2614,7 +2925,8 @@ const mIdx = cols.findIndex(c =>
       investments: retirementData.investments,
     };
 
-    const retirementCalYear = new Date().getFullYear() + (profile.retirementAge - profile.currentAge);
+    const currentYear = new Date().getFullYear();
+    const retirementCalYear = currentYear + (profile.retirementAge - profile.currentAge);
     // Pre-inflate post-retirement OTEs using two-segment logic so Monte Carlo uses nominal amounts
     // Amounts are in today's terms — inflated from currentYear forward.
     // Expand recurring OTEs into per-year entries for Monte Carlo.
@@ -2651,10 +2963,13 @@ const mIdx = cols.findIndex(c =>
         yearsToRetirement: profile.retirementAge - profile.currentAge,
         expenseCategories: expenseCategories,
         passiveIncomeSchedule: {
+          passiveItems:  income.passiveItems && income.passiveItems.length > 0 ? income.passiveItems : null,
+          otherItems:    income.otherIncomeItems && income.otherIncomeItems.length > 0 ? income.otherIncomeItems : null,
           passive:       income.passive || 0,
           other:         income.other   || 0,
           passiveGrowth: (assumptions.passiveGrowth      || 0) / 100,
           otherGrowth:   (assumptions.otherIncomeGrowth  || 0) / 100,
+          retirementCalYear: retirementCalYear,
         },
       }
     );
@@ -2851,192 +3166,6 @@ const mIdx = cols.findIndex(c =>
     return null;
   };
   
-  // Exchange Rate Input with proper formatting
-  const ExchangeRateInput = ({ currency, exchangeRates, setExchangeRates, fxStatus }) => {
-    const [displayValue, setDisplayValue] = useState(exchangeRates[currency].toFixed(2));
-    const [isFocused, setIsFocused] = useState(false);
-    
-    React.useEffect(() => {
-      if (!isFocused) {
-        setDisplayValue(exchangeRates[currency].toFixed(2));
-      }
-    }, [exchangeRates, currency, isFocused]);
-    
-    const handleFocus = () => {
-      setIsFocused(true);
-      setDisplayValue(exchangeRates[currency].toString());
-    };
-    
-    const handleBlur = () => {
-      setIsFocused(false);
-      const numValue = parseFloat(displayValue) || 1;
-      setExchangeRates({...exchangeRates, [currency]: numValue});
-      setDisplayValue(numValue.toFixed(2));
-    };
-    
-    const handleChange = (e) => {
-      const val = e.target.value;
-      if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-        setDisplayValue(val);
-      }
-    };
-    
-    return (
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', background: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.85rem' }}>
-        <span style={{ color: '#9ca3af' }}>Rate:</span>
-        <input
-          type="text"
-          value={displayValue}
-          onChange={handleChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          style={{
-            width: '70px',
-            padding: '0.25rem 0.5rem',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '4px',
-            color: '#e8e9ed',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: '0.85rem',
-          }}
-        />
-        <span style={{ color: '#9ca3af' }}>AED/{currency}</span>
-        <span style={{
-          fontSize: '0.6rem',
-          fontWeight: '600',
-          color: fxStatus === 'live' ? '#34d399' : '#6b7280',
-        }}>
-          {fxStatus === 'live' ? '●' : '○'}
-        </span>
-      </div>
-    );
-  };
-  
-  // Sub-item amount input with focus/blur management and currency conversion
-  // value: stored AED. rate: exchangeRates[currency]. onChange: receives new AED value.
-  const SubItemAmountInput = ({ value, onChange, rate, width, style }) => {
-    const _rate = rate || 1;
-    const toDisplayStr = (aed) => {
-      const d = toDisplay(aed, _rate);
-      return d % 1 === 0
-        ? d.toLocaleString()
-        : d.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    };
-    const [displayVal, setDisplayVal] = React.useState(toDisplayStr(value));
-    const [focused, setFocused] = React.useState(false);
-
-    React.useEffect(() => {
-      if (!focused) setDisplayVal(toDisplayStr(value));
-    }, [value, focused, _rate]);
-
-    return (
-      <input
-        type="text"
-        value={displayVal}
-        onFocus={() => {
-          setFocused(true);
-          setDisplayVal(displayVal.replace(/,/g, ''));
-        }}
-        onChange={(e) => {
-          const v = e.target.value.replace(/,/g, '');
-          if (v === '' || /^[\d.]*$/.test(v)) setDisplayVal(v);
-        }}
-        onBlur={() => {
-          setFocused(false);
-          const aed = fromDisplay(displayVal.replace(/,/g, ''), _rate);
-          onChange(aed);
-          setDisplayVal(toDisplayStr(aed));
-        }}
-        placeholder="Amount"
-        style={{
-          padding: '0.4rem 0.5rem',
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '6px',
-          color: '#e8e9ed',
-          fontSize: '0.82rem',
-          fontFamily: 'JetBrains Mono, monospace',
-          width: width || '95px',
-          ...(style || {})
-        }}
-      />
-    );
-  };
-
-  // Improved NumberInput with proper formatting + currency conversion
-  // value is always stored/received in AED. currency/rate props convert for display.
-  const NumberInput = ({ label, value, onChange, prefix, suffix, step, tooltip, rate }) => {
-    const _rate = rate || 1;
-    const _prefix = prefix !== undefined ? prefix : '';
-    const _suffix = suffix !== undefined ? suffix : '';
-    const _step = step !== undefined ? step : 1000;
-    // Display value is in selected currency
-    const toDisplayStr = (aedVal) => {
-      const d = toDisplay(aedVal, _rate);
-      return d % 1 === 0 ? formatNumber(d) : d.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    };
-    const [displayValue, setDisplayValue] = useState(toDisplayStr(value));
-    const [isFocused, setIsFocused] = useState(false);
-    
-    React.useEffect(() => {
-      if (!isFocused) {
-        setDisplayValue(toDisplayStr(value));
-      }
-    }, [value, isFocused, _rate]);
-    
-    const handleFocus = () => {
-      setIsFocused(true);
-      setDisplayValue(toDisplay(value, _rate).toString());
-    };
-    
-    const handleBlur = () => {
-      setIsFocused(false);
-      const aedValue = fromDisplay(displayValue.replace(/,/g, ''), _rate);
-      onChange(aedValue);
-      setDisplayValue(toDisplayStr(aedValue));
-    };
-    
-    const handleChange = (e) => {
-      const val = e.target.value.replace(/,/g, '');
-      if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-        setDisplayValue(val);
-      }
-    };
-    
-    return (
-      <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
-        <label style={{ display: 'flex', alignItems: 'center', fontSize: '0.9rem', color: '#9ca3af', marginBottom: '0.5rem', fontWeight: '500' }}>
-          {label}
-          {tooltip && <InfoTooltip text={tooltip} />}
-        </label>
-        <div style={{ position: 'relative' }}>
-          {_prefix && <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', pointerEvents: 'none', zIndex: 1 }}>{_prefix}</span>}
-          <input
-            type="text"
-            value={displayValue}
-            onChange={handleChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            style={{
-              width: '100%',
-              padding: '0.75rem 1rem',
-              paddingLeft: prefix ? '3.5rem' : '1rem',
-              paddingRight: suffix ? '3rem' : '1rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              color: '#e8e9ed',
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: '1rem',
-            }}
-          />
-          {_suffix && <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', pointerEvents: 'none', zIndex: 1 }}>{_suffix}</span>}
-        </div>
-      </div>
-    );
-  };
-  
   const toggleLine = (dataKey) => {
     setHiddenLines(prev => ({ ...prev, [dataKey]: !prev[dataKey] }));
   };
@@ -3081,17 +3210,6 @@ const mIdx = cols.findIndex(c =>
   };
   
   // Milestone legend
-  const MilestoneLegend = () => (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap', marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
-      {Object.entries(MILESTONE_COLORS).filter(([key]) => key !== 'retirement' && key !== 'expense').map(([key, { color, label }]) => (
-        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, border: '2px solid white' }} />
-          <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', color: '#e8e9ed', minHeight: '100vh', background: 'linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #0f1e36 100%)', padding: '2rem' }}>
       <TooltipLayer />
@@ -3509,14 +3627,12 @@ const mIdx = cols.findIndex(c =>
               const rfBdr         = rfVal === null ? 'rgba(107,114,128,0.2)'  : rfVal >= 85 ? 'rgba(34,197,94,0.2)'  : rfVal >= 50 ? 'rgba(234,179,8,0.2)'  : 'rgba(239,68,68,0.2)';
 
               // 7. Income Replacement Ratio
-              // Retirement spending power (what you can spend) / pre-retirement income
-              // = retirementBudgetNominal / (salary + passive + other today)
-              // Passive/other income funds part of the budget; SWR drawdown covers the rest.
-              // Adding them separately would double-count — the budget IS the spending power.
-              const yearsToRet = profile.retirementAge - profile.currentAge;
-              const retNominalExp = getRetNominalForYear(new Date().getFullYear() + yearsToRet);
+              // Retirement spending power (what you plan to spend) / pre-retirement income
+              // Both in today's terms to avoid apples-to-oranges comparison.
+              // effectiveRetirementExpense = sum of retirement budget in today's dollars.
+              // annualIncome = current annual income (salary + passive + other).
               const preRetIncome  = annualIncome;
-              const irrVal   = preRetIncome > 0 && retNominalExp > 0 ? (retNominalExp / preRetIncome) * 100 : null;
+              const irrVal   = preRetIncome > 0 && effectiveRetirementExpense > 0 ? (effectiveRetirementExpense / preRetIncome) * 100 : null;
               const irrColor = irrVal === null ? '#6b7280' : irrVal >= 80 && irrVal <= 120 ? '#22c55e' : irrVal > 120 ? '#eab308' : irrVal >= 70 ? '#eab308' : '#ef4444';
               const irrBg    = irrVal === null ? 'rgba(107,114,128,0.07)' : irrVal >= 80 && irrVal <= 120 ? 'rgba(34,197,94,0.07)' : irrVal > 120 ? 'rgba(234,179,8,0.07)' : irrVal >= 70 ? 'rgba(234,179,8,0.07)' : 'rgba(239,68,68,0.07)';
               const irrBdr   = irrVal === null ? 'rgba(107,114,128,0.2)'  : irrVal >= 80 && irrVal <= 120 ? 'rgba(34,197,94,0.2)'  : irrVal > 120 ? 'rgba(234,179,8,0.2)'  : irrVal >= 70 ? 'rgba(234,179,8,0.2)'  : 'rgba(239,68,68,0.2)';
@@ -3537,7 +3653,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 1. Savings Rate */}
                   <div style={tileStyle(srBg, srBdr)}>
                     <div>
-                      <div style={labelStyle}>💰 Savings Rate <InfoTooltip text={`Annual savings ÷ gross income. Savings = income minus current expenses (${formatCurrency(annualSavings, currency, exchangeRates)}/yr undeployed surplus). Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Higher rates compress the time to retirement significantly. Use Surplus Deployment in Outlook to model putting this to work.`} /></div>
+                      <div style={labelStyle}>💰 Savings Rate <InfoTooltip text={`Annual savings ÷ gross income. Savings = income minus current expenses (${formatCurrency(annualSavings, currency, exchangeRates)}/yr undeployed surplus). Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Higher rates compress the time to retirement significantly. Use Surplus Deployment in the Dashboard tab to model putting this to work.`} /></div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                         <span style={valueStyle(srColor)}>{srVal.toFixed(1)}%</span>
                         <span style={{ fontSize: '0.65rem', color: '#4b5563' }}>{formatCurrency(annualSavings, currency, exchangeRates)}/yr</span>
@@ -3600,7 +3716,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 6. Retirement Funding */}
                   <div style={tileStyle(rfBg, rfBdr)}>
                     <div>
-                      <div style={labelStyle}>🎯 Retirement Funding <InfoTooltip text={`Projected investments at retirement ÷ Required Nest Egg (same Q1 calc in the Retirement tab). Shows how far along you are toward the nest egg target. Below 50% = significant gap · 50–85% = on a reasonable path · 85%+ = approaching target · 100%+ = on track. Denominator uses retirement-day budget ÷ SWR — adjust both in the Retirement tab. Does not include surplus deployment; model that in Outlook.`} /></div>
+                      <div style={labelStyle}>🎯 Retirement Funding <InfoTooltip text={`Projected investments at retirement ÷ Required Nest Egg (same Q1 calc in the Retirement tab). Shows how far along you are toward the nest egg target. Below 50% = significant gap · 50–85% = on a reasonable path · 85%+ = approaching target · 100%+ = on track. Denominator uses retirement-day budget ÷ SWR — adjust both in the Retirement tab. Does not include surplus deployment; model that in the Dashboard tab.`} /></div>
                       {rfVal !== null
                         ? <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                             <span style={valueStyle(rfColor)}>{Math.min(rfVal, 999).toFixed(0)}%</span>
@@ -3614,7 +3730,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 7. Income Replacement Ratio */}
                   <div style={tileStyle(irrBg, irrBdr)}>
                     <div>
-                      <div style={labelStyle}>🔄 Income Replacement <InfoTooltip text={`How much of your pre-retirement income your retirement plan replaces. Calculated as: retirement budget (in retirement-day terms) ÷ current annual income. Target: 70–80% = adequate · 80–100% = comfortable · above 100% = retirement costs more than current income (review budget) · below 70% = lifestyle gap risk.`} /></div>
+                      <div style={labelStyle}>🔄 Income Replacement <InfoTooltip text={`How much of your pre-retirement income your retirement plan replaces. Calculated as: retirement budget (today's terms) ÷ current annual income — both in today's dollars for a like-for-like comparison. Thresholds: 80–120% = strong fit · 70–79% = caution (lean replacement) · above 120% = retirement costs exceed current income · below 70% = lifestyle gap risk.`} /></div>
                       {irrVal !== null
                         ? <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                             <span style={valueStyle(irrColor)}>{Math.round(irrVal)}%</span>
@@ -4665,7 +4781,7 @@ const mIdx = cols.findIndex(c =>
                                     <span style={{ fontSize: '1rem', fontWeight: '800', color: '#34d399', fontFamily: 'JetBrains Mono, monospace' }}>Age {t1FiAge}</span>
                                     {t1Delta !== null && deltaChip(t1Delta)}
                                   </div>
-                                : <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>Not reached within outlook horizon</span>
+                                : <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>Not reached within dashboard horizon</span>
                               }
                             </div>
                             <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', marginBottom: '0.65rem' }} />
@@ -4697,7 +4813,7 @@ const mIdx = cols.findIndex(c =>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                       {t2Sim.debtFreeAge
                                         ? <span style={{ fontSize: '1rem', fontWeight: '800', color: '#f87171', fontFamily: 'JetBrains Mono, monospace' }}>Age {t2Sim.debtFreeAge}</span>
-                                        : <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic' }}>Beyond outlook horizon</span>}
+                                        : <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontStyle: 'italic' }}>Beyond dashboard horizon</span>}
                                       {t2DebtDelta !== null && t2DebtDelta !== 0 && (
                                         <span style={{ fontSize: '0.72rem', color: '#34d399', fontFamily: 'JetBrains Mono, monospace' }}>▲ {Math.abs(t2DebtDelta)} yrs earlier</span>
                                       )}
@@ -4713,7 +4829,7 @@ const mIdx = cols.findIndex(c =>
                                           <span style={{ fontSize: '1rem', fontWeight: '800', color: '#34d399', fontFamily: 'JetBrains Mono, monospace' }}>Age {t2Sim.fiAgeResult}</span>
                                           {t2FiDelta !== null && deltaChip(t2FiDelta)}
                                         </div>
-                                      : <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>Not reached within outlook horizon</span>
+                                      : <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>Not reached within dashboard horizon</span>
                                     }
                                   </div>
                                 </>
@@ -4760,13 +4876,13 @@ const mIdx = cols.findIndex(c =>
                                     <span style={{ fontSize: '1rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>Age {t3Sim.fiAgeResult}</span>
                                     {t3Delta !== null && deltaChip(t3Delta)}
                                   </div>
-                                : <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>Not reached within outlook horizon</span>
+                                : <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>Not reached within dashboard horizon</span>
                               }
                             </div>
                           </div>
 
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.6rem' }}>Simplified model — investments only, no real estate or drawdown. To action a strategy, update your Finances tab and review the full Outlook projection.</div>
+                        <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.6rem' }}>Simplified model — investments only, no real estate or drawdown. To action a strategy, update your Finances tab and review the full Dashboard projection.</div>
                       </div>
                     )}
                   </div>
@@ -4938,8 +5054,8 @@ const mIdx = cols.findIndex(c =>
                   : 'High risk — funding gap and low survival odds';
               const verdictDetail = isStrong
                 ? (isCoasting
-                    ? "You\'re on track and already coasting — your current investments will grow to your Required Nest Egg by retirement without any additional savings. Any surplus you deploy only accelerates your timeline further. Survival odds are high."
-                    : "You\'re on track to meet your Required Nest Egg and survival odds are high. Your plan looks solid.")
+                    ? "You're on track and already coasting — your current investments will grow to your Required Nest Egg by retirement without any additional savings. Any surplus you deploy only accelerates your timeline further. Survival odds are high."
+                    : "You're on track to meet your Required Nest Egg and survival odds are high. Your plan looks solid.")
                 : isOnTrackMod
                   ? "Your projected Investments meet the Required Nest Egg target, but survival odds fall below 80% — consider revisiting your return assumptions or retirement spending."
                 : isOnTrackWeak
@@ -4965,18 +5081,38 @@ const mIdx = cols.findIndex(c =>
                 const extraAnnual = annuityFactor > 0 ? Math.round(absGap / annuityFactor) : null;
                 extraMonthly = extraAnnual ? Math.round(extraAnnual / 12) : null;
                 if (extraMonthly === null) saveMoreNA = true;
-                // Retire later — pure compounding only: how many extra years does it take for
-                // existing investments to compound to the required nest egg?
-                // Surplus stays uninvested (as stated in tooltip). This is consistent with the
-                // base wealthProjection which doesn't redeploy surplus into investments.
-                // When user actually updates retirementAge in Profile, their surplus WILL compound
-                // (via Surplus Deployment) so the real benefit can be even larger than shown here.
+                // Retire later — compounds existing investments AND adds net savings
+                // (income minus expenses) during each additional working year.
+                // Income grows at respective growth rates; expenses use pre-retirement budget.
+                // If net savings is negative (deficit), only investment compounding applies.
                 {
                   const retData = wealthProjection.find(function(d) { return d.age === profile.retirementAge; });
                   if (retData) {
                     let extInv = retData.investments;
+                    const baseSalary = income.salaryItems && income.salaryItems.length > 0
+                      ? income.salaryItems.reduce(function(s, i) { return s + (i.amount || 0); }, 0)
+                      : (income.salary || 0);
+                    const basePassive = income.passiveItems && income.passiveItems.length > 0
+                      ? income.passiveItems.reduce(function(s, i) { return s + (i.amount || 0); }, 0)
+                      : (income.passive || 0);
+                    const baseOther = income.otherIncomeItems && income.otherIncomeItems.length > 0
+                      ? income.otherIncomeItems.reduce(function(s, i) { return s + (i.amount || 0); }, 0)
+                      : (income.other || 0);
+                    const basePreRetExp = expenses.current || 0;
+                    const salGr = (assumptions.salaryGrowth || 0) / 100;
+                    const pasGr = (assumptions.passiveGrowth || 0) / 100;
+                    const othGr = (assumptions.otherIncomeGrowth || 0) / 100;
+                    const ytr = profile.retirementAge - profile.currentAge;
                     for (let yr = 1; yr <= 30; yr++) {
+                      // Compound investments
                       extInv = extInv * (1 + r);
+                      // Add net savings from continued work during this extra year
+                      const extYearSalary = baseSalary * Math.pow(1 + salGr, ytr + yr);
+                      const extYearPassive = basePassive * Math.pow(1 + pasGr, ytr + yr);
+                      const extYearOther = baseOther * Math.pow(1 + othGr, ytr + yr);
+                      const extYearIncome = extYearSalary + extYearPassive + extYearOther;
+                      const netSavings = Math.max(0, extYearIncome - basePreRetExp);
+                      extInv += netSavings;
                       const candidateAge = profile.retirementAge + yr;
                       const candidateCalYear = new Date().getFullYear() + (candidateAge - profile.currentAge);
                       const candidateNestEgg = nestEggSwr > 0 ? getRetNominalForYear(candidateCalYear) / (nestEggSwr / 100) : 0;
@@ -5031,7 +5167,7 @@ const mIdx = cols.findIndex(c =>
                             defaultValue={swr.toString()}
                             key={swr}
                             onBlur={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { const clamped = Math.min(SWR_MAX, Math.max(SWR_MIN, v)); setNestEggSwr(clamped); e.target.value = clamped.toString(); } else { e.target.value = swr.toString(); } }}
-                            onChange={(e) => { const v = e.target.value; if (!/^\d*\.?\d*$/.test(v)) e.target.value = v.replace(/[^d.]/g,''); }}
+                            onChange={(e) => { const v = e.target.value; if (!/^\d*\.?\d*$/.test(v)) e.target.value = v.replace(/[^\d.]/g,''); }}
                             style={{ width: '48px', padding: '0.25rem 0.4rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: '#e8e9ed', fontSize: '0.85rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
                           />
                           <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>%</span>
@@ -5043,7 +5179,7 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ marginBottom: '1.25rem' }}>
                         <div style={{ fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                           Q1 — How much do you need, and are you on track?
-                          <InfoTooltip text={`Will your investments be large enough to retire on the day you plan to? Required Nest Egg = retirement budget (inflated to retirement day) ÷ SWR — the lump sum needed for withdrawals to theoretically last indefinitely. Projected Investments = current portfolio compounded to retirement, without new savings (use Surplus Deployment in Outlook to model those). The funding bar shows % covered. Note: nest egg uses Day 1 budget conservatively — Survival Odds (Q2) accounts for phase-outs and is more precise.`} />
+                          <InfoTooltip text={`Will your investments be large enough to retire on the day you plan to? Required Nest Egg = retirement budget (inflated to retirement day) ÷ SWR — the lump sum needed for withdrawals to theoretically last indefinitely. Projected Investments = current portfolio compounded to retirement, without new savings (use Surplus Deployment in the Dashboard tab to model those). The funding bar shows % covered. Note: nest egg uses Day 1 budget conservatively — Survival Odds (Q2) accounts for phase-outs and is more precise.`} />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', alignItems: 'stretch', marginBottom: '0.85rem' }}>
@@ -5078,7 +5214,7 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ padding: '1rem', background: 'rgba(96,165,250,0.07)', borderRadius: '10px', border: '1px solid rgba(96,165,250,0.18)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                               Projected Investments at {profile.retirementAge}
-                              <InfoTooltip text={`Your projected Investment portfolio at retirement age ${profile.retirementAge}, based on your current investments compounding at your assumed return. Only liquid Investments count toward the SWR-based nest egg target — real estate and other illiquid assets are excluded. Surplus is not automatically reinvested; deploy it via Surplus Deployment in the Outlook tab to improve this figure.`} />
+                              <InfoTooltip text={`Your projected Investment portfolio at retirement age ${profile.retirementAge}, based on your current investments compounding at your assumed return. Only liquid Investments count toward the SWR-based nest egg target — real estate and other illiquid assets are excluded. Surplus is not automatically reinvested; deploy it via Surplus Deployment in the Dashboard tab to improve this figure.`} />
                             </div>
                             <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 }}>{formatCurrencyDecimal(projectedWealth, currency, exchangeRates)}</div>
                             <div style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.35rem' }}>on current trajectory</div>
@@ -5176,14 +5312,14 @@ const mIdx = cols.findIndex(c =>
                                 <div>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                                     <div style={{ padding: '0.85rem', background: saveMoreNA ? 'rgba(255,255,255,0.02)' : 'rgba(96,165,250,0.07)', borderRadius: '8px', border: `1px solid ${saveMoreNA ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario — assumes a fixed monthly amount invested immediately each month at your preset Investment return of ${assumptions.investmentReturn}%/yr, compounded annually until retirement. In reality your savings fluctuate year-to-year, but this simplified figure gives you a constant target to aim for. All other factors remain unchanged from your base scenario. Note: this figure does not include your existing surplus — any surplus you already have (see Surplus Deployment in the Outlook tab) can be applied toward this amount.`} /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario — assumes a fixed monthly amount invested immediately each month at your preset Investment return of ${assumptions.investmentReturn}%/yr, compounded annually until retirement. In reality your savings fluctuate year-to-year, but this simplified figure gives you a constant target to aim for. All other factors remain unchanged from your base scenario. Note: this figure does not include your existing surplus — any surplus you already have (see Surplus Deployment in the Dashboard tab) can be applied toward this amount.`} /></div>
                                       {saveMoreNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Not calculable</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrencyDecimal(extraMonthly, currency, exchangeRates)}/mo</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>constant monthly amount · invested at {assumptions.investmentReturn}%/yr · compounded until retirement</div>
                                       {!saveMoreNA && annualSavings > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Your current surplus of {formatCurrencyDecimal(annualSavings / 12, currency, exchangeRates)}/mo (today) can offset this</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra years of compounding your Investment portfolio at your preset return closes the gap — reaching the point where your Investments, drawn at your SWR, fully cover your post-retirement expenses. Any savings you accumulate during this period are assumed uninvested. To model the effect of actively deploying your surplus to retire faster, see Surplus Deployment in the Outlook tab." /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years close the gap. During each additional year, your portfolio compounds at your preset return AND your net savings (income minus expenses, if positive) are added — with income growing at your configured growth rates. To model the effect of actively deploying your surplus to retire faster, see Surplus Deployment in the Dashboard tab." /></div>
                                       {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Gap too large to close by working longer</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · no other changes`}</div>
@@ -5192,7 +5328,7 @@ const mIdx = cols.findIndex(c =>
                                       const returnDelta = solvedReturn !== null ? Math.round((solvedReturn - assumptions.investmentReturn) * 10) / 10 : null;
                                       return (
                                       <div style={{ padding: '0.85rem', background: returnNA ? 'rgba(255,255,255,0.02)' : 'rgba(245,158,11,0.07)', borderRadius: '8px', border: `1px solid ${returnNA ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.2)'}` }}>
-                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The return needed on your Investment portfolio to reach your Required Nest Egg, with everything else unchanged. Only liquid Investments are included — illiquid assets are excluded. Converting illiquid wealth to Investments would reduce the return required. Any savings you accumulate are assumed uninvested. To model the effect of deploying your surplus, see Surplus Deployment in the Outlook tab.`} /></div>
+                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The return needed on your Investment portfolio to reach your Required Nest Egg, with everything else unchanged. Only liquid Investments are included — illiquid assets are excluded. Converting illiquid wealth to Investments would reduce the return required. Any savings you accumulate are assumed uninvested. To model the effect of deploying your surplus, see Surplus Deployment in the Dashboard tab.`} /></div>
                                         {returnNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Would require unrealistic returns (&gt;30%/yr)</div>
                                           : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace' }}>{solvedReturn}%/yr {returnDelta !== null && returnDelta > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#f59e0b', opacity: 0.75 }}>(+{returnDelta}pp)</span>}</div>}
                                         <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{returnNA ? '' : `on Investments only · your current rate is ${assumptions.investmentReturn}%`}</div>
@@ -5238,7 +5374,7 @@ const mIdx = cols.findIndex(c =>
                                 defaultValue={assumptions.investmentStdDev.toString()}
                                 key={assumptions.investmentStdDev}
                                 onBlur={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 1 && v <= 40) { setAssumptions({...assumptions, investmentStdDev: v}); } else { e.target.value = assumptions.investmentStdDev.toString(); } }}
-                                onChange={(e) => { const v = e.target.value; if (!/^\d*\.?\d*$/.test(v)) e.target.value = v.replace(/[^d.]/g,''); }}
+                                onChange={(e) => { const v = e.target.value; if (!/^\d*\.?\d*$/.test(v)) e.target.value = v.replace(/[^\d.]/g,''); }}
                                 style={{ width: '44px', padding: '0.25rem 0.3rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#e8e9ed', fontSize: '0.75rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
                               />
                               <span style={{ fontSize: '0.65rem', color: '#4b5563' }}>%</span>
@@ -5296,12 +5432,26 @@ const mIdx = cols.findIndex(c =>
                     const retRate = cat ? ((retExpenseGrowthRates[cat] || 0) / 100) : 0;
                     return oneTimeHit.amount * Math.pow(1 + preRate, yearsToRetirement) * Math.pow(1 + retRate, yearsIn);
                   })();
-                  // Net passive + other income against withdrawal — consistent with wealthProjection logic
+                  // Net passive + other income against withdrawal — resolve sub-items with endYear
                   const passiveGrowth = (assumptions.passiveGrowth || 0) / 100;
                   const otherGrowth   = (assumptions.otherIncomeGrowth || 0) / 100;
                   const yearsTotal    = yearsToRetirement + yearsIn;
-                  const passiveInRet  = (income.passive || 0) * Math.pow(1 + passiveGrowth, yearsTotal);
-                  const otherInRet    = (income.other   || 0) * Math.pow(1 + otherGrowth,   yearsTotal);
+                  const passiveInRet  = (() => {
+                    const items = income.passiveItems && income.passiveItems.length > 0 ? income.passiveItems : null;
+                    if (!items) return (income.passive || 0) * Math.pow(1 + passiveGrowth, yearsTotal);
+                    return items.reduce((sum, item) => {
+                      if (item.endYear && calYear >= item.endYear) return sum;
+                      return sum + (item.amount || 0) * Math.pow(1 + passiveGrowth, yearsTotal);
+                    }, 0);
+                  })();
+                  const otherInRet    = (() => {
+                    const items = income.otherIncomeItems && income.otherIncomeItems.length > 0 ? income.otherIncomeItems : null;
+                    if (!items) return (income.other || 0) * Math.pow(1 + otherGrowth, yearsTotal);
+                    return items.reduce((sum, item) => {
+                      if (item.endYear && calYear >= item.endYear) return sum;
+                      return sum + (item.amount || 0) * Math.pow(1 + otherGrowth, yearsTotal);
+                    }, 0);
+                  })();
                   const netWithdrawal = Math.max(0, inflationAdjusted + oneTimeAmount - passiveInRet - otherInRet);
                   result.push({ age: age, balance: Math.round(Math.max(0, balance)) });
                   if (age > profile.retirementAge) {
@@ -7116,7 +7266,7 @@ const mIdx = cols.findIndex(c =>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(income.passive, exchangeRates[currency])}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span><input type="number" value={assumptions.passiveGrowth ?? 2} onChange={(e) => setAssumptions({...assumptions, passiveGrowth: parseFloat(e.target.value) || 0})} style={{ width: '52px', padding: '0.1rem 0.2rem', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#e8e9ed', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} /><span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
+                      <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span><input type="number" value={assumptions.passiveGrowth ?? 2} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0 && v <= 30) setAssumptions({...assumptions, passiveGrowth: v}); }} style={{ width: '52px', padding: '0.1rem 0.2rem', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#e8e9ed', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} /><span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
                       <span style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.1)', display: 'inline-block', margin: '0 0.1rem' }} />
                       <button onClick={() => setExpandedCategories({...expandedCategories, passiveItems: !expandedCategories.passiveItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.passiveItems ? '▲ Hide' : '▼ ' + ((income.passiveItems?.length || 0) === 1 ? '1 item' : (income.passiveItems?.length || 0) + ' items')}</button>
                     </div>
@@ -7157,7 +7307,7 @@ const mIdx = cols.findIndex(c =>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(income.other, exchangeRates[currency])}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span><input type="number" value={assumptions.otherIncomeGrowth ?? 2} onChange={(e) => setAssumptions({...assumptions, otherIncomeGrowth: parseFloat(e.target.value) || 0})} style={{ width: '52px', padding: '0.1rem 0.2rem', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#e8e9ed', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} /><span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
+                      <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span><input type="number" value={assumptions.otherIncomeGrowth ?? 2} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0 && v <= 30) setAssumptions({...assumptions, otherIncomeGrowth: v}); }} style={{ width: '52px', padding: '0.1rem 0.2rem', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#e8e9ed', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} /><span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
                       <span style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.1)', display: 'inline-block', margin: '0 0.1rem' }} />
                       <button onClick={() => setExpandedCategories({...expandedCategories, otherIncomeItems: !expandedCategories.otherIncomeItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.otherIncomeItems ? '▲ Hide' : '▼ ' + ((income.otherIncomeItems?.length || 0) === 1 ? '1 item' : (income.otherIncomeItems?.length || 0) + ' items')}</button>
                     </div>
@@ -7381,21 +7531,30 @@ const mIdx = cols.findIndex(c =>
               <NumberInput
                 label="Current Age"
                 value={profile.currentAge}
-                onChange={(val) => setProfile({...profile, currentAge: val})}
+                onChange={(val) => {
+                  const v = Math.max(1, Math.min(val, profile.retirementAge - 1));
+                  setProfile({...profile, currentAge: v});
+                }}
                 step={1}
                 tooltip={TOOLTIPS.currentAge}
               />
               <NumberInput
                 label="Planned Retirement Age"
                 value={profile.retirementAge}
-                onChange={(val) => setProfile({...profile, retirementAge: val})}
+                onChange={(val) => {
+                  const v = Math.max(profile.currentAge + 1, Math.min(val, profile.lifeExpectancy - 1));
+                  setProfile({...profile, retirementAge: v});
+                }}
                 step={1}
                 tooltip={TOOLTIPS.retirementAge}
               />
               <NumberInput
                 label="Life Expectancy"
                 value={profile.lifeExpectancy}
-                onChange={(val) => setProfile({...profile, lifeExpectancy: val})}
+                onChange={(val) => {
+                  const v = Math.max(profile.retirementAge + 1, val);
+                  setProfile({...profile, lifeExpectancy: v});
+                }}
                 step={1}
                 tooltip={TOOLTIPS.lifeExpectancy}
               />
@@ -7666,4 +7825,42 @@ const mIdx = cols.findIndex(c =>
   );
 };
 
-export default NetWorthNavigator;
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('AppErrorBoundary caught:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '3rem', textAlign: 'center', fontFamily: 'Inter, sans-serif', color: '#e8e9ed', minHeight: '100vh', background: '#0a1628', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Something went wrong</h1>
+          <p style={{ color: '#9ca3af', marginBottom: '1.5rem', maxWidth: '500px' }}>
+            An unexpected error occurred. Your data may still be saved in your browser. Try reloading the page.
+          </p>
+          <p style={{ color: '#6b7280', fontSize: '0.75rem', fontFamily: 'monospace', marginBottom: '1.5rem', maxWidth: '600px', wordBreak: 'break-word' }}>
+            {this.state.error?.message ? 'Error details have been logged to the console.' : ''}
+          </p>
+          <button onClick={() => window.location.reload()} style={{ padding: '0.75rem 2rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', cursor: 'pointer' }}>
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const App = () => (
+  <AppErrorBoundary>
+    <NetWorthNavigator />
+  </AppErrorBoundary>
+);
+
+export default App;

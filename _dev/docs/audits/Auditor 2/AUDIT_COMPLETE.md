@@ -62,14 +62,14 @@ This independent audit examined every calculation, metric, and assumption in the
 
 ### Executable Tests
 
-Run: `node run_all_tests.js`
+Run: `node _dev/tests/auditor2_run_all.js`
 
 | Test File | Status | Coverage |
 |-----------|--------|----------|
-| monte_carlo_test.js | ✅ Pass | Box-Muller, Success Condition, Cash Exclusion |
-| projection_test.js | ✅ Pass | Growth, Amortization, Drawdown, OTE |
-| scorecard_test.js | Ready | Savings Rate, NW Multiple, IRR, Emergency Fund |
-| gap_levers_test.js | Ready | Save More, Retire Later, Higher Return, Surplus |
+| auditor2_monte_carlo.js | ✅ Pass | Box-Muller, Success Condition, Cash Exclusion |
+| auditor2_projection.js | ✅ Pass | Growth, Amortization, Drawdown, OTE |
+| auditor2_scorecard.js | Ready | Savings Rate, NW Multiple, IRR, Emergency Fund |
+| auditor2_gap_levers.js | Ready | Save More, Retire Later, Higher Return, Surplus |
 
 ### Analysis Documents
 
@@ -127,11 +127,11 @@ Run: `node run_all_tests.js`
 
 ### Test Files (5)
 
-1. **monte_carlo_test.js** - Phase 3 tests
-2. **projection_test.js** - Phase 2 tests
-3. **scorecard_test.js** - Phase 4 tests
-4. **gap_levers_test.js** - Phase 5 tests
-5. **run_all_tests.js** - Test runner
+1. **auditor2_monte_carlo.js** - Phase 3 tests
+2. **auditor2_projection.js** - Phase 2 tests
+3. **auditor2_scorecard.js** - Phase 4 tests
+4. **auditor2_gap_levers.js** - Phase 5 tests
+5. **auditor2_run_all.js** - Test runner
 
 **Total:** 15 files created
 
