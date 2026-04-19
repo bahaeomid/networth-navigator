@@ -1,10 +1,10 @@
 # Implementation Log — NetWorth Navigator
 
-**Source audit:** `_dev/docs/audits/NETWORTH_NAVIGATOR_AUDIT_PLAN_v2.md`
+**Source audit:** `_dev/docs/audits/plans/NETWORTH_NAVIGATOR_AUDIT_PLAN_v2.md`
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-04-17 by Session 1
+**Last updated:** 2026-04-19 by Session 4
 
 ---
 
@@ -44,6 +44,9 @@
 | NEW-28 | IRR uses mismatched timeframes (nominal future vs today's terms) | MEDIUM | E | FIXED | 2 | Both numerator and denominator now use today's-terms values in scorecard JSX and HTML export |
 | NEW-29 | Retire Later lever excludes salary contributions during extended years | MEDIUM | E | FIXED | 2 | Loop adds net savings (income - expenses, if positive) with income growing at configured rates |
 | UCG-1 | Savings rate clamped to 0% hides deficit | MEDIUM | E | FIXED | 2 | Removed Math.max(0,...) clamp — shows negative values |
+| NEW-30 | Pre-Retirement BASE breakdown modal opens out of viewport | HIGH | F | FIXED | 3 | Changed overlay from absolute scroll-anchored positioning to fixed viewport overlay |
+| NEW-31 | Dashboard Retirement Health value row wraps/misaligns | MEDIUM | F | FIXED | 3 | Converted rows to two-column grid and enforced nowrap + right alignment for value column |
+| NEW-32 | Retirement Health tooltip icon baseline shift | LOW | F | FIXED | 3 | Adjusted InfoTooltip baseline styling (`lineHeight` + `verticalAlign`) for compact metric rows |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -311,3 +314,121 @@
 **Total findings resolved this session:** 10 FIXED, 3 DEFERRED
 **Total findings resolved across all sessions:** 23 FIXED, 8 WONTFIX/DEFERRED
 **Zero editor errors confirmed.**
+
+---
+
+## SESSION 3 — 2026-04-19 — GitHub Copilot (GPT-5.3-Codex)
+
+**Picking up from:** Session 2
+**Open findings at session start:** User-reported UI regressions not present in prior finding register
+**Session goal:** Run independent cross-audit against prior agent work, confirm/disagree with prior conclusions, and fix any validated regressions with full verification.
+**Session end status:** COMPLETE — 3 FIXED, 0 BLOCKED, 0 DEFERRED
+
+### Continuation State Summary (resolved in-session)
+
+- Prior sessions read in full: Session 1 + Session 2 blocks, audit registry, and latest audit report.
+- Cross-check completed: prior CRITICAL/HIGH fixes remained intact.
+- Discrepancy surfaced and resolved: current UI regressions were not captured in A4 even though behavior-level logic remained correct.
+
+### NEW-30 — Pre-Retirement BASE breakdown modal opens out of viewport (HIGH → FIXED)
+
+**Status:** FIXED ✅
+**Fix applied:** In `src/App.jsx`, replaced the BASE breakdown popup overlay from `position: 'absolute'` with scroll-offset anchoring to `position: 'fixed'` full-viewport overlay. Removed obsolete `breakdownScrollY` state and click-path usage.
+**Verification:** Browser-level Playwright check after scrolling deep into Pre-Retirement: modal heading `Breakdown at ...` appears inside viewport immediately.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Observations:** The regression was purely positioning logic in the popup container; no data or formula impact.
+**Files changed:** `src/App.jsx`
+
+### NEW-31 — Dashboard Retirement Health value row wraps/misaligns (MEDIUM → FIXED)
+
+**Status:** FIXED ✅
+**Fix applied:** In `src/App.jsx`, updated Retirement Health mini-card row layout from `display:flex` to a stable two-column grid (`1fr auto`) and applied `whiteSpace: 'nowrap'`, right-aligned, min-width value styling to preserve clean right-column alignment for entries like `Age 59`.
+**Verification:** Playwright computed-style capture on `Investments exhausted at` value span confirmed `white-space: nowrap` and `text-align: right`.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Observations:** Regression was responsive typography/layout pressure, not a metric computation error.
+**Files changed:** `src/App.jsx`
+
+### NEW-32 — Retirement Health tooltip icon baseline shift (LOW → FIXED)
+
+**Status:** FIXED ✅
+**Fix applied:** In `src/App.jsx`, adjusted `InfoTooltip` style baseline behavior (`lineHeight: 1.1` and `verticalAlign: 'middle'`) to improve icon alignment in compact card labels.
+**Verification:** Visual inspection in affected compact rows; no tooltip interaction regressions.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Observations:** Small but user-visible polish fix that improves readability consistency.
+**Files changed:** `src/App.jsx`
+
+## SESSION 3 CLOSE — 2026-04-19
+**Findings resolved this session:** 3 — NEW-30, NEW-31, NEW-32
+**Findings blocked:** 0 — none
+**Findings deferred:** 0 — none
+**Overall progress:** 26 / 26 actionable (100% complete on currently tracked actionable findings)
+
+**Key observations this session:**
+- Prior agent logic/security fixes remained intact under re-audit.
+- Remaining risks were UX/layout regressions in modal anchoring and compact metric row formatting.
+- Existing release verification chain (`lint + audits + smoke`) stayed green after the UI fixes.
+
+**Next session priority:**
+1. Optional: extend Playwright coverage to include explicit assertions for modal placement and compact card alignment across multiple viewport sizes.
+
+---
+
+## SESSION 4 — 2026-04-19 — GitHub Copilot (GPT-5.3-Codex)
+
+**Picking up from:** Session 3
+**Open findings at session start:** 0 confirmed product bugs in A5; independent re-audit requested from scratch with no assumptions.
+**Session goal:** Re-run full independent audit phases, reconcile stale/false-positive findings, and remediate any genuinely new issues.
+**Session end status:** COMPLETE — 3 FIXED, 0 BLOCKED, 0 DEFERRED
+
+### Continuation State Summary (resolved in-session)
+
+- Independent from-scratch validation confirmed some automated findings were stale against current code.
+- Runtime verification chain (`lint`, `_dev/tests` audits, Playwright smoke) re-run successfully.
+- New actionable issues surfaced in data-boundary validation and repository hygiene.
+
+### NEW-33 — SWR bounds bypassed on restore/import paths (MEDIUM → FIXED)
+
+**Status:** FIXED ✅
+**Fix applied:** Added shared `clampSwr()` helper in `src/App.jsx` and applied it to both auto-restore (`localStorage`) and JSON import paths before `setNestEggSwr`.
+**Verification:** Re-ran `npm run test:release`; all stages passed with no regressions.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Observations:** UI already clamped SWR edits, but persisted/imported payloads could bypass bounds and introduce unrealistic assumptions.
+**Files changed:** `src/App.jsx`
+
+### NEW-34 — Temporary root regression scripts left in repository surface (LOW → FIXED)
+
+**Status:** FIXED ✅
+**Fix applied:** Removed ad-hoc root scripts (`check_reg.js`, `check_regression.js`, `check_reg_v2.js`) and added `check_reg*.js` to `.gitignore` to prevent future reintroduction.
+**Verification:** Workspace root inventory confirms scripts removed; release verification remained green.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Observations:** One script was malformed/garbled and none were part of the documented or scripted release surface.
+**Files changed:** `.gitignore`, `check_reg.js` (deleted), `check_regression.js` (deleted), `check_reg_v2.js` (deleted)
+
+### NEW-35 — SWR range documentation drift vs enforced code bounds (LOW → FIXED)
+
+**Status:** FIXED ✅
+**Fix applied:** Updated `_dev/docs/core/FINANCIAL_MODEL.md` SWR range from `0.1–any` to `0.1–6.0` to match enforced app constraints.
+**Verification:** Manual docs-sync cross-check against `SWR_MIN`/`SWR_MAX` constants.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Observations:** This was a docs consistency issue, not a formula implementation bug.
+**Files changed:** `_dev/docs/core/FINANCIAL_MODEL.md`
+
+## SESSION 4 CLOSE — 2026-04-19
+**Findings resolved this session:** 3 — NEW-33, NEW-34, NEW-35
+**Findings blocked:** 0 — none
+**Findings deferred:** 0 — none
+**Overall progress:** 29 / 29 actionable (100% complete on currently tracked actionable findings)
+
+**Key observations this session:**
+- Re-audit quality improves when stale automated findings are manually reconciled against live source before remediation.
+- Input constraints must be enforced at all ingress points (UI, restore, and import), not just interactive form controls.
+- Repository hygiene issues can silently accumulate and should be treated as audit findings when they affect maintainability.
+
+**Next session priority:**
+1. Optional: add a focused Playwright case that explicitly validates SWR bounds after JSON import and localStorage restore.

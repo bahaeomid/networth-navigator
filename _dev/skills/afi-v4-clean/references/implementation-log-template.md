@@ -1,6 +1,6 @@
 # Implementation Log Template
 
-Copy this file to `_dev/docs/IMPLEMENTATION_LOG.md` at the start of **Session 1**.
+Copy this file to `_dev/docs/audits/continuity/IMPLEMENTATION_LOG.md` at the start of **Session 1**.
 In continuation sessions, do not copy this template — append a new session block
 to the existing file instead (see Session Block Template below).
 

@@ -200,9 +200,10 @@ const InfoTooltip = ({ text }) => {
         color: '#60a5fa',
         fontSize: '0.78rem',
         fontWeight: '400',
-        lineHeight: 1,
+        lineHeight: 1.1,
         display: 'inline-flex',
         alignItems: 'center',
+        verticalAlign: 'middle',
         textTransform: 'none',
         letterSpacing: 'normal',
         fontStyle: 'normal',
@@ -568,6 +569,11 @@ const MC_CAUTION_THRESHOLD  = 60;   // Monte Carlo success % = caution zone
 const GROWTH_RATE_MAX       = 20;   // CalcInput growth rate cap (%)
 const SWR_MIN               = 0.1;  // Safe withdrawal rate minimum (%)
 const SWR_MAX               = 6;    // Above 4% is historically risky; 6% is an outer bound for short-horizon cases
+const clampSwr = (value, fallback = 4) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(SWR_MAX, Math.max(SWR_MIN, n));
+};
 const WEALTH_MILESTONES_USD = [1000000, 5000000, 10000000, 25000000]; // Significant wealth milestones
 const ASSET_TYPES = [
   { key: 'investments', name: 'Investments', color: '#60a5fa' },
@@ -936,9 +942,7 @@ const NetWorthNavigator = () => {
   const [lowDelta, setLowDelta] = useState(-2.5);
   const [highDelta, setHighDelta] = useState(3.5);
   const [editingScenario, setEditingScenario] = useState(null); // 'low' | 'high' | null
-  const [breakdownCollapsed, setBreakdownCollapsed] = useState(true);
   const [breakdownPopupOpen, setBreakdownPopupOpen] = useState(false);
-  const [breakdownScrollY, setBreakdownScrollY] = useState(0);
   const [retirementBudgetCollapsed, setRetirementBudgetCollapsed] = useState(true);
   const [preRetirementBudgetCollapsed, setPreRetirementBudgetCollapsed] = useState(false);
   const [sensitivityCollapsed, setSensitivityCollapsed] = useState(true);
@@ -1022,7 +1026,7 @@ const NetWorthNavigator = () => {
       if (data.lifeEvents) setLifeEvents(data.lifeEvents);
       if (data.assumptions) setAssumptions(data.assumptions);
       if (data.oneTimeExpenses) setOneTimeExpenses(data.oneTimeExpenses);
-      if (data.nestEggSwr !== undefined) setNestEggSwr(data.nestEggSwr);
+      if (data.nestEggSwr !== undefined) setNestEggSwr(clampSwr(data.nestEggSwr));
       if (data.surplusSplitInvest !== undefined) setSurplusSplitInvest(data.surplusSplitInvest);
       if (data.surplusSplitDebt !== undefined) setSurplusSplitDebt(data.surplusSplitDebt);
     } catch (e) {
@@ -2271,7 +2275,7 @@ new Chart(document.getElementById('allocChart'),{
           setLifeEvents(imported.lifeEvents || DEFAULT_STATE.lifeEvents);
           setAssumptions(imported.assumptions || DEFAULT_STATE.assumptions);
           setOneTimeExpenses(imported.oneTimeExpenses || DEFAULT_STATE.oneTimeExpenses);
-          setNestEggSwr(imported.nestEggSwr || 4);
+          setNestEggSwr(clampSwr(imported.nestEggSwr));
           if (imported.surplusSplitInvest !== undefined) setSurplusSplitInvest(imported.surplusSplitInvest);
           if (imported.surplusSplitDebt   !== undefined) setSurplusSplitDebt(imported.surplusSplitDebt);
           alert('Data imported successfully! All values are in AED — switch currency above if needed.');
@@ -3497,9 +3501,9 @@ const mIdx = cols.findIndex(c =>
                 const exhaustionColor = exhaustionAge ? '#ef4444' : '#6b7280';
                 const swrTooltip = `The withdrawal rate your current investments (${formatCurrency(assets.investments, currency, exchangeRates)}) would need to fund your full retirement budget today. Target is ${nestEggSwr}% or below — based on your SWR setting in the Retirement tab, which you can adjust. A higher SWR target makes FI easier to reach; a lower one requires a larger portfolio.`;
                 const exhaustionTooltip = `Age at which your liquid investment portfolio runs to zero in the base scenario — when withdrawals outpace growth. Earlier exhaustion = lower survival odds. Address via higher savings, lower retirement spend, later retirement, or higher return assumption.`;
-                const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.28rem' };
-                const labelStyle = { fontSize: '0.67rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '0.2rem' };
-                const valueStyle = (color) => ({ fontSize: '0.8rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color });
+                const rowStyle = { display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', columnGap: '0.5rem', marginBottom: '0.28rem' };
+                const labelStyle = { fontSize: '0.67rem', color: '#6b7280', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', minWidth: 0, lineHeight: 1.2 };
+                const valueStyle = (color) => ({ fontSize: '0.8rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color, whiteSpace: 'nowrap', textAlign: 'right', minWidth: '68px' });
                 return (
                   <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '1.25rem', borderTop: '2px solid rgba(251,191,36,0.5)' }}>
                     {/* Card label */}
@@ -5166,7 +5170,7 @@ const mIdx = cols.findIndex(c =>
                             type="text"
                             defaultValue={swr.toString()}
                             key={swr}
-                            onBlur={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { const clamped = Math.min(SWR_MAX, Math.max(SWR_MIN, v)); setNestEggSwr(clamped); e.target.value = clamped.toString(); } else { e.target.value = swr.toString(); } }}
+                            onBlur={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { const clamped = clampSwr(v); setNestEggSwr(clamped); e.target.value = clamped.toString(); } else { e.target.value = swr.toString(); } }}
                             onChange={(e) => { const v = e.target.value; if (!/^\d*\.?\d*$/.test(v)) e.target.value = v.replace(/[^\d.]/g,''); }}
                             style={{ width: '48px', padding: '0.25rem 0.4rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: '#e8e9ed', fontSize: '0.85rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
                           />
@@ -6504,7 +6508,7 @@ const mIdx = cols.findIndex(c =>
                                 {/* Breakdown pill — only on Base card */}
                                 {!s.editable && (
                                   <button
-                                    onClick={() => { if (!breakdownPopupOpen) setBreakdownScrollY(window.scrollY); setBreakdownPopupOpen(v => !v); }}
+                                    onClick={() => setBreakdownPopupOpen(v => !v)}
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '10px', cursor: 'pointer', fontSize: '0.58rem', color: '#a78bfa', padding: '0.15rem 0.45rem', fontWeight: 600, lineHeight: 1.2 }}
                                   >
                                     <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0 }}>
@@ -6537,7 +6541,7 @@ const mIdx = cols.findIndex(c =>
                         clampedTargetYear >= e.year && clampedTargetYear <= (e.endYear || e.year)
                       );
                       return (
-                        <div style={{ position: 'absolute', top: breakdownScrollY, left: 0, right: 0, zIndex: 9998, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '5vh' }}
+                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '5vh' }}
                           onClick={() => setBreakdownPopupOpen(false)}>
                           <div style={{ background: 'rgba(10,22,40,0.98)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '14px', padding: '1.5rem', minWidth: '400px', maxWidth: '540px', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
                             onClick={e => e.stopPropagation()}>

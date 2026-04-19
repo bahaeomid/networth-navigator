@@ -5,7 +5,7 @@ whichever lifecycle skill runs first: `planner`, `codebase-auditor`, or `audit-f
 Every subsequent audit run appends to it. It is the single source of truth for the audit
 history of a project.
 
-**Default location:** `_dev/docs/audit/AUDIT_REGISTRY.md`
+**Default location:** `_dev/docs/audits/AUDIT_REGISTRY.md`
 Check agent context file `Audit registry:` key first, then the default above, then ask the user.
 
 ---
@@ -28,8 +28,8 @@ Check agent context file `Audit registry:` key first, then the default above, th
 
 | ID | Date | Command / Source | Scope | Report path | Status | AFI session |
 |----|------|-----------------|-------|-------------|--------|-------------|
-| AUDIT-01 | YYYY-MM-DD | codebase-auditor full | Full codebase, pre-launch | _dev/docs/audit/AUDIT_REPORT_YYYY-MM-DD.md | SUPERSEDED by AUDIT-02 | AFI session 1–3 (CLOSED) |
-| AUDIT-02 | YYYY-MM-DD | codebase-auditor security | Security focus post-refactor | _dev/docs/audit/AUDIT_REPORT_YYYY-MM-DD.md | ACTIVE | AFI session 4 (IN PROGRESS) |
+| AUDIT-01 | YYYY-MM-DD | codebase-auditor full | Full codebase, pre-launch | _dev/docs/audits/AUDIT_REPORT_YYYY-MM-DD.md | SUPERSEDED by AUDIT-02 | AFI session 1–3 (CLOSED) |
+| AUDIT-02 | YYYY-MM-DD | codebase-auditor security | Security focus post-refactor | _dev/docs/audits/AUDIT_REPORT_YYYY-MM-DD.md | ACTIVE | AFI session 4 (IN PROGRESS) |
 
 ---
 

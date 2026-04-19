@@ -72,21 +72,20 @@ Follow the path resolution protocol below.
 **Default `_dev/` layout:**
 ```
 _dev/docs/
-├── audit/          <- AUDIT_REGISTRY.md, AUDIT_REPORT_YYYY-MM-DD.md
+├── audits/         <- AUDIT_REGISTRY.md, AUDIT_REPORT_YYYY-MM-DD.md, continuity/
 ├── handovers/      <- HANDOVER-[PROJECT]-[SESSION].md
 ├── PLAN.md
 ├── EXECUTION_PLAN.md
-├── IMPLEMENTATION_LOG.md
-└── LESSONS_LEARNED.md
+└── core/
 ```
 
 **This skill's paths:**
 | File | Read path | Write path |
 |------|----------|-----------|
-| Audit document | Agent context `Audit report:` → `_dev/docs/audit/` (most recent) → ask | — |
-| Audit registry | Agent context `Audit registry:` → `_dev/docs/audit/AUDIT_REGISTRY.md` → optional | — |
-| `IMPLEMENTATION_LOG.md` | Agent context → `_dev/docs/IMPLEMENTATION_LOG.md` | `_dev/docs/IMPLEMENTATION_LOG.md` |
-| `LESSONS_LEARNED.md` | Same pattern | `_dev/docs/LESSONS_LEARNED.md` |
+| Audit document | Agent context `Audit report:` → `_dev/docs/audits/` (most recent) → ask | — |
+| Audit registry | Agent context `Audit registry:` → `_dev/docs/audits/AUDIT_REGISTRY.md` → optional | — |
+| `IMPLEMENTATION_LOG.md` | Agent context → `_dev/docs/audits/continuity/IMPLEMENTATION_LOG.md` | `_dev/docs/audits/continuity/IMPLEMENTATION_LOG.md` |
+| `LESSONS_LEARNED.md` | Same pattern | `_dev/docs/audits/continuity/LESSONS_LEARNED.md` |
 | `references/` templates | Resolve dynamically: find the skill folder containing this SKILL.md, then read `references/` within it. Never hardcode the folder name. | — |
 
 ---
@@ -148,7 +147,7 @@ and note the inference:
 Present the normalised finding inventory for user confirmation before planning.
 
 **If the audit document is split across multiple files:** ingest the index file first,
-then read supplementary files as needed. Check `_dev/docs/audit/` for related files.
+then read supplementary files as needed. Check `_dev/docs/audits/` for related files.
 
 ---
 

@@ -2,9 +2,11 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './_dev/e2e',
+  outputDir: './_dev/artifacts/test-results',
   timeout: 30000,
   fullyParallel: false,
   retries: 0,
+  reporter: [['list'], ['html', { outputFolder: './_dev/artifacts/playwright-report', open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
     headless: true,

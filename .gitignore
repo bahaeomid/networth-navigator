@@ -11,6 +11,8 @@ build/
 coverage/
 playwright-report/
 test-results/
+_dev/artifacts/playwright-report/
+_dev/artifacts/test-results/
 test-output.txt
 
 # Environment files
@@ -42,3 +44,4 @@ yarn-error.log*
 # Temporary files
 *.tmp
 *.temp
+check_reg*.js

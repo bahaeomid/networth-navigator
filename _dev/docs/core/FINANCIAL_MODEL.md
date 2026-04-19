@@ -32,7 +32,7 @@
 | Investment std dev | 12.0% | any | annual |
 | Real estate appreciation | 3.5% | any | annual |
 | Inflation (per-category) | 3–5% | any | annual |
-| Safe withdrawal rate | 4.0% | 0.1–any | % of nest egg |
+| Safe withdrawal rate | 4.0% | 0.1–6.0 | % of nest egg |
 
 ### Currency
 

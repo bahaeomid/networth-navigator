@@ -46,7 +46,7 @@ Follow the path resolution protocol below.
 **Default `_dev/` layout:**
 ```
 _dev/docs/
-├── audit/          <- AUDIT_REGISTRY.md, AUDIT_REPORT_YYYY-MM-DD.md
+├── audits/         <- AUDIT_REGISTRY.md, AUDIT_REPORT_YYYY-MM-DD.md
 ├── handovers/      <- HANDOVER-[PROJECT]-[SESSION].md
 ├── PLAN.md
 ├── EXECUTION_PLAN.md
@@ -57,9 +57,9 @@ _dev/docs/
 **This skill's paths:**
 | Output | Default path |
 |--------|-------------|
-| Audit report | `_dev/docs/audit/AUDIT_REPORT_YYYY-MM-DD.md` |
-| Supplementary files | `_dev/docs/audit/AUDIT_REPORT_YYYY-MM-DD_[PHASE].md` |
-| Audit registry | `_dev/docs/audit/AUDIT_REGISTRY.md` |
+| Audit report | `_dev/docs/audits/AUDIT_REPORT_YYYY-MM-DD.md` |
+| Supplementary files | `_dev/docs/audits/AUDIT_REPORT_YYYY-MM-DD_[PHASE].md` |
+| Audit registry | `_dev/docs/audits/AUDIT_REGISTRY.md` |
 | Agent context file scaffold | Project root (correct filename for environment) |
 
 ---
@@ -355,7 +355,7 @@ produce an index in `AUDIT_REPORT.md`. Ask the user before splitting.
 ### Audit Registry
 
 After saving the audit report, update `AUDIT_REGISTRY.md`. Follow path resolution
-(key: `Audit registry:` in agent context file; default: `_dev/docs/audit/AUDIT_REGISTRY.md`).
+(key: `Audit registry:` in agent context file; default: `_dev/docs/audits/AUDIT_REGISTRY.md`).
 
 **If no registry exists:** create it now using the schema in
 `references/audit-registry-schema.md` (bundled with this skill). This project may not have used the planner

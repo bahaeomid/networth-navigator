@@ -32,8 +32,8 @@ The `close` command is always user-initiated.
 
 | Artefact | Default location | Description |
 |---------|-----------------|-------------|
-| `IMPLEMENTATION_LOG.md` | `_dev/docs/IMPLEMENTATION_LOG.md` | Append-only session record |
-| `LESSONS_LEARNED.md` | `_dev/docs/LESSONS_LEARNED.md` | Accumulating knowledge document |
+| `IMPLEMENTATION_LOG.md` | `_dev/docs/audits/continuity/IMPLEMENTATION_LOG.md` | Append-only session record |
+| `LESSONS_LEARNED.md` | `_dev/docs/audits/continuity/LESSONS_LEARNED.md` | Accumulating knowledge document |
 
 Both documents are append-only — each agent session adds its own stamped block.
 `LESSONS_LEARNED.md` Part 4 contains generalizable principles designed to feed a
@@ -55,7 +55,7 @@ audit-fix-implementer/
 
 ## Audit Registry integration
 
-On first session, this skill checks for `_dev/docs/audit/AUDIT_REGISTRY.md`.
+On first session, this skill checks for `_dev/docs/audits/AUDIT_REGISTRY.md`.
 If found, it reads the current ground truth to identify the authoritative audit.
 If not found, it creates the registry. Either way, it updates the registry's
 AFI session column as work progresses and marks it CLOSED on project close.

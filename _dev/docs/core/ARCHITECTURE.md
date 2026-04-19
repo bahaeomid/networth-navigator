@@ -205,7 +205,7 @@ npm run test:release # Lint + audit harnesses + Playwright smoke test
 - `_dev/tests/` contains formula/parity/audit harnesses used to validate financial logic and prior audit findings.
 - `_dev/e2e/` contains browser-level Playwright smoke tests for release readiness.
 - `playwright.config.js` stays at the repo root so `npm run test:smoke` works conventionally.
-- Generated artifacts such as `dist/`, `test-results/`, `playwright-report/`, and `test-output.txt` are disposable and should not be treated as source assets.
+- Generated artifacts such as `dist/`, `_dev/artifacts/test-results/`, `_dev/artifacts/playwright-report/`, and `test-output.txt` are disposable and should not be treated as source assets.
 
 ### Dependencies (from package.json)
 

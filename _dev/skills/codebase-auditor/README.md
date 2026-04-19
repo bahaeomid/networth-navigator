@@ -33,8 +33,8 @@ codebase-auditor efficacy       → scan + efficacy review only
 
 | Artefact | Default location | Description |
 |---------|-----------------|-------------|
-| Audit report | `_dev/docs/audit/AUDIT_REPORT_YYYY-MM-DD.md` | Full findings report |
-| Audit registry | `_dev/docs/audit/AUDIT_REGISTRY.md` | Index of all audit runs |
+| Audit report | `_dev/docs/audits/AUDIT_REPORT_YYYY-MM-DD.md` | Full findings report |
+| Audit registry | `_dev/docs/audits/AUDIT_REGISTRY.md` | Index of all audit runs |
 | Agent context scaffold | Project root | CLAUDE.md / AGENTS.md / equivalent |
 
 The audit report is formatted for direct ingestion by the `audit-fix-implementer` skill.
@@ -74,7 +74,7 @@ or any targeted command.
 
 ## Audit Registry
 
-The Audit Registry (`_dev/docs/audit/AUDIT_REGISTRY.md`) tracks all audit runs with
+The Audit Registry (`_dev/docs/audits/AUDIT_REGISTRY.md`) tracks all audit runs with
 dates, scopes, report paths, and supersession status. This solves the common problem
 of multiple audits accumulating without traceability — agents always know which audit
 is current and which findings have been superseded.

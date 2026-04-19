@@ -123,9 +123,15 @@ networth-navigator/
 │   ├── App.jsx         # Main application component
 │   └── index.css      # Global styles
 ├── _dev/
+│   ├── README.md       # Developer workspace navigation
+│   ├── artifacts/      # Disposable generated outputs (Playwright, etc.)
 │   ├── e2e/            # Browser-level release smoke tests
 │   ├── tests/          # Formula and audit verification harnesses
-│   └── docs/           # Audit and architecture reference docs
+│   ├── skills/         # Auditing/fix workflow skills
+│   └── docs/
+│       ├── README.md   # Docs navigation index
+│       ├── core/       # Canonical app docs (architecture + financial model)
+│       └── audits/     # Audit registry, reports, continuity logs, plans, legacy
 └── README.md          # This file
 ```
 
