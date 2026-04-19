@@ -1407,7 +1407,7 @@ const NetWorthNavigator = () => {
       <td>${e.year}${e.endYear&&e.endYear>e.year?` – ${e.endYear}`:''}</td>
       <td>${escapeHtml(e.description||'—')}</td>
       <td class="num">${fmt(e.amount)}</td>
-      <td class="dim">${e.category&&e.category!=='none'?escapeHtml(getCatLabel(e.category)):e.category==='none'?'Uncategorised':'Uncategorised'}</td>
+      <td class="dim">${e.category&&e.category!=='none'?escapeHtml(getCatLabel(e.category)):'Uncategorized'}</td>
     </tr>`).join('') : '<tr><td colspan="4" class="dim" style="text-align:center;">No planned expenses entered</td></tr>';
 
     // ── Life events ──
@@ -5218,6 +5218,7 @@ const mIdx = cols.findIndex(c =>
               let solvedReturn = null;
               let saveMoreNA = false;
               let retireLaterna = false;
+              let retireLaterBeyondLife = false;
               let returnNA = false;
               if (yearsToRetire > 0 && !onTrack) {
                 // Save more
@@ -5232,13 +5233,22 @@ const mIdx = cols.findIndex(c =>
                   const retData = wealthProjection.find(function(d) { return d.age === profile.retirementAge; });
                   if (retData) {
                     let extInv = retData.investments;
+                    let computedExtraYears = null;
                     for (let yr = 1; yr <= 30; yr++) {
                       // Compound existing retirement balance for one additional year.
                       extInv = extInv * (1 + r);
                       const candidateAge = profile.retirementAge + yr;
                       const candidateCalYear = new Date().getFullYear() + (candidateAge - profile.currentAge);
                       const candidateNestEgg = nestEggSwr > 0 ? getRetNominalForYear(candidateCalYear) / (nestEggSwr / 100) : 0;
-                      if (extInv >= candidateNestEgg) { extraYears = yr; break; }
+                      if (extInv >= candidateNestEgg) { computedExtraYears = yr; break; }
+                    }
+                    if (computedExtraYears !== null) {
+                      const candidateRetAge = profile.retirementAge + computedExtraYears;
+                      if (candidateRetAge >= profile.lifeExpectancy) {
+                        retireLaterBeyondLife = true;
+                      } else {
+                        extraYears = computedExtraYears;
+                      }
                     }
                   }
                   if (extraYears === null) retireLaterna = true;
@@ -5441,8 +5451,8 @@ const mIdx = cols.findIndex(c =>
                                       {!saveMoreNA && annualSavings > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Your current surplus of {formatCurrencyDecimal(annualSavings / 12, currency, exchangeRates)}/mo (today) can offset this</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="Conservative estimate: how many extra years are needed if you only delay retirement and let your existing investments compound longer. No additional savings are invested in this lever, so this is intentionally strict. In reality, if you keep saving and invest the extra surplus while working longer, the required delay is usually shorter." /></div>
-                                      {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Gap too large to close by working longer</div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="Conservative estimate: how many extra years are needed if you only delay retirement and let your existing investments compound longer. No additional savings are invested in this lever, so this is intentionally strict. In reality, if you keep saving and invest the extra surplus while working longer, the required delay is usually shorter. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
+                                      {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>{retireLaterBeyondLife ? 'Would require retiring at or after life expectancy' : 'Gap too large to close by working longer'}</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · no other changes`}</div>
                                     </div>
@@ -5450,10 +5460,10 @@ const mIdx = cols.findIndex(c =>
                                       const returnDelta = solvedReturn !== null ? Math.round((solvedReturn - assumptions.investmentReturn) * 10) / 10 : null;
                                       return (
                                       <div style={{ padding: '0.85rem', background: returnNA ? 'rgba(255,255,255,0.02)' : 'rgba(245,158,11,0.07)', borderRadius: '8px', border: `1px solid ${returnNA ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.2)'}` }}>
-                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The return needed on your Investment portfolio to reach your Required Nest Egg, with everything else unchanged. Only liquid Investments are included — illiquid assets are excluded. Converting illiquid wealth to Investments would reduce the return required. Any savings you accumulate are assumed uninvested. To model the effect of deploying your surplus, see Surplus Deployment in the Dashboard tab.`} /></div>
+                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The return needed on your Investment portfolio to reach your Required Nest Egg, with everything else unchanged. Only liquid Investments are included — illiquid assets are excluded. Converting illiquid wealth to Investments would reduce the return required. Any savings you accumulate are assumed uninvested. To model the effect of deploying your surplus, see Surplus Deployment in the Dashboard tab. Displayed value is rounded to one decimal place, so entering it back may produce a very small residual gap in edge cases.`} /></div>
                                         {returnNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Would require unrealistic returns (&gt;30%/yr)</div>
                                           : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace' }}>{solvedReturn}%/yr {returnDelta !== null && returnDelta > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#f59e0b', opacity: 0.75 }}>(+{returnDelta}pp)</span>}</div>}
-                                        <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{returnNA ? '' : `on Investments only · your current rate is ${assumptions.investmentReturn}%`}</div>
+                                        <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{returnNA ? '' : `on Investments only · your current rate is ${assumptions.investmentReturn}% · rounded to 0.1%`}</div>
                                       </div>
                                       );
                                     })()}
@@ -6059,11 +6069,7 @@ const mIdx = cols.findIndex(c =>
                       row[cat.key] = (row[cat.key] || 0) + inflated;
                       if ((expenseTags[cat.key] || cat.group) === 'essential') essentialTotal += inflated;
                       else discTotal += inflated;
-                    } else {
-                      discTotal += inflated; // category key not found — treat as discretionary
                     }
-                  } else {
-                    discTotal += inflated; // no category assigned — treat as discretionary
                   }
                 });
                 const lifeEventHit = lifeEvents.find(e => e.year === y);
@@ -6328,7 +6334,14 @@ const mIdx = cols.findIndex(c =>
                                       ? pt.activeOTEsList.filter(ote =>
                                           ote.category && visibleLineKeys.includes(ote.category) && !hiddenCalcLines[ote.category]
                                         )
-                                      : pt.activeOTEsList;
+                                      : pt.activeOTEsList.filter((ote) => {
+                                          if (visibleLineKeys.includes('total')) return true;
+                                          if (!ote.category || ote.category === 'none') return false;
+                                          const cat = expenseCategories.find(c => c.key === ote.category);
+                                          if (!cat) return false;
+                                          const isEssential = (expenseTags[cat.key] || cat.group) === 'essential';
+                                          return isEssential ? visibleLineKeys.includes('essential') : visibleLineKeys.includes('discretionary');
+                                        });
                                     if (relevantOTEs.length === 0) return null;
                                     return (
                                       <div style={{ marginTop: '0.1rem' }}>
@@ -6337,13 +6350,14 @@ const mIdx = cols.findIndex(c =>
                                           const isRecurring = ote.endYear && ote.endYear > ote.year;
                                           const rangeLabel = isRecurring ? ' ' + ote.year + '–' + ote.endYear : ' ' + ote.year;
                                           const cat = ote.category && ote.category !== 'none' ? ote.category : null;
+                                          const catLabel = cat ? getCatLabel(cat) : 'Uncategorized';
                                           const rate = cat ? (expenseGrowthRates[cat] || 0) : 0;
                                           const inflatedAmt = (ote.amount || 0) * Math.pow(1 + rate / 100, yearsFrom);
                                           const showInflation = rate > 0 && yearsFrom > 0 && Math.abs(inflatedAmt - ote.amount) > 50;
                                           return (
                                             <div key={idx} style={{ marginTop: '0.05rem' }}>
                                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                                                <span style={{ color: '#d97706' }}>↳ {ote.description}<span style={{ color: '#92400e', fontSize: '0.63rem' }}>{rangeLabel}</span></span>
+                                                <span style={{ color: '#d97706' }}>↳ {ote.description}<span style={{ color: '#92400e', fontSize: '0.63rem' }}>{rangeLabel}</span><span style={{ color: '#a16207', fontSize: '0.62rem' }}> · {catLabel}</span></span>
                                                 <span style={{ fontFamily: 'monospace', color: '#f59e0b' }}>
                                                   {formatCurrencyDecimal(Math.round(ote.amount), currency, exchangeRates)}{isRecurring ? '/yr' : ''}
                                                 </span>
@@ -6479,6 +6493,9 @@ const mIdx = cols.findIndex(c =>
                                 // Only show if matching E or D aggregate line is visible
                                 if (oteCatIsEssential && !essentialVisible && !totalVisible) return null;
                                 if (!oteCatIsEssential && !discVisible && !totalVisible) return null;
+                              } else {
+                                // Uncategorized OTEs are represented on Total only
+                                if (!totalVisible) return null;
                               }
                             }
 
@@ -7602,7 +7619,7 @@ const mIdx = cols.findIndex(c =>
                           cursor: 'pointer',
                         }}
                       >
-                        <option value="none">Uncategorised</option>
+                        <option value="none">Uncategorized</option>
                         <optgroup label="Essential">
                           {expenseCategories.filter(function(c) { return (expenseTags[c.key] || c.group) === 'essential'; }).map(function(c) {
                             return <option key={c.key} value={c.key}>{c.label}</option>;

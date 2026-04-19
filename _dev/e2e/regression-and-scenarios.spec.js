@@ -294,6 +294,26 @@ test('regression: CSV category-key replacement keeps What-If and Planned Expense
   expect(orangeDots).toBeGreaterThan(0);
 });
 
+test('regression: uncategorized OTE affects total only (not discretionary line)', async ({ page }) => {
+  attachDialogHandler(page);
+  await page.goto('/');
+
+  await tabByName(page, 'Finances').click();
+  const plannedSection = page.locator('div').filter({ hasText: '📋 Planned Expenses' }).first();
+  const categorySelects = plannedSection.locator('select');
+  const selectCount = await categorySelects.count();
+  for (let i = 0; i < selectCount; i++) {
+    await categorySelects.nth(i).selectOption('none');
+  }
+
+  await tabByName(page, 'Pre-Retirement').click();
+  const noTotalBtn = page.locator('div[style*="cursor: pointer"]').filter({ hasText: 'Total' }).first();
+  await noTotalBtn.click();
+
+  const orangeDots = await page.locator('svg circle[fill="#f59e0b"]').count();
+  expect(orangeDots).toBe(0);
+});
+
 test('regression: retire-later recommendation is reproducible and runway percentages are normalized', async ({ page }) => {
   attachDialogHandler(page);
   await page.goto('/');
@@ -347,6 +367,40 @@ test('regression: retire-later recommendation is reproducible and runway percent
   const runwayText = (await runwayCard.textContent()) || '';
   expect(runwayText).not.toContain('5.300000000000001');
   expect(runwayText).not.toMatch(/\d+\.\d{6,}%\/yr/);
+});
+
+test('regression: retire-later does not recommend age at or beyond life expectancy', async ({ page }) => {
+  attachDialogHandler(page);
+  await page.goto('/');
+
+  const edgeCase = buildScenarioData({
+    name: 'retire-later-life-cap',
+    currentAge: 55,
+    retirementAge: 60,
+    lifeExpectancy: 62,
+    currency: 'AED',
+    assets: { cash: 30000, investments: 210000, realEstate: 180000, other: 10000 },
+    liabilities: { mortgage: 90000, loans: 10000, other: 0 },
+    income: { salary: 120000, passive: 5000, other: 4000 },
+    preExpenses: { housing: 70000, bills: 18000, groceries: 16000, healthBasic: 12000, travel: 8000, entertainment: 7000 },
+    retExpenses: { housing: 3500, bills: 1300, groceries: 1300, healthBasic: 1300, travel: 800, entertainment: 600 },
+    preRates: { housing: 3.0, bills: 3.2, groceries: 3.1, healthBasic: 4.2, travel: 3.4, entertainment: 3.0 },
+    retRates: { housing: 3.1, bills: 3.4, groceries: 3.2, healthBasic: 4.4, travel: 3.6, entertainment: 3.1 },
+    assumptions: { salaryGrowth: 2.0, passiveGrowth: 1.0, otherIncomeGrowth: 1.0, investmentReturn: 5.5, investmentStdDev: 12.0, realEstateAppreciation: 2.0, realEstateStdDev: 6.0, otherAssetGrowth: 1.0, otherAssetStdDev: 6.0 },
+    oneTimeExpenses: [
+      { id: 1, year: CURRENT_YEAR + 1, description: 'Medical', amount: 50000, category: 'healthBasic', endYear: null },
+    ],
+    nestEggSwr: 3.5,
+  });
+  await importJsonPayload(page, edgeCase);
+
+  await tabByName(page, 'Retirement').click();
+  const gapShowBtn = page.getByRole('button', { name: /Show Details/ }).first();
+  if (await gapShowBtn.isVisible()) await gapShowBtn.click();
+
+  await expect(page.getByText(/Would require retiring at or after life expectancy/i)).toBeVisible();
+  await expect(page.getByText(/retire at age\s*62/i)).toHaveCount(0);
+  await expect(page.getByText(/retire at age\s*63/i)).toHaveCount(0);
 });
 
 for (const scenario of SCENARIOS) {
