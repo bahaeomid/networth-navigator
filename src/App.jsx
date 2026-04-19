@@ -125,12 +125,24 @@ const buildCategoryAliasMap = (categories) => {
   return map;
 };
 
-const resolveCategoryRef = (rawCategory, validKeys, aliasMap) => {
-  if (!rawCategory || rawCategory === 'none') return 'none';
+const UNCATEGORIZED_ALIASES = new Set(['uncategorized', 'uncategorised']);
+
+const findUncategorizedCategoryKey = (categories) => {
+  const list = categories || [];
+  const match = list.find((cat) => {
+    const keyAlias = normalizeCategoryAlias(cat.key);
+    const labelAlias = normalizeCategoryAlias(cat.label);
+    return UNCATEGORIZED_ALIASES.has(keyAlias) || UNCATEGORIZED_ALIASES.has(labelAlias);
+  });
+  return match ? match.key : null;
+};
+
+const resolveCategoryRef = (rawCategory, validKeys, aliasMap, fallbackCategoryKey) => {
+  if (!rawCategory || rawCategory === 'none') return fallbackCategoryKey || 'none';
   if (validKeys.has(rawCategory)) return rawCategory;
   const alias = normalizeCategoryAlias(rawCategory);
   if (alias && aliasMap.has(alias)) return aliasMap.get(alias);
-  return 'none';
+  return fallbackCategoryKey || 'none';
 };
 
 // Tooltips
@@ -1014,12 +1026,14 @@ const NetWorthNavigator = () => {
   const normalizeCategoryLinkedState = React.useCallback((nextCategories) => {
     const validKeys = new Set((nextCategories || []).map(c => c.key));
     const aliasMap = buildCategoryAliasMap(nextCategories || []);
+    const uncategorizedCategoryKey = findUncategorizedCategoryKey(nextCategories || []);
+    const fallbackCategoryKey = uncategorizedCategoryKey || 'none';
 
     const normalizeOneTimers = (sourceList) => {
       const list = sourceList || [];
       let changed = false;
       const next = list.map((ote) => {
-        const resolved = resolveCategoryRef(ote.category, validKeys, aliasMap);
+        const resolved = resolveCategoryRef(ote.category, validKeys, aliasMap, fallbackCategoryKey);
         if (resolved === ote.category) return ote;
         changed = true;
         return { ...ote, category: resolved };
@@ -1033,7 +1047,7 @@ const NetWorthNavigator = () => {
       let changed = false;
       const next = [];
       list.forEach((adj) => {
-        const resolved = resolveCategoryRef(adj.category, validKeys, aliasMap);
+        const resolved = resolveCategoryRef(adj.category, validKeys, aliasMap, fallbackCategoryKey);
         if (resolved === 'none' || seen.has(resolved)) {
           changed = true;
           return;
@@ -1053,7 +1067,7 @@ const NetWorthNavigator = () => {
     const normalizedAdj = normalizeAdj(sensitivityAdj);
 
     const pickerSource = sensitivityCatPicker;
-    const resolvedPicker = resolveCategoryRef(pickerSource, validKeys, aliasMap);
+    const resolvedPicker = resolveCategoryRef(pickerSource, validKeys, aliasMap, fallbackCategoryKey);
     const fallbackPicker = (nextCategories && nextCategories[0] && nextCategories[0].key) ? nextCategories[0].key : '';
     const normalizedPicker = resolvedPicker === 'none' ? fallbackPicker : resolvedPicker;
 
@@ -1088,14 +1102,19 @@ const NetWorthNavigator = () => {
     normalizeCategoryLinkedState(expenseCategories);
   }, [expenseCategories, normalizeCategoryLinkedState]);
 
+  const uncategorizedCategoryKey = useMemo(() => {
+    return findUncategorizedCategoryKey(expenseCategories || []);
+  }, [expenseCategories]);
+
   const normalizedOneTimeExpenses = useMemo(() => {
     const validKeys = new Set((expenseCategories || []).map((c) => c.key));
     const aliasMap = buildCategoryAliasMap(expenseCategories || []);
+    const fallbackCategoryKey = uncategorizedCategoryKey || 'none';
     return (oneTimeExpenses || []).map((ote) => {
-      const resolved = resolveCategoryRef(ote.category, validKeys, aliasMap);
+      const resolved = resolveCategoryRef(ote.category, validKeys, aliasMap, fallbackCategoryKey);
       return resolved === ote.category ? ote : { ...ote, category: resolved };
     });
-  }, [oneTimeExpenses, expenseCategories]);
+  }, [oneTimeExpenses, expenseCategories, uncategorizedCategoryKey]);
 
   // Auto-save state to localStorage (debounced)
   useEffect(() => {
@@ -2579,6 +2598,18 @@ const mIdx = cols.findIndex(c =>
         setExpenseTags(newTags);
         setExpensePhaseOutYears({});
         setRetExpensePhaseOutYears({});
+        setOneTimeExpenses((prev) => {
+          const uncategorizedCsvCat = newCats.find((c) => {
+            const alias = normalizeCategoryAlias(c.label);
+            return alias === 'uncategorized' || alias === 'uncategorised';
+          });
+          const fallbackKey = uncategorizedCsvCat ? uncategorizedCsvCat.key : 'none';
+          return (prev || []).map((ote) => {
+            const raw = ote.category;
+            if (!raw || raw === 'none') return { ...ote, category: fallbackKey };
+            return ote;
+          });
+        });
         normalizeCategoryLinkedState(newCats);
 
         // Switch the app display currency to match the CSV base currency
@@ -6068,6 +6099,11 @@ const mIdx = cols.findIndex(c =>
                     if (cat) {
                       row[cat.key] = (row[cat.key] || 0) + inflated;
                       if ((expenseTags[cat.key] || cat.group) === 'essential') essentialTotal += inflated;
+                      else discTotal += inflated;
+                    } else if (uncategorizedCategoryKey) {
+                      row[uncategorizedCategoryKey] = (row[uncategorizedCategoryKey] || 0) + inflated;
+                      const uncategorizedCat = expenseCategories.find(function(c) { return c.key === uncategorizedCategoryKey; });
+                      if (uncategorizedCat && (expenseTags[uncategorizedCategoryKey] || uncategorizedCat.group) === 'essential') essentialTotal += inflated;
                       else discTotal += inflated;
                     }
                   }

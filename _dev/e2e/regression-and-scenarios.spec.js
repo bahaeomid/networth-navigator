@@ -314,6 +314,44 @@ test('regression: uncategorized OTE affects total only (not discretionary line)'
   expect(orangeDots).toBe(0);
 });
 
+test('regression: CSV Uncategorized category captures unmatched OTE mapping', async ({ page }) => {
+  attachDialogHandler(page);
+  await page.goto('/');
+
+  const csv = [
+    'Category,Monthly Planning Budget (AED),Description,Expense Type',
+    'Housing,15000,Rent and maintenance,Essential',
+    'Bills,3500,Utilities and services,Essential',
+    'Groceries,2200,Food and household,Essential',
+    'Travel,2400,Trips and holidays,Discretionary',
+    'Entertainment,1100,Leisure and subscriptions,Discretionary',
+    'Uncategorized,280,Fallback bucket,Discretionary',
+  ].join('\n');
+
+  await importCsvPayload(page, csv);
+
+  await tabByName(page, 'Finances').click();
+  const plannedSection = page.locator('div').filter({ hasText: '📋 Planned Expenses' }).first();
+  const categorySelects = plannedSection.locator('select');
+  const optionValues = await categorySelects.first().locator('option').evaluateAll((opts) => opts.map((o) => o.value));
+  expect(optionValues).toContain('csv_uncategorized');
+
+  const valuesAfterImport = await categorySelects.evaluateAll((els) => els.map((el) => el.value));
+  expect(valuesAfterImport.some((v) => v === 'csv_uncategorized')).toBeTruthy();
+
+  const selectCount = await categorySelects.count();
+  for (let i = 0; i < selectCount; i++) {
+    await categorySelects.nth(i).selectOption('csv_uncategorized');
+  }
+
+  await tabByName(page, 'Pre-Retirement').click();
+  const noTotalBtn = page.locator('div[style*="cursor: pointer"]').filter({ hasText: 'Total' }).first();
+  await noTotalBtn.click();
+
+  const orangeDots = await page.locator('svg circle[fill="#f59e0b"]').count();
+  expect(orangeDots).toBeGreaterThan(0);
+});
+
 test('regression: retire-later recommendation is reproducible and runway percentages are normalized', async ({ page }) => {
   attachDialogHandler(page);
   await page.goto('/');
