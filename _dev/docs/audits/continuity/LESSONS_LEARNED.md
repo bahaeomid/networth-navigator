@@ -3,7 +3,7 @@
 **Project:** NetWorth Navigator v2.0.0
 **Domain:** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-04-19
+**Last updated:** 2026-04-19 (Session 5)
 
 ---
 
@@ -112,3 +112,29 @@ Findings in batch: NEW-33, NEW-34, NEW-35
 - `nestEggSwr` is now normalized through a shared clamp helper before state restoration/import application, reducing invalid-plan-state risk.
 - Removing `check_reg*.js` clarified that release verification is officially `lint + _dev/tests + _dev/e2e`.
 - Financial model documentation now matches the enforced SWR range (`0.1–6.0`).
+
+---
+
+## Batch Synthesis — Session 5 — 2026-04-19
+Findings in batch: NEW-36, NEW-37, NEW-38, NEW-39, NEW-40
+
+### Patterns observed
+
+1. Category identity drift (label/key/`csv_*` renames) creates multi-surface regressions unless every dependent state path is normalized.
+2. Behavioral trust breaks quickly when decision-lever copy and computation diverge, even if both are individually defensible.
+3. One-time-expense logic tends to be implemented as one-per-year by accident (`find`) but real data needs many-per-year aggregation.
+4. E2E tests that assert exact display strings are fragile when the app intentionally rounds/changes formatting; behavior-focused assertions are more resilient.
+
+### Principles extracted
+
+- **Normalize reference data at boundaries and on schema mutation:** When categories are replaced/imported, immediately repair all cross-linked state (pickers, adjustments, chart filters, hidden keys, tagged records).
+- **Use alias resolution for human-entered/imported keys:** Map both category key and label aliases to canonical keys to survive migrations without data loss.
+- **Prefer aggregate-by-default for financial events:** For year-bucketed costs, always sum all active events and handle recurring ranges explicitly.
+- **Keep explanatory text mathematically isomorphic to implementation:** If a lever says “no other changes,” the model must enforce exactly that.
+- **In UI tests, assert outcome deltas not brittle snapshots:** Example: verify a slider changes its displayed delta from +1.0% to +2.0% rather than assuming an absolute fixed string appears in one node.
+
+### Codebase-specific observations
+
+- A single canonical derived list (`normalizedOneTimeExpenses`) simplified consistency across export, projections, charts, and retirement simulations.
+- Applying percentage formatting through helpers (`formatPct`, `formatRatePerYear`) removed floating-point artifacts and improved display parity.
+- The new `_dev/e2e/regression-and-scenarios.spec.js` meaningfully extends coverage with both targeted regressions and 5 cross-tab scenario traversals.

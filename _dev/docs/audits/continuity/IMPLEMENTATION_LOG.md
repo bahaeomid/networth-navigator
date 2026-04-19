@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-04-19 by Session 4
+**Last updated:** 2026-04-19 by Session 5
 
 ---
 
@@ -47,6 +47,11 @@
 | NEW-30 | Pre-Retirement BASE breakdown modal opens out of viewport | HIGH | F | FIXED | 3 | Changed overlay from absolute scroll-anchored positioning to fixed viewport overlay |
 | NEW-31 | Dashboard Retirement Health value row wraps/misaligns | MEDIUM | F | FIXED | 3 | Converted rows to two-column grid and enforced nowrap + right alignment for value column |
 | NEW-32 | Retirement Health tooltip icon baseline shift | LOW | F | FIXED | 3 | Adjusted InfoTooltip baseline styling (`lineHeight` + `verticalAlign`) for compact metric rows |
+| NEW-36 | Category-key drift after CSV/category replacement breaks What-If and OTE linkage | HIGH | G | FIXED | 5 | Added alias-based category reference normalization across OTEs, What-If adjustments/picker, chart drilldown selections, and hidden line state |
+| NEW-37 | Retire Later lever behavior mismatched its "no other changes" copy | MEDIUM | G | FIXED | 5 | Switched lever to conservative compounding-only logic (no extra savings), and updated tooltip/methodology text |
+| NEW-38 | Retirement Runway % labels leak floating-point precision strings | LOW | G | FIXED | 5 | Added centralized percent formatting helpers and applied to runway labels/tooltips |
+| NEW-39 | One-time expenses undercounted when multiple entries share a year | HIGH | G | FIXED | 5 | Replaced single-entry `find()` logic with active-entry aggregation in deterministic runway + Monte Carlo |
+| NEW-40 | Missing E2E regression coverage for category remap/systemic scenarios | MEDIUM | G | FIXED | 5 | Added `_dev/e2e/regression-and-scenarios.spec.js` with 2 targeted regressions + 5 multi-profile stress scenarios |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -432,3 +437,106 @@
 
 **Next session priority:**
 1. Optional: add a focused Playwright case that explicitly validates SWR bounds after JSON import and localStorage restore.
+
+---
+
+## SESSION 5 — 2026-04-19 — GitHub Copilot (GPT-5.3-Codex)
+
+**Picking up from:** Session 4
+**Open findings at session start:** User-reported post-audit regressions in Pre-Retirement/Retirement plus request for broad multi-profile scenario stress testing.
+**Session goal:** Fix all reported regressions, verify whether root causes were systemic, add robust E2E coverage, and re-run full release verification.
+**Session end status:** COMPLETE — 5 FIXED, 0 BLOCKED, 0 DEFERRED
+
+### Continuation State Summary (resolved in-session)
+
+- Independent root-cause analysis confirmed issues were not category-specific; they traced to stale category-key references after category replacement/import.
+- Retirement gap lever semantics were realigned to user-facing copy: "Retire later" now models delay-only compounding (conservative).
+- One-time expense handling was hardened in both deterministic and stochastic retirement paths.
+- New regression and scenario E2E suite stabilized and integrated into smoke/release chain.
+
+### NEW-36 — Category-key drift after CSV/category replacement (HIGH → FIXED)
+
+**Status:** FIXED ✅
+**Problem:** After category replacement/import (notably CSV replacing defaults with `csv_*` keys), linked states retained stale keys. Symptoms included What-If default category drift and planned-expense markers/dots rendering inconsistently until category toggles.
+**Fix applied:** In `src/App.jsx`, added category alias normalization utilities and a shared normalization flow to resolve stale references across:
+- `oneTimeExpenses[].category`
+- `sensitivityAdj[].category`
+- `sensitivityCatPicker`
+- chart drilldown selection (`selectedChartCats`)
+- hidden line map (`hiddenCalcLines`)
+
+Also added a reactive normalization effect on `expenseCategories` changes and introduced `normalizedOneTimeExpenses` as the canonical downstream data source.
+**Verification:** `npm run test:smoke` regression case `CSV category-key replacement keeps What-If and Planned Expense visuals in sync` passed.
+**Verification result:** PASS ✅
+**Attempts:** 2 (first pass exposed flaky/over-broad locators; selectors tightened and assertions made behavior-based)
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`
+
+### NEW-37 — Retire Later behavior/copy mismatch (MEDIUM → FIXED)
+
+**Status:** FIXED ✅
+**Problem:** Card subtext said "no other changes" but prior implementation included extra savings contributions during delayed years, making recommendation non-reproducible by changing retirement age alone.
+**Fix applied:** Reworked Retire Later lever in `src/App.jsx` to conservative delay-only compounding on existing retirement investments. Removed additional contribution assumptions from that lever and updated tooltip + methodology note text to match behavior.
+**Verification:** Playwright regression `retire-later recommendation is reproducible and runway percentages are normalized` passed after setting suggested age in Profile and confirming gap-closing panel disappears.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`
+
+### NEW-38 — Runway floating-point precision artifacts (LOW → FIXED)
+
+**Status:** FIXED ✅
+**Problem:** Runway labels/tooltips could display long floating tails (for example precision leak strings) from raw float interpolation.
+**Fix applied:** Added `roundTo`, `formatPct`, and `formatRatePerYear` helpers in `src/App.jsx` and applied them to runway return/rate displays and investment-growth tooltip labels.
+**Verification:** Regression assertions now enforce absence of long-float percent artifacts; smoke/release chain passed.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`
+
+### NEW-39 — One-time expense undercount in runway + Monte Carlo (HIGH → FIXED)
+
+**Status:** FIXED ✅
+**Problem:** Single-entry lookup (`find`) only captured one one-time expense for a year and missed overlapping/recurring entries, understating withdrawals.
+**Fix applied:**
+- Monte Carlo: replaced per-year single hit with summed yearly aggregation across all matching entries.
+- Deterministic runway: replaced single hit with active-entry filtering across recurring ranges and summed inflation-adjusted total.
+- Pre-retirement chart dot attribution: moved to per-row stored OTE lists to avoid stale global matching.
+**Verification:** Multi-profile scenario stress tests (including same-year multi-OTE cases) passed; no `Infinity`/`NaN`/precision artifacts observed.
+**Verification result:** PASS ✅
+**Attempts:** 1
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`
+
+### NEW-40 — Coverage gap for systemic cross-tab regressions (MEDIUM → FIXED)
+
+**Status:** FIXED ✅
+**Problem:** Existing E2E surface lacked scenario-level coverage to catch category remap drift and cross-tab stability regressions.
+**Fix applied:** Created `_dev/e2e/regression-and-scenarios.spec.js` containing:
+- 2 targeted regressions (category remap / retire-later + runway formatting)
+- 5 varied profile stress scenarios traversing Profile, Finances, Pre-Retirement, Retirement, Dashboard
+- artifact guards (`Infinity`, `NaN`, excessive float precision patterns)
+
+Selectors were hardened to avoid ambiguous role/text matches (tab-name regex anchoring and behavior-focused assertions).
+**Verification:** Entire Playwright suite green with new tests included.
+**Verification result:** PASS ✅
+**Attempts:** 2 (initial selectors/assertions were too brittle; stabilized in final pass)
+**Files changed:** `_dev/e2e/regression-and-scenarios.spec.js`
+
+### Verification Chain (Session 5)
+
+- `npm run lint` → PASS ✅
+- `npm run test:audits` → PASS ✅
+- `npm run test:smoke` → PASS ✅ (8/8)
+- `npm run test:release` → PASS ✅
+
+## SESSION 5 CLOSE — 2026-04-19
+**Findings resolved this session:** 5 — NEW-36, NEW-37, NEW-38, NEW-39, NEW-40
+**Findings blocked:** 0 — none
+**Findings deferred:** 0 — none
+**Overall progress:** 34 / 34 actionable (100% complete on currently tracked actionable findings)
+
+**Key observations this session:**
+- Category-key replacement has systemic blast radius unless all category-linked state is normalized reactively.
+- Recommendation text must exactly match lever math or users lose reproducibility trust.
+- Aggregation logic for one-time expenses must assume many-to-one year mappings by default.
+- Scenario-level E2E coverage across tabs is required to catch cross-surface regressions that unit-style checks miss.
+
+**Next session priority:**
+1. Optional: add a small invariant test set for category-reference normalization (unit-level) to complement Playwright coverage.

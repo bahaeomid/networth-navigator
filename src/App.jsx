@@ -86,6 +86,53 @@ const formatDisplayNumber = (aedVal, rate) => {
   return d.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
+const roundTo = (value, decimals = 1) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const factor = Math.pow(10, decimals);
+  return Math.round(n * factor) / factor;
+};
+
+const formatPct = (value, decimals = 1, opts) => {
+  const _opts = opts || {};
+  const rounded = roundTo(value, decimals);
+  if (rounded === null) return '—';
+  const plus = _opts.forcePlus && rounded > 0 ? '+' : '';
+  return `${plus}${rounded.toFixed(decimals)}%`;
+};
+
+const formatRatePerYear = (value, decimals = 1, opts) => {
+  return `${formatPct(value, decimals, opts)}/yr`;
+};
+
+const normalizeCategoryAlias = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/^csv_/, '')
+    .replace(/[^a-z0-9]/g, '');
+};
+
+const buildCategoryAliasMap = (categories) => {
+  const map = new Map();
+  categories.forEach((cat) => {
+    const keyAlias = normalizeCategoryAlias(cat.key);
+    const labelAlias = normalizeCategoryAlias(cat.label);
+    if (keyAlias && !map.has(keyAlias)) map.set(keyAlias, cat.key);
+    if (labelAlias && !map.has(labelAlias)) map.set(labelAlias, cat.key);
+  });
+  return map;
+};
+
+const resolveCategoryRef = (rawCategory, validKeys, aliasMap) => {
+  if (!rawCategory || rawCategory === 'none') return 'none';
+  if (validKeys.has(rawCategory)) return rawCategory;
+  const alias = normalizeCategoryAlias(rawCategory);
+  if (alias && aliasMap.has(alias)) return aliasMap.get(alias);
+  return 'none';
+};
+
 // Tooltips
 const TOOLTIPS = {
   currentAge: "Your current age in years. Used as the starting point for all projections.",
@@ -462,8 +509,10 @@ const runMonteCarloSimulation = (portfolioAssets, yearsToProject, annualContribu
       investments -= yearlyWithdrawals[year];
       // Deduct any one-time expense scheduled for this calendar year
       const calYear = safeRetCalYear + year;
-      const oneTimeHit = safeOneTimers.find(function(e) { return e.year === calYear; });
-      if (oneTimeHit) investments -= oneTimeHit.amount;
+      const oneTimeTotal = safeOneTimers
+        .filter(function(e) { return e.year === calYear; })
+        .reduce(function(sum, e) { return sum + (e.amount || 0); }, 0);
+      if (oneTimeTotal > 0) investments -= oneTimeTotal;
       // Portfolio exhausted — no illiquid backstop
       if (investments <= 0) { investments = 0; break; }
     }
@@ -962,6 +1011,92 @@ const NetWorthNavigator = () => {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [expenseViewMode, setExpenseViewMode] = useState('annual'); // 'annual' | 'monthly'
 
+  const normalizeCategoryLinkedState = React.useCallback((nextCategories) => {
+    const validKeys = new Set((nextCategories || []).map(c => c.key));
+    const aliasMap = buildCategoryAliasMap(nextCategories || []);
+
+    const normalizeOneTimers = (sourceList) => {
+      const list = sourceList || [];
+      let changed = false;
+      const next = list.map((ote) => {
+        const resolved = resolveCategoryRef(ote.category, validKeys, aliasMap);
+        if (resolved === ote.category) return ote;
+        changed = true;
+        return { ...ote, category: resolved };
+      });
+      return { changed, list: changed ? next : list };
+    };
+
+    const normalizeAdj = (adjList) => {
+      const list = adjList || [];
+      const seen = new Set();
+      let changed = false;
+      const next = [];
+      list.forEach((adj) => {
+        const resolved = resolveCategoryRef(adj.category, validKeys, aliasMap);
+        if (resolved === 'none' || seen.has(resolved)) {
+          changed = true;
+          return;
+        }
+        seen.add(resolved);
+        if (resolved === adj.category) next.push(adj);
+        else {
+          changed = true;
+          next.push({ ...adj, category: resolved });
+        }
+      });
+      if (next.length !== list.length) changed = true;
+      return { changed, list: changed ? next : list };
+    };
+
+    const normalizedOneTimers = normalizeOneTimers(oneTimeExpenses);
+    const normalizedAdj = normalizeAdj(sensitivityAdj);
+
+    const pickerSource = sensitivityCatPicker;
+    const resolvedPicker = resolveCategoryRef(pickerSource, validKeys, aliasMap);
+    const fallbackPicker = (nextCategories && nextCategories[0] && nextCategories[0].key) ? nextCategories[0].key : '';
+    const normalizedPicker = resolvedPicker === 'none' ? fallbackPicker : resolvedPicker;
+
+    if (normalizedOneTimers.changed) {
+      setOneTimeExpenses(normalizedOneTimers.list);
+    }
+    if (normalizedAdj.changed) {
+      setSensitivityAdj(normalizedAdj.list);
+    }
+    if (normalizedPicker !== sensitivityCatPicker) {
+      setSensitivityCatPicker(normalizedPicker);
+    }
+    setSelectedChartCats((prev) => {
+      const next = (prev || []).filter((k) => validKeys.has(k));
+      return next.length === (prev || []).length ? prev : next;
+    });
+    setHiddenCalcLines((prev) => {
+      const keys = Object.keys(prev || {});
+      const stale = keys.some((k) => !validKeys.has(k) && !['total', 'essential', 'discretionary'].includes(k));
+      if (!stale) return prev;
+      const next = {};
+      keys.forEach((k) => {
+        if (['total', 'essential', 'discretionary'].includes(k) || validKeys.has(k)) {
+          next[k] = prev[k];
+        }
+      });
+      return next;
+    });
+  }, [oneTimeExpenses, sensitivityAdj, sensitivityCatPicker]);
+
+  useEffect(() => {
+    normalizeCategoryLinkedState(expenseCategories);
+  }, [expenseCategories, normalizeCategoryLinkedState]);
+
+  const normalizedOneTimeExpenses = useMemo(() => {
+    const validKeys = new Set((expenseCategories || []).map((c) => c.key));
+    const aliasMap = buildCategoryAliasMap(expenseCategories || []);
+    return (oneTimeExpenses || []).map((ote) => {
+      const resolved = resolveCategoryRef(ote.category, validKeys, aliasMap);
+      return resolved === ote.category ? ote : { ...ote, category: resolved };
+    });
+  }, [oneTimeExpenses, expenseCategories]);
+
   // Auto-save state to localStorage (debounced)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -985,7 +1120,7 @@ const NetWorthNavigator = () => {
           retExpenseGrowthRates,
           lifeEvents,
           assumptions,
-          oneTimeExpenses,
+          oneTimeExpenses: normalizedOneTimeExpenses,
           nestEggSwr,
           surplusSplitInvest,
           surplusSplitDebt,
@@ -999,7 +1134,7 @@ const NetWorthNavigator = () => {
   }, [currency, exchangeRates, profile, assets, liabilities, income, expenses,
       expenseCategories, expenseCalculator, retirementBudget, expenseGrowthRates,
       expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retExpenseGrowthRates,
-      lifeEvents, assumptions, oneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt]);
+      lifeEvents, assumptions, normalizedOneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt]);
 
   // Auto-restore from localStorage on mount
   useEffect(() => {
@@ -1015,7 +1150,9 @@ const NetWorthNavigator = () => {
       if (data.liabilities) setLiabilities(data.liabilities);
       if (data.income) setIncome(data.income);
       if (data.expenses) setExpenses(data.expenses);
-      if (data.expenseCategories) setExpenseCategories(data.expenseCategories);
+        if (data.expenseCategories && data.expenseCategories.length > 0) {
+          setExpenseCategories(data.expenseCategories);
+        }
       if (data.expenseCalculator) setExpenseCalculator(data.expenseCalculator);
       if (data.retirementBudget) setRetirementBudget(data.retirementBudget);
       if (data.expenseGrowthRates) setExpenseGrowthRates(data.expenseGrowthRates);
@@ -1093,7 +1230,7 @@ const NetWorthNavigator = () => {
       retExpenseGrowthRates,
       lifeEvents,
       assumptions,
-      oneTimeExpenses,
+      oneTimeExpenses: normalizedOneTimeExpenses,
       nestEggSwr,
       surplusSplitInvest,
       surplusSplitDebt,
@@ -1191,7 +1328,7 @@ const NetWorthNavigator = () => {
       const isDebtFree = debtFreeAge && d.age === debtFreeAge;
       const isMilestone = wealthMilestones.some(m => m.age === d.age);
       const isLifeEvent = lifeEvents.some(e => e.year === d.year);
-      const isOTE = oneTimeExpenses.some(e => d.year >= e.year && d.year <= (e.endYear||e.year));
+      const isOTE = normalizedOneTimeExpenses.some(e => d.year >= e.year && d.year <= (e.endYear||e.year));
       const every5 = (d.age - profile.currentAge) % 5 === 0;
       return every5 || isRet || isFI || isDebtFree || isMilestone || isLifeEvent || isOTE;
     });
@@ -1202,7 +1339,7 @@ const NetWorthNavigator = () => {
       const isDebt = debtFreeAge && d.age === debtFreeAge;
       const milestone = wealthMilestones.find(m => m.age === d.age);
       const lifeEv = lifeEvents.find(e => e.year === d.year);
-      const ote = oneTimeExpenses.filter(e => d.year >= e.year && d.year <= (e.endYear||e.year));
+      const ote = normalizedOneTimeExpenses.filter(e => d.year >= e.year && d.year <= (e.endYear||e.year));
       const tags = [];
       if (isRet) tags.push('<span class="tag ret">Retirement</span>');
       if (isFI) tags.push('<span class="tag fi">FI Age</span>');
@@ -1266,7 +1403,7 @@ const NetWorthNavigator = () => {
     const otherLiabRows = (liabilities.otherLiabilityItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${escapeHtml(i.name||'Other')}</td><td class="num red">${fmt(i.amount||0)}</td><td class="dim">${i.endYear?`ends ${i.endYear}`:'no end year'}</td></tr>`).join('');
 
     // ── OTE rows ──
-    const oteRows = oneTimeExpenses.length>0 ? oneTimeExpenses.map(e=>`<tr>
+    const oteRows = normalizedOneTimeExpenses.length>0 ? normalizedOneTimeExpenses.map(e=>`<tr>
       <td>${e.year}${e.endYear&&e.endYear>e.year?` – ${e.endYear}`:''}</td>
       <td>${escapeHtml(e.description||'—')}</td>
       <td class="num">${fmt(e.amount)}</td>
@@ -1838,7 +1975,7 @@ const NetWorthNavigator = () => {
       ${lifeEvents.length>0?`<table class="data"><thead><tr><th>Year</th><th>Age</th><th>Event</th><th>Stage</th></tr></thead><tbody>${lifeEventRows}</tbody></table>`:'<p class="dim" style="padding:12px 0;">No life events entered</p>'}
       <div class="sub-head" style="margin-top:20px;">Planned One-Time Expenses</div>
       <table class="data"><thead><tr><th>Year(s)</th><th>Description</th><th class="r">Amount</th><th>Category</th></tr></thead><tbody>${oteRows}</tbody></table>
-      ${oneTimeExpenses.length>0?`<div style="margin-top:8px;font-size:0.78rem;color:#64748b;">Total: <strong>${fmt(oneTimeExpenses.reduce((s,e)=>s+(e.amount||0),0))}</strong></div>`:''}
+      ${normalizedOneTimeExpenses.length>0?`<div style="margin-top:8px;font-size:0.78rem;color:#64748b;">Total: <strong>${fmt(normalizedOneTimeExpenses.reduce((s,e)=>s+(e.amount||0),0))}</strong></div>`:''}
     </div>
   </div>
 </div>
@@ -2040,7 +2177,7 @@ const NetWorthNavigator = () => {
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
         <li><strong>Save More.</strong> The additional monthly investment required to accumulate the gap amount by retirement, assuming contributions compound at the investment return using a future-value annuity formula. Your existing monthly surplus partially offsets this requirement.</li>
-        <li><strong>Retire Later.</strong> The number of additional working years (beyond planned retirement) needed for your investments to reach the required nest egg. During each extra year, existing investments compound at the current return AND net savings (projected income minus expenses, if positive) are added. Income grows at the configured growth rates. Displays "Gap too large" if not achievable within 30 extra years.</li>
+        <li><strong>Retire Later.</strong> The number of additional working years (beyond planned retirement) needed for your existing investment portfolio to reach the required nest egg through extra compounding time only. No additional savings contributions are assumed in this lever (conservative). Displays "Gap too large" if not achievable within 30 extra years.</li>
         <li><strong>Higher Return.</strong> The CAGR required for existing investments alone (no new contributions) to reach the required nest egg by retirement, solved via: (Required Nest Egg ÷ Current Investments)^(1 ÷ Years) − 1. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
       <p>All three levers are illustrative. A combination strategy will always close the gap more efficiently than any single lever in isolation.</p>
@@ -2264,7 +2401,9 @@ new Chart(document.getElementById('allocChart'),{
           setLiabilities(imported.liabilities || DEFAULT_STATE.liabilities);
           setIncome(imported.income || DEFAULT_STATE.income);
           setExpenses(imported.expenses || DEFAULT_STATE.expenses);
-          if (imported.expenseCategories && imported.expenseCategories.length > 0) setExpenseCategories(imported.expenseCategories);
+          if (imported.expenseCategories && imported.expenseCategories.length > 0) {
+            setExpenseCategories(imported.expenseCategories);
+          }
           if (imported.expenseCalculator) setExpenseCalculator(imported.expenseCalculator);
           if (imported.retirementBudget) setRetirementBudget(imported.retirementBudget);
           if (imported.expenseGrowthRates) setExpenseGrowthRates(imported.expenseGrowthRates);
@@ -2440,6 +2579,7 @@ const mIdx = cols.findIndex(c =>
         setExpenseTags(newTags);
         setExpensePhaseOutYears({});
         setRetExpensePhaseOutYears({});
+        normalizeCategoryLinkedState(newCats);
 
         // Switch the app display currency to match the CSV base currency
         if (CURRENCIES[csvCurrency]) {
@@ -2662,7 +2802,7 @@ const mIdx = cols.findIndex(c =>
     // Skipped when called via getLifeStageExpense — wealthProjection handles OTEs separately
     if (!_opts.excludeOTEs) {
       const _currentYear = new Date().getFullYear();
-      oneTimeExpenses
+      normalizedOneTimeExpenses
         .filter(e => targetYear >= e.year && targetYear <= (e.endYear || e.year))
         .forEach(e => {
           const base = e.amount || 0;
@@ -2694,7 +2834,7 @@ const mIdx = cols.findIndex(c =>
     });
     // Sum all OTE entries active in targetYear — inflated from today (amounts in today's terms) + sensitivity adj
     const _currentYear2 = new Date().getFullYear();
-    oneTimeExpenses
+    normalizedOneTimeExpenses
       .filter(e => targetYear >= e.year && targetYear <= (e.endYear || e.year))
       .forEach(e => {
         const base = e.amount || 0;
@@ -2756,7 +2896,7 @@ const mIdx = cols.findIndex(c =>
       // OTE two-segment inflation: supports recurring (endYear) and single-year entries.
       // Amounts are entered in today's terms — inflated from currentYear forward.
       // Sum all entries whose year <= calYear <= (endYear || year).
-      const activeOTEs = oneTimeExpenses.filter(e => year >= e.year && year <= (e.endYear || e.year));
+      const activeOTEs = normalizedOneTimeExpenses.filter(e => year >= e.year && year <= (e.endYear || e.year));
       const oneTimeExpense = activeOTEs.reduce((total, oneTime) => {
         const base = oneTime.amount || 0;
         const cat = oneTime.category && oneTime.category !== 'none' ? oneTime.category : null;
@@ -2917,7 +3057,7 @@ const mIdx = cols.findIndex(c =>
     // Attach exhaustionAge to the array so charts can reference it directly
     data.exhaustionAge = exhaustionAge;
     return data;
-  }, [profile, assets, liabilities, income, expenses, expenseCalculator, expenseGrowthRates, expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retirementBudget, retExpenseGrowthRates, assumptions, oneTimeExpenses]);
+  }, [profile, assets, liabilities, income, expenses, expenseCalculator, expenseGrowthRates, expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retirementBudget, retExpenseGrowthRates, assumptions, normalizedOneTimeExpenses]);
   
   const retirementMetrics = useMemo(() => {
     const retirementData = wealthProjection.find(d => d.age === profile.retirementAge);
@@ -2936,7 +3076,7 @@ const mIdx = cols.findIndex(c =>
     // Expand recurring OTEs into per-year entries for Monte Carlo.
     // A recurring OTE (endYear set) is split into one entry per year it overlaps retirement.
     const postRetirementOneTimers = [];
-    oneTimeExpenses.forEach(function(e) {
+    normalizedOneTimeExpenses.forEach(function(e) {
       const effectiveEnd = e.endYear || e.year;
       if (effectiveEnd < retirementCalYear) return; // fully pre-retirement, skip
       const cat = e.category && e.category !== 'none' ? e.category : null;
@@ -2983,7 +3123,7 @@ const mIdx = cols.findIndex(c =>
       successProbability,
       yearsToRetirement: profile.retirementAge - profile.currentAge,
     };
-  }, [wealthProjection, profile, expenses, assumptions, oneTimeExpenses, retExpensePhaseOutYears, retirementBudget, retExpenseGrowthRates, expenseCategories]);
+  }, [wealthProjection, profile, expenses, assumptions, normalizedOneTimeExpenses, retExpensePhaseOutYears, retirementBudget, retExpenseGrowthRates, expenseCategories]);
   
   // Wealth milestones - calculated in USD (global standard)
   const wealthMilestones = useMemo(() => {
@@ -3128,7 +3268,7 @@ const mIdx = cols.findIndex(c =>
     const wealthMilestone = wealthMilestones.find(m => m.age === age);
     const lifeEvent = lifeEvents.find(e => e.year === year);
     // Only single-year OTEs get dots; recurring OTEs (with endYear > year) are shown via band
-    const singleYearOTE = oneTimeExpenses.find(e =>
+    const singleYearOTE = normalizedOneTimeExpenses.find(e =>
       e.year === year && !(e.endYear && e.endYear > e.year)
     );
     
@@ -4388,7 +4528,7 @@ const mIdx = cols.findIndex(c =>
                       const year = pt?.year ?? (currentYear + (label - profile.currentAge));
                       const wealthMilestone = wealthMilestones.find(m => m.age === label);
                       const lifeEvent = lifeEvents.find(e => e.year === year);
-                      const oneTimeHits = oneTimeExpenses.filter(e => year >= e.year && year <= (e.endYear || e.year));
+                      const oneTimeHits = normalizedOneTimeExpenses.filter(e => year >= e.year && year <= (e.endYear || e.year));
                       const isPreRetirement = label < profile.retirementAge;
                       return (
                         <div style={{ minWidth: '230px' }}>
@@ -4561,7 +4701,7 @@ const mIdx = cols.findIndex(c =>
                   {/* OTE shaded bands — only when expenses line is visible; vertical labels; alternating opacity */}
                   {!hiddenLines.expenses && (() => {
                     let bandIndex = 0;
-                    return oneTimeExpenses.map(e => {
+                    return normalizedOneTimeExpenses.map(e => {
                       const currentYear = new Date().getFullYear();
                       const x1 = profile.currentAge + (e.year - currentYear);
                       const x2 = profile.currentAge + ((e.endYear || e.year) - currentYear);
@@ -5085,38 +5225,16 @@ const mIdx = cols.findIndex(c =>
                 const extraAnnual = annuityFactor > 0 ? Math.round(absGap / annuityFactor) : null;
                 extraMonthly = extraAnnual ? Math.round(extraAnnual / 12) : null;
                 if (extraMonthly === null) saveMoreNA = true;
-                // Retire later — compounds existing investments AND adds net savings
-                // (income minus expenses) during each additional working year.
-                // Income grows at respective growth rates; expenses use pre-retirement budget.
-                // If net savings is negative (deficit), only investment compounding applies.
+                // Retire later — conservative, no-other-changes model.
+                // Only extends compounding time on investments already projected at planned retirement.
+                // Does NOT assume any extra savings are invested during the added years.
                 {
                   const retData = wealthProjection.find(function(d) { return d.age === profile.retirementAge; });
                   if (retData) {
                     let extInv = retData.investments;
-                    const baseSalary = income.salaryItems && income.salaryItems.length > 0
-                      ? income.salaryItems.reduce(function(s, i) { return s + (i.amount || 0); }, 0)
-                      : (income.salary || 0);
-                    const basePassive = income.passiveItems && income.passiveItems.length > 0
-                      ? income.passiveItems.reduce(function(s, i) { return s + (i.amount || 0); }, 0)
-                      : (income.passive || 0);
-                    const baseOther = income.otherIncomeItems && income.otherIncomeItems.length > 0
-                      ? income.otherIncomeItems.reduce(function(s, i) { return s + (i.amount || 0); }, 0)
-                      : (income.other || 0);
-                    const basePreRetExp = expenses.current || 0;
-                    const salGr = (assumptions.salaryGrowth || 0) / 100;
-                    const pasGr = (assumptions.passiveGrowth || 0) / 100;
-                    const othGr = (assumptions.otherIncomeGrowth || 0) / 100;
-                    const ytr = profile.retirementAge - profile.currentAge;
                     for (let yr = 1; yr <= 30; yr++) {
-                      // Compound investments
+                      // Compound existing retirement balance for one additional year.
                       extInv = extInv * (1 + r);
-                      // Add net savings from continued work during this extra year
-                      const extYearSalary = baseSalary * Math.pow(1 + salGr, ytr + yr);
-                      const extYearPassive = basePassive * Math.pow(1 + pasGr, ytr + yr);
-                      const extYearOther = baseOther * Math.pow(1 + othGr, ytr + yr);
-                      const extYearIncome = extYearSalary + extYearPassive + extYearOther;
-                      const netSavings = Math.max(0, extYearIncome - basePreRetExp);
-                      extInv += netSavings;
                       const candidateAge = profile.retirementAge + yr;
                       const candidateCalYear = new Date().getFullYear() + (candidateAge - profile.currentAge);
                       const candidateNestEgg = nestEggSwr > 0 ? getRetNominalForYear(candidateCalYear) / (nestEggSwr / 100) : 0;
@@ -5323,7 +5441,7 @@ const mIdx = cols.findIndex(c =>
                                       {!saveMoreNA && annualSavings > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Your current surplus of {formatCurrencyDecimal(annualSavings / 12, currency, exchangeRates)}/mo (today) can offset this</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years close the gap. During each additional year, your portfolio compounds at your preset return AND your net savings (income minus expenses, if positive) are added — with income growing at your configured growth rates. To model the effect of actively deploying your surplus to retire faster, see Surplus Deployment in the Dashboard tab." /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="Conservative estimate: how many extra years are needed if you only delay retirement and let your existing investments compound longer. No additional savings are invested in this lever, so this is intentionally strict. In reality, if you keep saving and invest the extra surplus while working longer, the required delay is usually shorter." /></div>
                                       {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Gap too large to close by working longer</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · no other changes`}</div>
@@ -5428,14 +5546,16 @@ const mIdx = cols.findIndex(c =>
                     const rate = (retExpenseGrowthRates[cat.key] || 0) / 100;
                     return s + base * Math.pow(1 + rate, yearsToRetirement + yearsIn);
                   }, 0) * safeMultiplier;
-                  const oneTimeHit = oneTimeExpenses.find(function(e) { return e.year === calYear; });
-                  const oneTimeAmount = (() => {
-                    if (!oneTimeHit) return 0;
-                    const cat = oneTimeHit.category && oneTimeHit.category !== 'none' ? oneTimeHit.category : null;
+                  const activeRunwayOTEs = normalizedOneTimeExpenses.filter(function(e) {
+                    return calYear >= e.year && calYear <= (e.endYear || e.year);
+                  });
+                  const oneTimeAmount = activeRunwayOTEs.reduce((sum, ote) => {
+                    const cat = ote.category && ote.category !== 'none' ? ote.category : null;
                     const preRate = cat ? ((expenseGrowthRates[cat] || 0) / 100) : 0;
                     const retRate = cat ? ((retExpenseGrowthRates[cat] || 0) / 100) : 0;
-                    return oneTimeHit.amount * Math.pow(1 + preRate, yearsToRetirement) * Math.pow(1 + retRate, yearsIn);
-                  })();
+                    const inflated = (ote.amount || 0) * Math.pow(1 + preRate, yearsToRetirement) * Math.pow(1 + retRate, yearsIn);
+                    return sum + inflated;
+                  }, 0);
                   // Net passive + other income against withdrawal — resolve sub-items with endYear
                   const passiveGrowth = (assumptions.passiveGrowth || 0) / 100;
                   const otherGrowth   = (assumptions.otherIncomeGrowth || 0) / 100;
@@ -5562,7 +5682,7 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>Pessimistic</div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exPessimistic)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
                           <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exPessimistic}</div>
-                          <div style={{ fontSize: '0.68rem', color: '#f87171', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{baseRate}% → {pessimisticReturn}%/yr</div>
+                          <div style={{ fontSize: '0.68rem', color: '#f87171', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatPct(baseRate, 1)} → {formatRatePerYear(pessimisticReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#f87171', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(baseSpend, currency, exchangeRates)}{runwayPessSpend > 0 ? ` → ${formatCurrency(baseSpend * pessSpendMult, currency, exchangeRates)}/yr` : '/yr spend'}</div>
                           {/* Return slider */}
                           <div style={{ marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
@@ -5610,7 +5730,7 @@ const mIdx = cols.findIndex(c =>
                           </div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exBase)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
                           <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exBase}</div>
-                          <div style={{ fontSize: '0.68rem', color: '#60a5fa', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{baseReturn}%/yr</div>
+                          <div style={{ fontSize: '0.68rem', color: '#60a5fa', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatRatePerYear(baseReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#60a5fa', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(retYearNominalSpend, currency, exchangeRates)}/yr spend</div>
                           <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
                             <div style={{ fontSize: '0.65rem', color: '#4b5563', lineHeight: 1.5 }}>Uses your configured investment return and retirement spend — no adjustments. This is your plan as entered.</div>
@@ -5629,7 +5749,7 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>Optimistic</div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exOptimistic)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
                           <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exOptimistic}</div>
-                          <div style={{ fontSize: '0.68rem', color: '#34d399', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{baseRate}% → {optimisticReturn}%/yr</div>
+                          <div style={{ fontSize: '0.68rem', color: '#34d399', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatPct(baseRate, 1)} → {formatRatePerYear(optimisticReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#34d399', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(baseSpend, currency, exchangeRates)}{runwayOptSpend > 0 ? ` → ${formatCurrency(baseSpend * optSpendMult, currency, exchangeRates)}/yr` : '/yr spend'}</div>
                           {/* Return slider */}
                           <div style={{ marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
@@ -5675,7 +5795,7 @@ const mIdx = cols.findIndex(c =>
                           const yearsIn = label - profile.retirementAge;
                           const retirementCalendarYear = new Date().getFullYear() + (profile.retirementAge - profile.currentAge);
                           const hoveredCalYear = retirementCalendarYear + yearsIn;
-                          const runwayOTEHits = oneTimeExpenses.filter(function(e) { return hoveredCalYear >= e.year && hoveredCalYear <= (e.endYear || e.year); });
+                          const runwayOTEHits = normalizedOneTimeExpenses.filter(function(e) { return hoveredCalYear >= e.year && hoveredCalYear <= (e.endYear || e.year); });
                           // Per-category nominal spend for hovered year — matches simulateRunway exactly
                           const baseNominalSpend = getRetNominalForYear(hoveredCalYear);
                           const scenarioMeta = {
@@ -5720,7 +5840,7 @@ const mIdx = cols.findIndex(c =>
                                         </div>
                                         {/* Step 2: Investment growth */}
                                         <div style={{ fontSize: '0.68rem', color: '#6b7280' }}>
-                                          Investment growth ({meta.ret}%): <span style={{ color: '#34d399', fontFamily: 'monospace' }}>{formatCurrencyDecimal(p.value, currency, exchangeRates)} → {formatCurrencyDecimal(balanceAfterGrowth, currency, exchangeRates)} (+{formatCurrencyDecimal(investmentGrowth, currency, exchangeRates)})</span>
+                                          Investment growth ({formatPct(meta.ret, 1)}): <span style={{ color: '#34d399', fontFamily: 'monospace' }}>{formatCurrencyDecimal(p.value, currency, exchangeRates)} → {formatCurrencyDecimal(balanceAfterGrowth, currency, exchangeRates)} (+{formatCurrencyDecimal(investmentGrowth, currency, exchangeRates)})</span>
                                         </div>
                                         {/* Step 3: Withdrawal */}
                                         {isRetirementYear ? (
@@ -5892,7 +6012,7 @@ const mIdx = cols.findIndex(c =>
               // Build chart data: each year from now until lifeExpectancy (but show up to retirement for clarity)
               const CHART_CAT_LINES = expenseCategories;
               // OTEs that are relevant for the chart range (for dot/band rendering)
-              const activeOTEsForChart = oneTimeExpenses.filter(e => e.year <= currentYear + (profile.retirementAge - profile.currentAge));
+              const activeOTEsForChart = normalizedOneTimeExpenses.filter(e => e.year <= currentYear + (profile.retirementAge - profile.currentAge));
 
               const chartData = [];
               const chartYearsMax = profile.retirementAge - profile.currentAge; // pre-retirement only
@@ -5914,7 +6034,8 @@ const mIdx = cols.findIndex(c =>
                 });
                 // Include all active one-time expenses in total line and route to assigned categories
                 // OTE amounts are in today's terms — inflated from currentYear at category's growth rate
-                const activeOTEsForYear = oneTimeExpenses.filter(e => y >= e.year && y <= (e.endYear || e.year));
+                const activeOTEsForYear = normalizedOneTimeExpenses.filter(e => y >= e.year && y <= (e.endYear || e.year));
+                const singleYearOTEsForYear = activeOTEsForYear.filter(e => !(e.endYear && e.endYear > e.year));
                 const getInflatedOTEAmount = (ote) => {
                   const cat = ote.category && ote.category !== 'none' ? ote.category : null;
                   const rate = cat ? ((expenseGrowthRates[cat] || 0) / 100) : 0;
@@ -5929,6 +6050,7 @@ const mIdx = cols.findIndex(c =>
                   : null;
                 row.oneTimeCategory = activeOTEsForYear.length === 1 ? (activeOTEsForYear[0].category || 'none') : (activeOTEsForYear.length > 1 ? 'multiple' : null);
                 row.activeOTEsList = activeOTEsForYear; // stored for tooltip detail
+                row.singleYearOTEsList = singleYearOTEsForYear;
                 activeOTEsForYear.forEach(function(ote) {
                   const inflated = getInflatedOTEAmount(ote);
                   if (ote.category && ote.category !== 'none') {
@@ -6267,9 +6389,7 @@ const mIdx = cols.findIndex(c =>
                             const { cx, cy, payload } = props;
                             const hasMilestone = wealthMilestones.find(m => m.age === payload.age);
                             const hasLifeEvent = !!payload.lifeEventLabel;
-                            const hasSingleOTE = activeOTEsForChart.some(e =>
-                              e.year === payload.year && !(e.endYear && e.endYear > e.year)
-                            );
+                             const hasSingleOTE = (payload.singleYearOTEsList || []).length > 0;
                             if (hasMilestone && hasLifeEvent) {
                               return <g key={payload.year}><circle cx={cx} cy={cy} r={7} fill="none" stroke="#34d399" strokeWidth={2.5} strokeOpacity={0.85} /><circle cx={cx} cy={cy} r={4} fill="#60a5fa" stroke="white" strokeWidth={1.5} /></g>;
                             }
@@ -6289,8 +6409,7 @@ const mIdx = cols.findIndex(c =>
                         <Line type="monotone" dataKey="essential" name="Essential" stroke="#ef4444" strokeWidth={2} strokeDasharray="6 3"
                           dot={(props) => {
                             const { cx, cy, payload } = props;
-                            const hasSingleOTE = activeOTEsForChart.some(e => {
-                              if (e.year !== payload.year || (e.endYear && e.endYear > e.year)) return false;
+                            const hasSingleOTE = (payload.singleYearOTEsList || []).some(e => {
                               const cat = expenseCategories.find(c => c.key === e.category);
                               return cat && (expenseTags[cat.key] || cat.group) === 'essential';
                             });
@@ -6301,8 +6420,7 @@ const mIdx = cols.findIndex(c =>
                         <Line type="monotone" dataKey="discretionary" name="Discretionary" stroke="#60a5fa" strokeWidth={2} strokeDasharray="6 3"
                           dot={(props) => {
                             const { cx, cy, payload } = props;
-                            const hasSingleOTE = activeOTEsForChart.some(e => {
-                              if (e.year !== payload.year || (e.endYear && e.endYear > e.year)) return false;
+                            const hasSingleOTE = (payload.singleYearOTEsList || []).some(e => {
                               const cat = expenseCategories.find(c => c.key === e.category);
                               return cat && (expenseTags[cat.key] || cat.group) !== 'essential';
                             });
@@ -6315,11 +6433,7 @@ const mIdx = cols.findIndex(c =>
                             dot={(props) => {
                               const { cx, cy, payload } = props;
                               // Show OTE dot ONLY for single-year OTEs that belong to this category
-                              const hasOTE = activeOTEsForChart.some(e =>
-                                e.category === cat.key &&
-                                payload.year === e.year &&
-                                !(e.endYear && e.endYear > e.year)  // single-year only
-                              );
+                              const hasOTE = (payload.singleYearOTEsList || []).some(e => e.category === cat.key);
                               if (hasOTE) return <circle cx={cx} cy={cy} r={5} fill="#f59e0b" stroke="white" strokeWidth={2} key={payload.year} />;
                               return null;
                             }}
@@ -6537,7 +6651,7 @@ const mIdx = cols.findIndex(c =>
                     })()}
                     {/* Breakdown popup — fixed overlay triggered by pill in BASE card */}
                     {breakdownPopupOpen && (() => {
-                      const allActiveOTEs = oneTimeExpenses.filter(e =>
+                      const allActiveOTEs = normalizedOneTimeExpenses.filter(e =>
                         clampedTargetYear >= e.year && clampedTargetYear <= (e.endYear || e.year)
                       );
                       return (
@@ -6638,6 +6752,13 @@ const mIdx = cols.findIndex(c =>
                     const vsHigh = sensitivityResult - highScenario;
                     const pctVsBase = baseScenario > 0 ? ((vsBase / baseScenario) * 100) : 0;
                     const addAdj = () => {
+                      const validKeys = new Set(ALL_CAT_OPTIONS.map(c => c.key));
+                      if (!validKeys.has(sensitivityCatPicker)) {
+                        if (ALL_CAT_OPTIONS[0] && ALL_CAT_OPTIONS[0].key) {
+                          setSensitivityCatPicker(ALL_CAT_OPTIONS[0].key);
+                        }
+                        return;
+                      }
                       if (sensitivityAdj.some(a => a.category === sensitivityCatPicker)) return;
                       setSensitivityAdj(prev => [...prev, { id: Date.now(), category: sensitivityCatPicker, delta: 1 }]);
                     };
@@ -7380,7 +7501,7 @@ const mIdx = cols.findIndex(c =>
                 </p>
                 
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  {oneTimeExpenses.length > 0 && (
+                  {normalizedOneTimeExpenses.length > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: '80px 80px 1fr 110px 110px auto', gap: '1rem', padding: '0 1rem' }}>
                     <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: '500' }}>Start</span>
                     <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>End <InfoTooltip text="Optional. Set an end year to make this a recurring annual expense — it will repeat every year from Start to End inclusive. Leave blank for a single-year expense. Amounts inflate each year at the category's growth rate from the start year." /></span>
@@ -7390,7 +7511,7 @@ const mIdx = cols.findIndex(c =>
                     <span></span>
                   </div>
                   )}
-                  {oneTimeExpenses.map((expense) => {
+                  {normalizedOneTimeExpenses.map((expense) => {
                     return (
                     <div key={expense.id} style={{ 
                       display: 'grid', 
@@ -7481,6 +7602,7 @@ const mIdx = cols.findIndex(c =>
                           cursor: 'pointer',
                         }}
                       >
+                        <option value="none">Uncategorised</option>
                         <optgroup label="Essential">
                           {expenseCategories.filter(function(c) { return (expenseTags[c.key] || c.group) === 'essential'; }).map(function(c) {
                             return <option key={c.key} value={c.key}>{c.label}</option>;
@@ -7784,6 +7906,8 @@ const mIdx = cols.findIndex(c =>
                   setRunwayOptimisticOffset(3);
                   setRunwayPessSpend(0);
                   setRunwayOptSpend(25);
+                  setSelectedChartCats([]);
+                  setSensitivityCatPicker(DEFAULT_EXPENSE_CATEGORIES[0].key);
                   setProjectionTargetYear(new Date().getFullYear() + 5);
                   setSurplusSplitInvest(100);
                   setSurplusSplitDebt(0);
