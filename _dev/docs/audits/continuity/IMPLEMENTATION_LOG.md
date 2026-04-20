@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-04-19 by Session 5
+**Last updated:** 2026-04-20 by Session 6
 
 ---
 
@@ -540,3 +540,65 @@ Selectors were hardened to avoid ambiguous role/text matches (tab-name regex anc
 
 **Next session priority:**
 1. Optional: add a small invariant test set for category-reference normalization (unit-level) to complement Playwright coverage.
+
+---
+
+## SESSION 6 — 2026-04-20 — GPT-5.3-Codex
+
+**Picking up from:** Session 5 close (all actionable findings fixed)
+**Session goal:** Close runway parity follow-ups requested post-audit and synchronize _dev verification/docs with current code behavior.
+
+### Follow-up 1 — Import/reset runway parity regression hardening (DONE)
+
+**Status:** CLOSED ✅
+**Work completed:**
+1. Kept runway control persistence active across autosave + JSON import/export paths.
+2. Added explicit Playwright regression assertions in `_dev/e2e/user-scenario-capture.spec.js`:
+   - perturbed runway controls must match injected values,
+   - reset runway controls must match baseline controls after re-import,
+   - reset runway years must equal baseline runway years.
+
+**Verification:** `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` passed with new assertions active.
+**Files changed:** `_dev/e2e/user-scenario-capture.spec.js`
+
+### Follow-up 2 — Float-safe runway slider parsing (DONE)
+
+**Status:** CLOSED ✅
+**Problem:** Runway slider handlers used integer parsing, which can truncate fractional values on ranges with fractional min anchors.
+**Fix applied:** Replaced integer parsing with `parseRangeInputValue(...)` in `src/App.jsx` to preserve numeric precision and align values to min/step semantics.
+**Verification:** Fresh capture now records perturbed pessimistic return offset exactly at `-5.5` (no truncation).
+**Files changed:** `src/App.jsx`
+
+### Follow-up 3 — Control parity evidence in full-element report (DONE)
+
+**Status:** CLOSED ✅
+**Work completed:**
+1. Extended `_dev/tests/verify_full_element_coverage.mjs` with 8 explicit `Runway Control Parity` checks (perturbed targets + reset-vs-baseline controls).
+2. Updated `_dev/tests/run_all_audits.js` to execute `verify_full_element_coverage.mjs` when required capture artifacts are present.
+
+**Verification:** Full coverage report shows `Runway Control Parity: 8 pass / 0 fail`.
+**Files changed:** `_dev/tests/verify_full_element_coverage.mjs`, `_dev/tests/run_all_audits.js`
+
+### Verification Chain (Session 6)
+
+- `npm run build` → PASS ✅
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` → PASS ✅
+- `node _dev/tests/extract_user_capture_metrics.mjs` → PASS ✅
+- `node _dev/tests/verify_full_element_coverage.mjs` → PASS ✅ (`44/44`)
+
+### Artifact Sync (Session 6)
+
+- `_dev/artifacts/user_scenario_capture.json` regenerated (`2026-04-20T06:41:19.634Z`)
+- `_dev/artifacts/user_scenario_extracted.json` regenerated (`2026-04-20T06:41:19.634Z`)
+- `_dev/artifacts/full_element_coverage_report.json` regenerated (`2026-04-20T06:41:40.009Z`)
+
+## SESSION 6 CLOSE — 2026-04-20
+**Findings resolved this session:** 2 follow-up regression closures (runway reset parity, float-safe slider handling)
+**Findings blocked:** 0 — none
+**Findings deferred:** 0 — none
+**Overall progress:** All previously reported follow-up items are now implemented and verified in fresh artifacts.
+
+**Key observations this session:**
+- Range inputs with fractional min anchors require numeric parsing that preserves decimal alignment; integer parsing is unsafe.
+- Deterministic E2E capture requires isolating persisted browser state to avoid hidden restore races.
+- Control-state parity checks complement metric-level parity and catch UI control drift earlier.

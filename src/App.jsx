@@ -1014,11 +1014,42 @@ const NetWorthNavigator = () => {
   const [surplusSplitInvest, setSurplusSplitInvest] = useState(100);
   const [surplusSplitDebt, setSurplusSplitDebt] = useState(0);
 
+  const RUNWAY_DEFAULT_CONSERVATIVE_OFFSET = -3;
+  const RUNWAY_DEFAULT_OPTIMISTIC_OFFSET = 3;
+  const RUNWAY_DEFAULT_PESS_SPEND = 0;
+  const RUNWAY_DEFAULT_OPT_SPEND = 25;
+
+  const parseNumericOrDefault = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const parseRangeInputValue = (target, fallback) => {
+    const raw = Number(target?.value);
+    if (!Number.isFinite(raw)) return fallback;
+
+    const min = Number(target?.min);
+    const max = Number(target?.max);
+    const step = Number(target?.step);
+
+    let next = raw;
+    if (Number.isFinite(min)) next = Math.max(min, next);
+    if (Number.isFinite(max)) next = Math.min(max, next);
+
+    if (Number.isFinite(step) && step > 0 && Number.isFinite(min)) {
+      const snapped = min + Math.round((next - min) / step) * step;
+      const decimals = (String(step).split('.')[1] || '').length;
+      next = Number(snapped.toFixed(decimals));
+    }
+
+    return next;
+  };
+
   const [runwayHiddenLines, setRunwayHiddenLines] = useState({});
-  const [runwayConservativeOffset, setRunwayConservativeOffset] = useState(-3);
-  const [runwayOptimisticOffset, setRunwayOptimisticOffset] = useState(3);
-  const [runwayPessSpend, setRunwayPessSpend] = useState(0);   // % spend increase for pessimistic
-  const [runwayOptSpend, setRunwayOptSpend] = useState(25);    // % spend reduction for optimistic
+  const [runwayConservativeOffset, setRunwayConservativeOffset] = useState(RUNWAY_DEFAULT_CONSERVATIVE_OFFSET);
+  const [runwayOptimisticOffset, setRunwayOptimisticOffset] = useState(RUNWAY_DEFAULT_OPTIMISTIC_OFFSET);
+  const [runwayPessSpend, setRunwayPessSpend] = useState(RUNWAY_DEFAULT_PESS_SPEND);   // % spend increase for pessimistic
+  const [runwayOptSpend, setRunwayOptSpend] = useState(RUNWAY_DEFAULT_OPT_SPEND);    // % spend reduction for optimistic
   const [ribbonMenuOpen, setRibbonMenuOpen] = useState(false);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const [expenseViewMode, setExpenseViewMode] = useState('annual'); // 'annual' | 'monthly'
@@ -1143,6 +1174,10 @@ const NetWorthNavigator = () => {
           nestEggSwr,
           surplusSplitInvest,
           surplusSplitDebt,
+          runwayConservativeOffset,
+          runwayOptimisticOffset,
+          runwayPessSpend,
+          runwayOptSpend,
         };
         localStorage.setItem('nwn_autosave', JSON.stringify(dataToSave));
       } catch (e) {
@@ -1153,7 +1188,8 @@ const NetWorthNavigator = () => {
   }, [currency, exchangeRates, profile, assets, liabilities, income, expenses,
       expenseCategories, expenseCalculator, retirementBudget, expenseGrowthRates,
       expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retExpenseGrowthRates,
-      lifeEvents, assumptions, normalizedOneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt]);
+      lifeEvents, assumptions, normalizedOneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt,
+      runwayConservativeOffset, runwayOptimisticOffset, runwayPessSpend, runwayOptSpend]);
 
   // Auto-restore from localStorage on mount
   useEffect(() => {
@@ -1185,6 +1221,10 @@ const NetWorthNavigator = () => {
       if (data.nestEggSwr !== undefined) setNestEggSwr(clampSwr(data.nestEggSwr));
       if (data.surplusSplitInvest !== undefined) setSurplusSplitInvest(data.surplusSplitInvest);
       if (data.surplusSplitDebt !== undefined) setSurplusSplitDebt(data.surplusSplitDebt);
+      setRunwayConservativeOffset(Math.min(-1, parseNumericOrDefault(data.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET)));
+      setRunwayOptimisticOffset(Math.max(1, Math.min(8, parseNumericOrDefault(data.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))));
+      setRunwayPessSpend(Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))));
+      setRunwayOptSpend(Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))));
     } catch (e) {
       // Corrupted or unavailable — start with defaults
     }
@@ -1253,6 +1293,10 @@ const NetWorthNavigator = () => {
       nestEggSwr,
       surplusSplitInvest,
       surplusSplitDebt,
+      runwayConservativeOffset,
+      runwayOptimisticOffset,
+      runwayPessSpend,
+      runwayOptSpend,
     };
     
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
@@ -2436,6 +2480,10 @@ new Chart(document.getElementById('allocChart'),{
           setNestEggSwr(clampSwr(imported.nestEggSwr));
           if (imported.surplusSplitInvest !== undefined) setSurplusSplitInvest(imported.surplusSplitInvest);
           if (imported.surplusSplitDebt   !== undefined) setSurplusSplitDebt(imported.surplusSplitDebt);
+          setRunwayConservativeOffset(Math.min(-1, parseNumericOrDefault(imported.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET)));
+          setRunwayOptimisticOffset(Math.max(1, Math.min(8, parseNumericOrDefault(imported.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))));
+          setRunwayPessSpend(Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))));
+          setRunwayOptSpend(Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))));
           alert('Data imported successfully! All values are in AED — switch currency above if needed.');
         } else {
           alert('Incompatible file format. Please use a file exported from NetWorth Navigator.');
@@ -5738,7 +5786,7 @@ const mIdx = cols.findIndex(c =>
                                     <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: '#f87171', fontWeight: '700' }}>{runwayConservativeOffset}pp</span>
                                   </div>
                                   <input type="range" min={pessMin} max={-1} step={1} value={runwayConservativeOffset}
-                                    onChange={function(e) { setRunwayConservativeOffset(parseInt(e.target.value, 10)); }}
+                                    onChange={function(e) { setRunwayConservativeOffset(parseRangeInputValue(e.target, runwayConservativeOffset)); }}
                                     style={{ width: '100%', accentColor: '#f87171' }} />
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>{pessMin}pp</span><span>−1pp</span></div>
                                 </>
@@ -5752,7 +5800,7 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayPessSpend > 0 ? '#f87171' : '#4b5563', fontWeight: '700' }}>{runwayPessSpend > 0 ? '+' + runwayPessSpend + '%' : 'Off'}</span>
                             </div>
                             <input type="range" min={0} max={50} step={5} value={runwayPessSpend}
-                              onChange={function(e) { setRunwayPessSpend(parseInt(e.target.value, 10)); }}
+                              onChange={function(e) { setRunwayPessSpend(parseRangeInputValue(e.target, runwayPessSpend)); }}
                               style={{ width: '100%', accentColor: '#f87171' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>+50%</span></div>
                           </div>
@@ -5799,7 +5847,7 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: '#34d399', fontWeight: '700' }}>+{runwayOptimisticOffset}pp</span>
                             </div>
                             <input type="range" min={1} max={8} step={1} value={runwayOptimisticOffset}
-                              onChange={function(e) { setRunwayOptimisticOffset(parseInt(e.target.value, 10)); }}
+                              onChange={function(e) { setRunwayOptimisticOffset(parseRangeInputValue(e.target, runwayOptimisticOffset)); }}
                               style={{ width: '100%', accentColor: '#34d399' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>+1pp</span><span>+8pp</span></div>
                           </div>
@@ -5810,7 +5858,7 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayOptSpend > 0 ? '#34d399' : '#4b5563', fontWeight: '700' }}>{runwayOptSpend > 0 ? '−' + runwayOptSpend + '%' : 'Off'}</span>
                             </div>
                             <input type="range" min={0} max={50} step={5} value={runwayOptSpend}
-                              onChange={function(e) { setRunwayOptSpend(parseInt(e.target.value, 10)); }}
+                              onChange={function(e) { setRunwayOptSpend(parseRangeInputValue(e.target, runwayOptSpend)); }}
                               style={{ width: '100%', accentColor: '#34d399' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>−50%</span></div>
                           </div>
@@ -7955,10 +8003,10 @@ const mIdx = cols.findIndex(c =>
                   setSensitivityAdj([]);
                   setLowDelta(-2.5);
                   setHighDelta(3.5);
-                  setRunwayConservativeOffset(-3);
-                  setRunwayOptimisticOffset(3);
-                  setRunwayPessSpend(0);
-                  setRunwayOptSpend(25);
+                  setRunwayConservativeOffset(RUNWAY_DEFAULT_CONSERVATIVE_OFFSET);
+                  setRunwayOptimisticOffset(RUNWAY_DEFAULT_OPTIMISTIC_OFFSET);
+                  setRunwayPessSpend(RUNWAY_DEFAULT_PESS_SPEND);
+                  setRunwayOptSpend(RUNWAY_DEFAULT_OPT_SPEND);
                   setSelectedChartCats([]);
                   setSensitivityCatPicker(DEFAULT_EXPENSE_CATEGORIES[0].key);
                   setProjectionTargetYear(new Date().getFullYear() + 5);

@@ -3,7 +3,7 @@
 **Project:** NetWorth Navigator v2.0.0
 **Domain:** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-04-19 (Session 5)
+**Last updated:** 2026-04-20 (Session 6)
 
 ---
 
@@ -138,3 +138,29 @@ Findings in batch: NEW-36, NEW-37, NEW-38, NEW-39, NEW-40
 - A single canonical derived list (`normalizedOneTimeExpenses`) simplified consistency across export, projections, charts, and retirement simulations.
 - Applying percentage formatting through helpers (`formatPct`, `formatRatePerYear`) removed floating-point artifacts and improved display parity.
 - The new `_dev/e2e/regression-and-scenarios.spec.js` meaningfully extends coverage with both targeted regressions and 5 cross-tab scenario traversals.
+
+---
+
+## Batch Synthesis — Session 6 — 2026-04-20
+Findings in batch: Post-audit runway follow-up closures
+
+### Patterns observed
+
+1. UI controls with fractional range anchors can silently drift if handlers parse values as integers.
+2. State-restoration pathways (autosave/import) require dedicated parity assertions, not only formula-level checks.
+3. E2E capture pipelines can produce false negatives when persisted browser state leaks between runs.
+
+### Principles extracted
+
+- **Range controls must use numeric parsing aligned to min/step:** For HTML range inputs, parse as Number and snap to step relative to min when needed; never use integer truncation on potentially fractional domains.
+- **Assert both metric parity and control parity:** A model can still output expected high-level values while controls drift; include checks for slider/control states in addition to chart/card totals.
+- **Reset browser persistence before deterministic audits:** Clear persisted app state before load when the test is intended to validate imported payloads as the sole source of truth.
+
+### Codebase-specific observations
+
+- `parseRangeInputValue(...)` in `src/App.jsx` now provides float-safe runway slider parsing across all runway controls.
+- `_dev/e2e/user-scenario-capture.spec.js` now includes explicit regression assertions for:
+	- perturbed runway control values,
+	- reset-vs-baseline runway control parity,
+	- reset-vs-baseline runway years parity after re-import.
+- `_dev/tests/verify_full_element_coverage.mjs` now includes 8 `Runway Control Parity` checks in the generated report, and `_dev/tests/run_all_audits.js` executes that verifier when artifacts exist.
