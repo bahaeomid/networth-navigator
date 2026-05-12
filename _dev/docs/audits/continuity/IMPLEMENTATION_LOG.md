@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-04-20 by Session 6
+**Last updated:** 2026-05-12 by Session 8
 
 ---
 
@@ -55,6 +55,12 @@
 | NEW-41 | Ongoing investment contributions missing from base projection | HIGH | H | FIXED | 7 | Added investment-item `annualContrib` and `contribGrowthRate`; contributions now flow through `wealthProjection` and downstream retirement/report surfaces |
 | NEW-42 | Savings-rate metric ignored current-year planned expenses | MEDIUM | H | FIXED | 7 | Renamed to current-year savings rate and subtracts planned expenses active in the current calendar year; report notes updated |
 | NEW-43 | Liability balances could be mistaken for debt-service cashflow | MEDIUM | H | DOCUMENTED / DEFERRED | 7 | Documented current workflow: keep liabilities for net worth and enter full debt-service payments as expense categories for all liability types |
+| NEW-44 | Save More surplus-offset hint used gross surplus after investment contributions were added | HIGH | I | FIXED | 8 | Save More now explains it is additional to entered contributions and only positive undeployed surplus can offset it |
+| NEW-45 | Surplus Deployment copy described standalone scenarios as additive to the base projection | HIGH | I | FIXED | 8 | Reframed section and Tile 1 tooltip as standalone full-surplus/split scenarios with delta versus base |
+| NEW-46 | Investment contribution entry layout was visually unclear | MEDIUM | I | FIXED | 8 | Reworked investment item rows with explicit Name, Current value, Annual contrib, and Growth labels |
+| NEW-47 | Investment contribution fields lacked local explanatory tooltips | MEDIUM | I | FIXED | 8 | Added inline tooltips for Annual contrib and Growth fields |
+| NEW-48 | Current-year savings-rate tooltip did not disclose contribution treatment | LOW | I | FIXED | 8 | Tooltip now states contributions are deployment of savings, not expenses, and defines undeployed surplus |
+| NEW-49 | HTML report Save More methodology note referenced generic surplus offset | LOW | I | FIXED | 8 | Report note now uses undeployed surplus after entered annual investment contributions |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -631,3 +637,51 @@ Selectors were hardened to avoid ambiguous role/text matches (tab-name regex anc
 **Decision:** Do not add first-class liability payment fields in this pass. Keep the current architecture where liabilities are balance-sheet items and expense categories carry cashflow.
 **Documented workflow:** For all liability types, keep the liability entry for net worth and enter the full scheduled debt-service payment as an expense category with phase-out year matching payoff year. For amortising loans, enter full principal + interest because both reduce investable cashflow. Avoid double-counting if already included in another expense category.
 **Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`, `_dev/docs/audits/AUDIT_REPORT_2026-05-12.md`
+
+---
+
+## SESSION 8 - 2026-05-12 - Codex
+
+**Picking up from:** `_dev/Prompt/session7-post-implementation-audit.md`
+**Open findings at session start:** Post-implementation disclosure and layout gaps around investment contributions, Save More, Surplus Deployment, and savings-rate wording.
+**Session goal:** Implement the validated UX/documentation issues without changing the financial model calculations.
+
+### NEW-44 - Save More surplus-offset hint used gross surplus after investment contributions were added (HIGH -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added `annualInvestmentContribution` and `annualUndeployedSurplus` to the app-level derived metrics. The Save More card now explains that the displayed monthly amount is additional to entered investment-item contributions and only shows the offset hint when undeployed surplus is positive.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-45 - Surplus Deployment copy described standalone scenarios as additive to the base projection (HIGH -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Reframed Surplus Deployment as standalone scenarios. The explainer now distinguishes base projection contributions from the full dynamic surplus alternative, and Tile 1 explains why full-surplus deployment is normally an upper-bound scenario but can vary by year.
+**Files changed:** `src/App.jsx`
+
+### NEW-46 - Investment contribution entry layout was visually unclear (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Reworked investment sub-item rows into labelled fields for Name, Current value, Annual contrib, and Growth, with a lightweight header row and stable grid columns.
+**Files changed:** `src/App.jsx`
+
+### NEW-47 - Investment contribution fields lacked local explanatory tooltips (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added inline tooltips beside Annual contrib and Growth labels to state how they affect the base projection and that affordability is user-entered, not capped by the model.
+**Files changed:** `src/App.jsx`
+
+### NEW-48 - Current-year savings-rate tooltip did not disclose contribution treatment (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Updated the tooltip to clarify that annual investment contributions are deployment of savings, not expenses, and that undeployed surplus equals current surplus minus entered annual contributions.
+**Files changed:** `src/App.jsx`
+
+### NEW-49 - HTML report Save More methodology note referenced generic surplus offset (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Updated the HTML report methodology note so Save More is documented as additional to entered contributions, offset only by undeployed surplus.
+**Files changed:** `src/App.jsx`
+
+### Verification Chain (Session 8)
+
+- `npm run test:release` -> PASS

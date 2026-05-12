@@ -1336,7 +1336,7 @@ const NetWorthNavigator = () => {
       .reduce((s,e)=>s+(e.amount||0),0);
     const surplus = totalAnnualIncome - totalPreRetExpenses - currentYearOTETotal;
     const savingsRate = totalAnnualIncome>0 ? (surplus/totalAnnualIncome)*100 : 0;
-    const annualInvestmentContribution = (assets.investmentItems||[]).reduce((s,i)=>s+(i.annualContrib||0),0);
+    const undeployedSurplus = surplus - annualInvestmentContribution;
     const debtRatio = totalAssets>0 ? (totalLiabilities/totalAssets)*100 : 0;
     const monthlyExpenses = totalPreRetExpenses/12;
     const emergencyMonths = monthlyExpenses>0 ? (assets.cash||0)/monthlyExpenses : 0;
@@ -2244,7 +2244,7 @@ const NetWorthNavigator = () => {
       <p>The <strong>overall verdict</strong> is a 6-state classification combining Q1 (on track vs gap) and Q2 (≥80% strong, 60–79% caution, &lt;60% weak): Strong · Moderate risk · High risk · Gap with strong odds · Gap detected · High risk with gap and low odds.</p>
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
-        <li><strong>Save More.</strong> The additional monthly investment required to accumulate the gap amount by retirement, assuming contributions compound at the investment return using a future-value annuity formula. Your existing monthly surplus partially offsets this requirement.</li>
+        <li><strong>Save More.</strong> The additional monthly investment required to accumulate the gap amount by retirement, assuming contributions compound at the investment return using a future-value annuity formula. Annual contributions entered on investment items are already included in the base projection; this amount is additional to those contributions. Only undeployed surplus (${fmt(undeployedSurplus)}/yr today) can offset the additional requirement.</li>
         <li><strong>Retire Later.</strong> The number of additional working years (beyond planned retirement) needed for your existing investment portfolio to reach the required nest egg through extra compounding time only. No additional savings contributions are assumed in this lever (conservative). Displays "Gap too large" if not achievable within 30 extra years.</li>
         <li><strong>Higher Return.</strong> The CAGR required for existing investments alone (no new contributions) to reach the required nest egg by retirement, solved via: (Required Nest Egg ÷ Current Investments)^(1 ÷ Years) − 1. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
@@ -2272,7 +2272,7 @@ const NetWorthNavigator = () => {
   <div class="note-block">
     <div class="note-heading"><span class="note-num">11.</span> Surplus Deployment Scenarios</div>
     <div class="note-body">
-      <p>The Surplus Deployment section models three strategies for allocating annual pre-retirement savings surplus. All three scenarios use the actual year-by-year surplus from the base projection (which reflects salary growth, expense inflation, and one-time costs) rather than a fixed annual figure. Annual contributions entered on investment items are already included in the base projection; Surplus Deployment should be read as additional deployment of remaining surplus. The FI Age shown in each tile uses the same per-year nominal threshold as the main FI Age calculation (Note 5) and is therefore directly comparable. Scenarios are illustrative only — they do not update the base projection or any other metric in the report.</p>
+      <p>The Surplus Deployment section models three standalone strategies for allocating annual pre-retirement savings surplus. All three scenarios use the actual year-by-year surplus from the base projection (which reflects salary growth, expense inflation, and one-time costs) rather than a fixed annual figure. The base projection includes only annual contributions entered on investment items; Tile 1 shows an upper-bound alternative where the full dynamic surplus is invested. The delta versus base FI Age is the benefit of deploying more than the entered contributions. Scenarios are illustrative only — they do not update the base projection or any other metric in the report.</p>
     </div>
   </div>
   <hr class="note-rule"/>
@@ -2860,6 +2860,14 @@ const mIdx = cols.findIndex(c =>
   const savingsRate = useMemo(() => {
     return annualIncome > 0 ? (annualSavings / annualIncome) * 100 : 0;
   }, [annualSavings, annualIncome]);
+
+  const annualInvestmentContribution = useMemo(() => {
+    return (assets.investmentItems || []).reduce((sum, item) => sum + (item.annualContrib || 0), 0);
+  }, [assets.investmentItems]);
+
+  const annualUndeployedSurplus = useMemo(() => {
+    return annualSavings - annualInvestmentContribution;
+  }, [annualSavings, annualInvestmentContribution]);
   
   // Compute projected annual expenses for any given year using per-category growth rates
   const getProjectedExpenses = (targetYear, opts) => {
@@ -3892,7 +3900,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 1. Current-year savings rate */}
                   <div style={tileStyle(srBg, srBdr)}>
                     <div>
-                      <div style={labelStyle}>💰 Current-year savings rate <InfoTooltip text={`Current-year savings ÷ gross income. Savings = income minus current expenses and any Planned Expenses active this calendar year (${formatCurrency(annualSavings, currency, exchangeRates)}/yr current surplus). Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Liability balances are not cashflow payments; add debt service as expense categories if you want those payments reflected here.`} /></div>
+                      <div style={labelStyle}>💰 Current-year savings rate <InfoTooltip text={`Current-year savings ÷ gross income. Savings = income minus current expenses and any Planned Expenses active this calendar year (${formatCurrency(annualSavings, currency, exchangeRates)}/yr current surplus). This metric does not deduct annual investment contributions; those are treated as deployment of savings, not expenses. Undeployed surplus is current surplus minus entered annual contributions. Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Liability balances are not cashflow payments; add debt service as expense categories if you want those payments reflected here.`} /></div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                         <span style={valueStyle(srColor)}>{srVal.toFixed(1)}%</span>
                         <span style={{ fontSize: '0.65rem', color: '#4b5563' }}>{formatCurrency(annualSavings, currency, exchangeRates)}/yr</span>
@@ -4992,7 +5000,7 @@ const mIdx = cols.findIndex(c =>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: surplusOpen ? '0.85rem' : 0 }}>
                       <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         💸 Surplus Deployment
-                        <InfoTooltip text={`Your annual pre-retirement surplus (total income minus expenses) sits undeployed by default except for any annual contributions you explicitly entered on investment items. These three strategies show what happens to your FI Age and retirement wealth if you actively deploy additional surplus. Important: all strategies operate pre-retirement only — surplus deployment stops at your Planned Retirement Age. Post-retirement, passive and other non-salary income is automatically netted against investment drawdown, so there is no double-counting between pre- and post-retirement phases.`} />
+                        <InfoTooltip text={`Your annual pre-retirement surplus (total income minus expenses) sits undeployed by default except for any annual contributions you explicitly entered on investment items. These three standalone strategies show what happens to your FI Age and retirement wealth if you actively deploy surplus in different ways. Important: all strategies operate pre-retirement only — surplus deployment stops at your Planned Retirement Age. Post-retirement, passive and other non-salary income is automatically netted against investment drawdown, so there is no double-counting between pre- and post-retirement phases.`} />
                       </div>
                       {!hasFutureSurplus
                         ? <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>No surplus — expenses meet or exceed income throughout projection</span>
@@ -5001,14 +5009,14 @@ const mIdx = cols.findIndex(c =>
                           </button>
                       }
                     </div>
-                    {surplusOpen && hasFutureSurplus && <div style={{ fontSize: '0.72rem', color: '#6b7280', marginBottom: '0.85rem', lineHeight: 1.5 }}>Use your pre-retirement surplus to see if you can retire faster — or pay off debt sooner. Each strategy uses your year-by-year actual surplus, which grows dynamically with your salary and expenses. If you already entered annual contributions under Investments, treat these scenarios as additional deployment on top of the base projection.</div>}
+                    {surplusOpen && hasFutureSurplus && <div style={{ fontSize: '0.72rem', color: '#6b7280', marginBottom: '0.85rem', lineHeight: 1.5 }}>Use your pre-retirement surplus to see if you can retire faster — or pay off debt sooner. Each tile is a standalone scenario, not an addition to the base projection. The base projection uses annual contributions entered on investment items; these tiles show what happens if you deploy the full dynamic surplus or split it differently. The delta versus base FI Age is the benefit of deploying more than the entered contributions.</div>}
                     {surplusOpen && hasFutureSurplus && (
                       <div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
 
                           {/* Tile 1 — Invest all */}
                           <div style={{ padding: '1rem', background: 'rgba(52,211,153,0.07)', borderRadius: '10px', border: '1px solid rgba(52,211,153,0.3)' }}>
-                            <div style={{ fontSize: '0.85rem', color: '#34d399', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>💹 Invest all surplus <InfoTooltip text={`Each year's leftover Savings — after all expenses — is added to your Investments pot immediately and grows at your assumed return of ${assumptions.investmentReturn}%/yr until retirement. The annual savings fluctuate over time as your income and expenses change. The FI Age shown is how early you could retire if you consistently invest every extra bit of saving.`} /></div>
+                            <div style={{ fontSize: '0.85rem', color: '#34d399', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>💹 Invest all surplus <InfoTooltip text={`Each year's leftover Savings — after all expenses — is added to your Investments pot immediately and grows at your assumed return of ${assumptions.investmentReturn}%/yr until retirement. This is a full-surplus deployment scenario, not an amount to add to the base projection. It typically acts as an upper bound versus entered fixed contributions, though large planned expenses can make dynamic surplus lower than entered contributions in specific years. The FI Age shown is how early you could retire if you consistently invest every extra bit of saving.`} /></div>
                             <div style={{ fontSize: '0.85rem', color: '#e8e9ed', marginBottom: '0.85rem', lineHeight: 1.5 }}>Each year's surplus invested at {assumptions.investmentReturn}%/yr & compounded until retirement.</div>
                             <div style={{ height: '1px', background: 'rgba(52,211,153,0.2)', marginBottom: '0.75rem' }} />
                             <div style={{ marginBottom: '0.65rem' }}>
@@ -5539,11 +5547,11 @@ const mIdx = cols.findIndex(c =>
                                 <div>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                                     <div style={{ padding: '0.85rem', background: saveMoreNA ? 'rgba(255,255,255,0.02)' : 'rgba(96,165,250,0.07)', borderRadius: '8px', border: `1px solid ${saveMoreNA ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario — assumes a fixed monthly amount invested immediately each month at your preset Investment return of ${assumptions.investmentReturn}%/yr, compounded annually until retirement. In reality your savings fluctuate year-to-year, but this simplified figure gives you a constant target to aim for. All other factors remain unchanged from your base scenario. Note: this figure does not include your existing surplus — any surplus you already have (see Surplus Deployment in the Dashboard tab) can be applied toward this amount.`} /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario — assumes a fixed monthly amount invested immediately each month at your preset Investment return of ${assumptions.investmentReturn}%/yr, compounded annually until retirement. Annual contributions entered on investment items are already included in the base projection; this number is additional to those contributions. Only undeployed surplus can offset it: current surplus minus entered annual investment contributions. All other factors remain unchanged from your base scenario.`} /></div>
                                       {saveMoreNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Not calculable</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrencyDecimal(extraMonthly, currency, exchangeRates)}/mo</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>constant monthly amount · invested at {assumptions.investmentReturn}%/yr · compounded until retirement</div>
-                                      {!saveMoreNA && annualSavings > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Your current surplus of {formatCurrencyDecimal(annualSavings / 12, currency, exchangeRates)}/mo (today) can offset this</div>}
+                                      {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo (today) can offset this{annualInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(annualInvestmentContribution / 12, currency, exchangeRates)}/mo already committed` : ''}</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
                                       <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="Conservative estimate: how many extra years are needed if you only delay retirement and let your existing investments compound longer. No additional savings are invested in this lever, so this is intentionally strict. In reality, if you keep saving and invest the extra surplus while working longer, the required delay is usually shorter. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
@@ -7103,58 +7111,74 @@ const mIdx = cols.findIndex(c =>
                 {/* Sub-items list */}
                 {expandedCategories.investmentItems && (
                   <div style={{ marginTop: '0.75rem', marginLeft: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 130px 150px 95px 42px', gap: '0.6rem', alignItems: 'center', marginBottom: '0.45rem', padding: '0 0.25rem', fontSize: '0.58rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
+                      <span>Name</span>
+                      <span>Current value</span>
+                      <span>Annual contrib</span>
+                      <span>Growth</span>
+                      <span />
+                    </div>
                     {(assets.investmentItems || []).map((item) => (
-                      <div key={item.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <input
-                          type="text"
-                          value={item.name}
-                          onChange={(e) => {
-                            const newItems = assets.investmentItems.map(i => 
-                              i.id === item.id ? { ...i, name: e.target.value } : i
-                            );
-                            setAssets({ ...assets, investmentItems: newItems });
-                          }}
-                          placeholder="Item name"
-                          style={{
-                            flex: 1,
-                            padding: '0.5rem',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '6px',
-                            color: '#e8e9ed',
-                            fontSize: '0.85rem'
-                          }}
-                        />
-                        <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="120px"
-                          onChange={(aed) => {
-                            const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, amount: aed } : i);
-                            const total = newItems.reduce((sum, i) => sum + i.amount, 0);
-                            setAssets({ ...assets, investmentItems: newItems, investments: total });
-                          }} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
-                          <span style={{ fontSize: '0.68rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>contrib</span>
-                          <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="110px"
+                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 130px 150px 95px 42px', gap: '0.6rem', marginBottom: '0.75rem', alignItems: 'end', padding: '0.7rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600' }}>Name</span>
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => {
+                              const newItems = assets.investmentItems.map(i => 
+                                i.id === item.id ? { ...i, name: e.target.value } : i
+                              );
+                              setAssets({ ...assets, investmentItems: newItems });
+                            }}
+                            placeholder="Item name"
+                            style={{
+                              width: '100%',
+                              minWidth: 0,
+                              padding: '0.5rem',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              borderRadius: '6px',
+                              color: '#e8e9ed',
+                              fontSize: '0.85rem'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap' }}>Current value</span>
+                          <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="130px"
+                            onChange={(aed) => {
+                              const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, amount: aed } : i);
+                              const total = newItems.reduce((sum, i) => sum + i.amount, 0);
+                              setAssets({ ...assets, investmentItems: newItems, investments: total });
+                            }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual amount added to this investment item before retirement. It is included in the base projection and affects FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and reports. Enter only contributions you expect to fund; the model does not cap this field to calculated surplus." /></span>
+                          <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="150px"
                             onChange={(aed) => {
                               const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, annualContrib: aed } : i);
                               setAssets({ ...assets, investmentItems: newItems });
                             }} />
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                          <span style={{ fontSize: '0.68rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>contrib growth</span>
-                          <input
-                            type="number"
-                            value={item.contribGrowthRate || 0}
-                            onChange={(e) => {
-                              const v = parseFloat(e.target.value);
-                              if (!isNaN(v) && v >= 0 && v <= 30) {
-                                const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribGrowthRate: v } : i);
-                                setAssets({ ...assets, investmentItems: newItems });
-                              }
-                            }}
-                            title="Annual growth rate applied to this contribution amount"
-                            style={{ width: '52px', padding: '0.45rem 0.35rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '6px', color: '#34d399', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
-                          />
-                          <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Growth <InfoTooltip text="Annual increase applied to this item's contribution amount before retirement. Example: 5% means next year's contribution is 5% higher than this year's contribution." /></span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <input
+                              type="number"
+                              value={item.contribGrowthRate || 0}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                if (!isNaN(v) && v >= 0 && v <= 30) {
+                                  const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribGrowthRate: v } : i);
+                                  setAssets({ ...assets, investmentItems: newItems });
+                                }
+                              }}
+                              title="Annual growth rate applied to this contribution amount"
+                              style={{ width: '52px', padding: '0.45rem 0.35rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '6px', color: '#34d399', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
+                            />
+                            <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
+                          </div>
                         </div>
                         <button
                           onClick={() => {
@@ -7170,7 +7194,8 @@ const mIdx = cols.findIndex(c =>
                             color: '#ef4444',
                             cursor: 'pointer',
                             fontSize: '0.75rem',
-                            fontWeight: '600'
+                            fontWeight: '600',
+                            width: '42px'
                           }}
                         >
                           ✕

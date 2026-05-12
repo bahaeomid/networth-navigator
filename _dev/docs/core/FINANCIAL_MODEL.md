@@ -233,6 +233,14 @@ extraMonthly = (gap / annuityFactor) / 12
 
 Shows how much additional monthly investment closes the gap.
 
+This lever is additional to the annual contributions entered on investment sub-items, because those contributions are already included in `projectedWealth`. Only undeployed surplus can offset the displayed monthly amount:
+
+```
+undeployedSurplus = currentYearSavings - annualInvestmentContributions
+```
+
+If annual investment contributions exceed current-year savings, the base model still honors the entered contribution plan; users should reduce the contribution inputs if they are not affordable.
+
 ### Lever 2: Retire Later
 
 ```
