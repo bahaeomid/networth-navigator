@@ -5,7 +5,7 @@ This folder contains all audit-related assets, split by role for fast navigation
 ## Current Ground Truth
 
 - Registry: `AUDIT_REGISTRY.md`
-- Current audit report: `AUDIT_REPORT_2026-04-19.md`
+- Current audit report: `AUDIT_REPORT_2026-05-12-codebase-auditor-full.md`
 
 ## Folders
 

@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-12 by Session 11
+**Last updated:** 2026-05-12 by Session 12
 
 ---
 
@@ -63,11 +63,11 @@
 | NEW-49 | HTML report Save More methodology note referenced generic surplus offset | LOW | I | FIXED | 8 | Report note now uses undeployed surplus after entered annual investment contributions |
 | NEW-50 | Gap-closing levers no longer matched applied-input outcomes after contribution-model update | HIGH | J | FIXED | 9 | Replaced closed-form/compounding-only lever logic with actionable parity solvers for Save More, Retire Later, and Higher Return |
 | NEW-51 | Collapsed Investments header hid contribution activity when lump-sum balance was zero | MEDIUM | J | FIXED | 9 | Added annual-contribution badge beside Investments total in collapsed header |
-| NEW-52 | Export HTML report interpolates user strings without escape (XSS regression) | CRITICAL | K | OPEN | - | Maps to A9 FINDING-01; escape all liability/dependent output with `escapeHtml` |
+| NEW-52 | Export HTML report interpolates user strings without escape (XSS regression) | CRITICAL | K | FIXED | 12 | Escaped liability/dependent interpolations in Balance Sheet + assumptions sections with `escapeHtml` |
 | NEW-53 | Retirement boundary mismatch causes one-year drawdown offset | HIGH | K | FIXED | 11 | Drawdown boundary aligned to `age >= retirementAge` in deterministic + runway surfaces; docs/tooltips synced |
 | NEW-54 | Monte Carlo withdrawal onset out of parity with deterministic/runway | HIGH | K | FIXED | 11 | Deterministic/runway now match MC year-0 withdrawal convention; parity contract documented + harness updated |
-| NEW-55 | Audit harness mixes advisory scripts into pass/fail gating | MEDIUM | K | OPEN | - | Maps to A9 FINDING-04; split advisory reporters or harden with assertions |
-| NEW-56 | Docs index current-ground-truth pointers stale vs registry | LOW | K | OPEN | - | Maps to A9 FINDING-05; update docs index links to latest active/full audit lineage |
+| NEW-55 | Audit harness mixes advisory scripts into pass/fail gating | MEDIUM | K | FIXED | 12 | Reclassified all auditor1 scripts as advisory in `run_all_audits.js`; gating pass banner now reflects assertion-backed tests only |
+| NEW-56 | Docs index current-ground-truth pointers stale vs registry | LOW | K | FIXED | 12 | Updated docs index pointers to the active full audit lineage (`AUDIT_REPORT_2026-05-12-codebase-auditor-full.md`) |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -855,3 +855,66 @@ Reviewed and re-validated the main connected surfaces after lever fixes:
 1. NEW-52
 2. NEW-55
 3. NEW-56
+
+---
+
+## SESSION 12 - 2026-05-12 - Codex
+
+**Picking up from:** Session 11 close and user-requested Sonnet feedback reconciliation.  
+**Open findings at session start:** NEW-52, NEW-55, NEW-56.  
+**Session goal:** Implement all remaining deferred A9 findings and the identified documentation inconsistency from Sonnet review.
+
+### NEW-52 - Export HTML report interpolates user strings without escape (CRITICAL -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Patched all confirmed unescaped user-string interpolations in report export:
+- Escaped liability names in Balance Sheet liability table for mortgage/loan/other rows.
+- Escaped dependent names in Planning Assumptions section.
+- Used existing `escapeHtml(...)` utility already applied elsewhere in the report template.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-55 - Audit harness mixes advisory scripts into pass/fail gating (MEDIUM -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Reclassified all `auditor1_*` scripts in `_dev/tests/run_all_audits.js` as **advisory (non-gating)** and updated suite summary messaging:
+- Gating pass/fail now reflects assertion-backed tests only.
+- Advisory script execution remains visible and explicitly labeled as non-gating.
+- Removed the ambiguous `ALL AUDIT TESTS PASSED` framing in favor of separate gating/advisory summaries.
+
+**Files changed:** `_dev/tests/run_all_audits.js`
+
+### NEW-56 - Docs index current-ground-truth pointers stale vs registry (LOW -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Updated documentation index pointers to latest active full audit lineage:
+- `_dev/docs/README.md` current ground-truth report pointer updated.
+- `_dev/docs/audits/README.md` current audit report pointer updated.
+
+**Files changed:** `_dev/docs/README.md`, `_dev/docs/audits/README.md`
+
+### Documentation Consistency Follow-Up (from Sonnet review)
+
+- Updated the stale drawdown-convention row in `_dev/docs/core/FINANCIAL_MODEL.md` Section 6 from `age >` to `age >= retirementAge` so it matches current code and formula sections.
+
+### Verification Chain (Session 12)
+
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run test:smoke` -> PASS (12 Playwright tests)
+
+## SESSION 12 CLOSE - 2026-05-12
+
+**Findings resolved this session:** 3 - NEW-52, NEW-55, NEW-56  
+**Findings blocked:** 0  
+**Findings deferred:** 0 (no new deferrals)  
+**Overall progress:** A9 open backlog fully closed.
+
+**Key observations this session:**
+- Export report XSS exposure is closed at all confirmed liability/dependent interpolation points.
+- Audit suite pass/fail signal now cleanly distinguishes gating tests from advisory diagnostics.
+- Financial model documentation is now internally consistent on retirement drawdown timing.
+
+**Next session priority:**
+1. Validate and close any remaining non-A9 deferred findings if desired (e.g., NEW-21, NEW-25, NEW-27, NEW-43).

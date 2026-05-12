@@ -1859,9 +1859,9 @@ const NetWorthNavigator = () => {
         <thead><tr><th>Liability</th><th class="r">Balance</th><th class="r">% of Total</th><th>End Year</th></tr></thead>
         <tbody>
           ${totalLiabilities>0 ? `
-          ${(liabilities.mortgageItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${i.name||'Mortgage'}</td><td class="num red">${fmt(i.amount)}</td><td class="num dim">${((i.amount/totalLiabilities)*100).toFixed(1)}%</td><td class="dim">${i.endYear||'—'}</td></tr>`).join('')}
-          ${(liabilities.loanItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${i.name||'Loan'}</td><td class="num red">${fmt(i.amount)}</td><td class="num dim">${((i.amount/totalLiabilities)*100).toFixed(1)}%</td><td class="dim">${i.endYear||'—'}</td></tr>`).join('')}
-          ${(liabilities.otherLiabilityItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${i.name||'Other'}</td><td class="num red">${fmt(i.amount)}</td><td class="num dim">${((i.amount/totalLiabilities)*100).toFixed(1)}%</td><td class="dim">${i.endYear||'—'}</td></tr>`).join('')}
+          ${(liabilities.mortgageItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${escapeHtml(i.name||'Mortgage')}</td><td class="num red">${fmt(i.amount)}</td><td class="num dim">${((i.amount/totalLiabilities)*100).toFixed(1)}%</td><td class="dim">${i.endYear||'—'}</td></tr>`).join('')}
+          ${(liabilities.loanItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${escapeHtml(i.name||'Loan')}</td><td class="num red">${fmt(i.amount)}</td><td class="num dim">${((i.amount/totalLiabilities)*100).toFixed(1)}%</td><td class="dim">${i.endYear||'—'}</td></tr>`).join('')}
+          ${(liabilities.otherLiabilityItems||[]).filter(i=>i.amount>0).map(i=>`<tr><td>${escapeHtml(i.name||'Other')}</td><td class="num red">${fmt(i.amount)}</td><td class="num dim">${((i.amount/totalLiabilities)*100).toFixed(1)}%</td><td class="dim">${i.endYear||'—'}</td></tr>`).join('')}
           <tr style="font-weight:700;background:#f8fafc;border-top:2px solid #e2e8f0;"><td>Total Liabilities</td><td class="num red">${fmt(totalLiabilities)}</td><td class="num">100%</td><td></td></tr>
           ` : '<tr><td colspan="4" class="dim" style="text-align:center;padding:16px;">No liabilities entered — debt free</td></tr>'}
         </tbody>
@@ -2133,7 +2133,7 @@ const NetWorthNavigator = () => {
         <div class="assume-item"><div class="assume-label">Currency</div><div class="assume-value">${currency}</div></div>
         ${currency!=='AED'?`<div class="assume-item"><div class="assume-label">Exchange Rate</div><div class="assume-value">1 ${currency} = ${(exchangeRates[currency]||1).toFixed(4)} AED</div></div>`:''}
       </div>
-      ${profile.dependents&&profile.dependents.length>0?`<div class="sub-head" style="margin-top:16px;">Dependents</div><p style="font-size:0.82rem;color:#64748b;">${profile.dependents.map(d=>d.name||'Dependent').join(', ')}</p>`:''}
+      ${profile.dependents&&profile.dependents.length>0?`<div class="sub-head" style="margin-top:16px;">Dependents</div><p style="font-size:0.82rem;color:#64748b;">${profile.dependents.map(d=>escapeHtml(d.name||'Dependent')).join(', ')}</p>`:''}
     </div>
   </div>
 </div>

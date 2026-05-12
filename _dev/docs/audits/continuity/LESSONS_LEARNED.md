@@ -209,3 +209,26 @@ Findings in batch: NEW-53, NEW-54
 - `wealthProjection` and `simulateRunway` now start drawdown at `age >= retirementAge`.
 - Monte Carlo year-0 withdrawal now explicitly documents the same retirement-age transition convention.
 - Projection harness `_dev/tests/auditor2_projection.js` now asserts retirement-year drawdown onset.
+
+---
+
+## Batch Synthesis - Session 12 - 2026-05-12
+Findings in batch: NEW-52, NEW-55, NEW-56
+
+### Patterns observed
+
+1. Security regressions often hide in duplicated template blocks where one section is hardened and another is not.
+2. Test-suite trust degrades when advisory diagnostics share the same pass/fail channel as assertions.
+3. Documentation drift can persist even after correct code fixes when summary/design tables are updated separately from formula sections.
+
+### Principles extracted
+
+- **Harden by pattern, not by spot fix:** When escaping user input in templates, sweep all sibling interpolation blocks in the same commit.
+- **Keep gating signals binary and explicit:** Advisory scripts should stay visible but must not influence a gating "all green" message.
+- **Treat docs consistency as part of defect closure:** A finding is not fully closed until code, formula docs, and decision tables agree.
+
+### Codebase-specific observations
+
+- Export report liability/dependent interpolations now consistently use `escapeHtml(...)`.
+- `_dev/tests/run_all_audits.js` now reports gating and advisory outcomes separately.
+- Docs index pointers now reference `AUDIT_REPORT_2026-05-12-codebase-auditor-full.md` as current ground truth.

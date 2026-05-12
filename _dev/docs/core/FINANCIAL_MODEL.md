@@ -282,7 +282,7 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 | **Liability balances do not imply payments** | Balance sheet and cashflow are deliberately separate | Keep liabilities for net worth; enter full debt-service payments as expenses to affect savings |
 | **NW Multiple uses salary only** | Fidelity standard benchmark | Passive/other income excluded from denominator |
 | **Higher Return lever keeps the base projection unchanged except return** | Solves required return after current balances and entered annual contributions are reflected in projected wealth | Gives an isolated return-lever estimate with actionable parity to changing the return assumption |
-| **Drawdown timing: age > (not >=)** | Conservative — retirement-year expenses paid from final salary year | Standard practice |
+| **Drawdown timing: age >= retirementAge** | Drawdown starts in the retirement-age transition year, aligned across deterministic, runway, and Monte Carlo engines | Consistent cross-surface timing semantics |
 
 ---
 
