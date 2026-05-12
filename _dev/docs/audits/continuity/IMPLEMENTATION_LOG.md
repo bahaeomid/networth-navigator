@@ -52,6 +52,9 @@
 | NEW-38 | Retirement Runway % labels leak floating-point precision strings | LOW | G | FIXED | 5 | Added centralized percent formatting helpers and applied to runway labels/tooltips |
 | NEW-39 | One-time expenses undercounted when multiple entries share a year | HIGH | G | FIXED | 5 | Replaced single-entry `find()` logic with active-entry aggregation in deterministic runway + Monte Carlo |
 | NEW-40 | Missing E2E regression coverage for category remap/systemic scenarios | MEDIUM | G | FIXED | 5 | Added `_dev/e2e/regression-and-scenarios.spec.js` with 2 targeted regressions + 5 multi-profile stress scenarios |
+| NEW-41 | Ongoing investment contributions missing from base projection | HIGH | H | FIXED | 7 | Added investment-item `annualContrib` and `contribGrowthRate`; contributions now flow through `wealthProjection` and downstream retirement/report surfaces |
+| NEW-42 | Savings-rate metric ignored current-year planned expenses | MEDIUM | H | FIXED | 7 | Renamed to current-year savings rate and subtracts planned expenses active in the current calendar year; report notes updated |
+| NEW-43 | Liability balances could be mistaken for debt-service cashflow | MEDIUM | H | DOCUMENTED / DEFERRED | 7 | Documented current workflow: keep liabilities for net worth and enter full debt-service payments as expense categories for all liability types |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -602,3 +605,29 @@ Selectors were hardened to avoid ambiguous role/text matches (tab-name regex anc
 - Range inputs with fractional min anchors require numeric parsing that preserves decimal alignment; integer parsing is unsafe.
 - Deterministic E2E capture requires isolating persisted browser state to avoid hidden restore races.
 - Control-state parity checks complement metric-level parity and catch UI control drift earlier.
+---
+## SESSION 7 - 2026-05-12 - Codex
+
+**Picking up from:** User-reported planning caveats documented in `_dev/Prompt/`
+**Open findings at session start:** Ongoing investment contributions missing from base projection; savings-rate metric/current-year OTE parity; liability debt-service workflow unclear to users.
+**Session goal:** Implement the low-risk A+B scope and document the deferred debt-service workflow without adding first-class liability payment fields.
+
+### NEW-41 - Ongoing investment contributions missing from base projection (HIGH -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added `annualContrib` and `contribGrowthRate` fields to investment sub-items. The `wealthProjection` loop now adds pre-retirement planned contributions to the investment balance, so the change cascades into base charts, FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and HTML report charts.
+**User caveat surfaced:** The model does not cap contributions to calculated surplus. Users should enter an affordable planned contribution. Surplus Deployment remains useful for testing additional surplus strategies beyond explicit investment-item contributions.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`, `_dev/docs/core/ARCHITECTURE.md`, `README.md`
+
+### NEW-42 - Savings-rate metric ignored current-year planned expenses (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Renamed the metric to current-year savings rate and changed `annualSavings` to subtract planned expenses active in the current calendar year. HTML report calculations and notes were updated for parity.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-43 - Liability balances could be mistaken for debt-service cashflow (MEDIUM -> DOCUMENTED / DEFERRED)
+
+**Status:** DOCUMENTED / DEFERRED
+**Decision:** Do not add first-class liability payment fields in this pass. Keep the current architecture where liabilities are balance-sheet items and expense categories carry cashflow.
+**Documented workflow:** For all liability types, keep the liability entry for net worth and enter the full scheduled debt-service payment as an expense category with phase-out year matching payoff year. For amortising loans, enter full principal + interest because both reduce investable cashflow. Avoid double-counting if already included in another expense category.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`, `_dev/docs/audits/AUDIT_REPORT_2026-05-12.md`

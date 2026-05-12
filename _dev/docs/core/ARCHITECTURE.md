@@ -71,8 +71,8 @@ All state lives in the `NetWorthNavigator` function component via 50+ `useState`
 | `currency` | string | `'AED'` | Display currency |
 | `exchangeRates` | object | `{AED:1, USD:3.67, ...}` | Live or cached FX rates |
 | `profile` | object | `{currentAge:35, retirementAge:55, lifeExpectancy:85}` | Life stage |
-| `assets` | object | `{cash:50K, investments:300K, realEstate:800K, ...}` | Balances + sub-items |
-| `liabilities` | object | `{mortgage:600K, loans:20K, ...}` | Debts + sub-items with endYear |
+| `assets` | object | `{cash:50K, investments:300K, realEstate:800K, ...}` | Balances + sub-items; investment sub-items may include `annualContrib` and `contribGrowthRate` |
+| `liabilities` | object | `{mortgage:600K, loans:20K, ...}` | Debts + sub-items with endYear; balances affect net worth only, not cashflow |
 | `income` | object | `{salary:300K, passive:40K, other:60K, ...}` | Income + sub-items with endYear |
 | `expenseCalculator` | object | 15 categories | Pre-retirement monthly amounts |
 | `expenseCategories` | array | `DEFAULT_EXPENSE_CATEGORIES` | Category metadata, ordering, labels, colours |

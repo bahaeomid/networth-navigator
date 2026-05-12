@@ -151,12 +151,12 @@ const TOOLTIPS = {
   retirementAge: "The age you plan to stop working. Income stops and retirement expenses begin at this age.",
   lifeExpectancy: "Expected age of death for planning purposes. Standard is 90-95 years.",
   cash: "Liquid cash in bank accounts, emergency funds. Low/no growth expected.",
-  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions.",
+  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution field to model planned ongoing additions; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts.",
   realEstate: "Property value (your home + investment properties). Appreciates based on real estate rate.",
   otherAssets: "Other valuable assets: business equity, collectibles, precious metals, vehicles, etc. Treated as illiquid — this category appreciates at the Other growth rate but does not contribute to SWR drawdown capacity. Only Investments and Cash are considered liquid for retirement funding purposes.",
-  mortgage: "Outstanding mortgage balance on all properties. The 'end year' field on each sub-item sets the calendar year it's paid off — balance amortizes linearly to zero by then. Without an end year, the balance amortizes linearly over a default 25-year term from today.",
-  loans: "Car loans, personal loans, student loans, etc. The 'end year' field on each sub-item sets the payoff year — balance amortizes to zero by then. Without an end year, the balance amortizes linearly over a default 5-year term from today.",
-  otherLiabilities: "Credit card debt, lines of credit, other debts. The 'end year' field on each sub-item sets the payoff year — balance amortizes to zero by then. Without an end year, the balance amortizes linearly over a default 5-year term from today.",
+  mortgage: "Outstanding mortgage balance on all properties. This affects net worth only; it does not create a cashflow expense. To reflect the payment in savings, enter the full annual principal + interest payment as a Pre-Retirement expense category with 0% growth and a phase-out year matching the loan payoff year. Keep the liability here for net worth accuracy. Avoid double-counting if that payment is already included in another expense category.",
+  loans: "Car loans, personal loans, student loans, etc. This affects net worth only; it does not create a cashflow expense. To reflect payments in savings, enter the full annual debt-service amount as a Pre-Retirement expense category with a phase-out year matching the payoff year. Keep the liability here for net worth accuracy. Avoid double-counting if the payment is already included elsewhere.",
+  otherLiabilities: "Credit card debt, lines of credit, and other debts. This affects net worth only; it does not create a cashflow expense. To reflect payments in savings, enter the full annual debt-service amount as a Pre-Retirement expense category with a phase-out year matching the payoff year. Keep the liability here for net worth accuracy. Avoid double-counting if the payment is already included elsewhere.",
   salary: "Annual salary income. Grows each year at the Salary Growth rate until your retirement age, then stops. The 'end year' field on each sub-item overrides this — useful for fixed-term or contract roles. If you pay income tax, enter your after-tax take-home pay for more accurate projections — the app does not model tax brackets.",
   bonuses: "Annual bonuses, RSUs, stock options, performance pay.",
   rentalIncome: "Annual rental income from investment properties.",
@@ -170,8 +170,8 @@ const TOOLTIPS = {
   investmentReturn: "Expected annual return on investments (stocks/bonds). Historical avg: 7-8%. Enter your after-tax return — if your gains are subject to capital gains or dividend tax, subtract the drag (typically 0.5–1.5pp) from your gross expected return.",
   investmentStdDev: "Volatility of investment returns. Used in Monte Carlo simulation. Typical: 12-15%.",
   realEstateAppreciation: "Annual property value growth %. Typical range: 3–6% depending on market and location.",
-  savingsRate: "Annual savings as % of gross income. This surplus is undeployed by default — use Surplus Deployment in the Dashboard tab to model investing it or paying down debt. Target: 10% minimum · 20% healthy · 30%+ accelerates wealth building.",
-  netWorth: "Total assets minus total liabilities. Liabilities amortize linearly to their end year — set end years on mortgages and loans in the Finances tab to reflect scheduled payoffs. Without an end year: mortgages default to a 25-year term, loans and other liabilities to 5 years.",
+  savingsRate: "Current-year savings as % of gross income. Uses today's income minus current annual expenses and any planned expenses active this calendar year. Liability balances are not payments; add debt service as expense categories if you want those payments reflected in savings.",
+  netWorth: "Total assets minus total liabilities. Liabilities amortize linearly to their end year — set end years on mortgages and loans in the Finances tab to reflect scheduled payoffs. Liability balances affect net worth only; debt payments must be entered as expenses to affect savings.",
   retirementReadiness: "Survival odds: % of 1,000 market scenarios where your money lasts through your life expectancy. Above 80% = strong plan. Below 60% = review your retirement budget or savings rate. Uses your Retirement Budget (entered in today's terms, inflated to retirement day) as the annual withdrawal amount.",
   yearsToRetirement: "Years until your planned retirement age. FI Age (in the Retirement Health card) shows the earliest you could theoretically retire based on current savings — ideally it lands before or at this date.",
   drawdown: "When enabled, retirement expenses are withdrawn annually from your Investments balance — simulating the real depletion of your portfolio during retirement. Withdrawals are funded from Investments only (stocks, ETFs, index funds, retirement accounts), since real estate appreciates passively and other assets are treated as illiquid. The annual withdrawal equals your inflation-adjusted retirement expenses, reduced by any passive or other income continuing through retirement — only the net shortfall is withdrawn from your portfolio to cover your retirement expenses. Disable to see gross asset growth without any depletion effect.",
@@ -895,8 +895,8 @@ const NetWorthNavigator = () => {
         { id: 2, name: 'Checking Account', amount: 20000 }
       ],
       investmentItems: [
-        { id: 1, name: 'Savings Account', amount: 100000 },
-        { id: 2, name: 'Investment Portfolio', amount: 200000 }
+        { id: 1, name: 'Savings Account', amount: 100000, annualContrib: 0, contribGrowthRate: 0 },
+        { id: 2, name: 'Investment Portfolio', amount: 200000, annualContrib: 0, contribGrowthRate: 0 }
       ],
       realEstateItems: [
         { id: 1, name: 'Primary Residence', amount: 600000 },
@@ -1331,8 +1331,12 @@ const NetWorthNavigator = () => {
     const totalAnnualIncome = totalSalary + totalPassive + totalOther;
     const totalPreRetExpenses = Object.values(expenseCalculator).reduce((s,v)=>s+(v||0),0);
     const totalRetExpenses = Object.values(retirementBudget).reduce((s,v)=>s+(v||0),0);
-    const surplus = totalAnnualIncome - totalPreRetExpenses;
+    const currentYearOTETotal = normalizedOneTimeExpenses
+      .filter(e => e.year <= currentYear && currentYear <= (e.endYear || e.year))
+      .reduce((s,e)=>s+(e.amount||0),0);
+    const surplus = totalAnnualIncome - totalPreRetExpenses - currentYearOTETotal;
     const savingsRate = totalAnnualIncome>0 ? (surplus/totalAnnualIncome)*100 : 0;
+    const annualInvestmentContribution = (assets.investmentItems||[]).reduce((s,i)=>s+(i.annualContrib||0),0);
     const debtRatio = totalAssets>0 ? (totalLiabilities/totalAssets)*100 : 0;
     const monthlyExpenses = totalPreRetExpenses/12;
     const emergencyMonths = monthlyExpenses>0 ? (assets.cash||0)/monthlyExpenses : 0;
@@ -1641,7 +1645,7 @@ const NetWorthNavigator = () => {
     <div>
       <div class="cover-stat-label">Annual Income</div>
       <div class="cover-stat-value">${fmt(totalAnnualIncome)}</div>
-      <div class="cover-stat-sub">Savings rate ${fmtPct(savingsRate)} · ${surplus>=0?'+'+fmt(surplus)+'/yr surplus':fmt(surplus)+'/yr deficit'}</div>
+      <div class="cover-stat-sub">Current-year savings rate ${fmtPct(savingsRate)} · ${surplus>=0?'+'+fmt(surplus)+'/yr surplus':fmt(surplus)+'/yr deficit'}</div>
     </div>
     <div>
       <div class="cover-stat-label">Retirement Target</div>
@@ -1675,10 +1679,10 @@ const NetWorthNavigator = () => {
 
   ${(() => {
     const items = [];
-    if (savingsRate >= 20) items.push({type:'good', text:`Savings rate of ${fmtPct(savingsRate)} — ${fmt(surplus)}/yr surplus · on a wealth-building pace`});
+    if (savingsRate >= 20) items.push({type:'good', text:`Current-year savings rate of ${fmtPct(savingsRate)} — ${fmt(surplus)}/yr surplus · on a wealth-building pace`});
     else if (savingsRate < 0) items.push({type:'bad', text:`Expenses exceed income by ${fmt(Math.abs(surplus))}/yr (${fmtPct(Math.abs(savingsRate))} overspend) — no savings being generated`});
-    else if (savingsRate < 10) items.push({type:'bad', text:`Low savings rate of ${fmtPct(savingsRate)} — target 20%+ for meaningful wealth accumulation`});
-    else items.push({type:'warn', text:`Savings rate of ${fmtPct(savingsRate)} — adequate but below the 20%+ wealth-building threshold`});
+    else if (savingsRate < 10) items.push({type:'bad', text:`Low current-year savings rate of ${fmtPct(savingsRate)} — target 20%+ for meaningful wealth accumulation`});
+    else items.push({type:'warn', text:`Current-year savings rate of ${fmtPct(savingsRate)} — adequate but below the 20%+ wealth-building threshold`});
     if (successProb >= 80) items.push({type:'good', text:`Monte Carlo: ${successProb}% of simulations succeed — retirement plan is robust`});
     else if (successProb === 0) items.push({type:'bad', text:`Monte Carlo: 0 of 1,000 simulations succeed — portfolio is far too small to fund retirement as planned`});
     else items.push({type:'bad', text:`Monte Carlo: only ${successProb}% of simulations succeed — high risk of running out of money in retirement`});
@@ -1718,7 +1722,7 @@ const NetWorthNavigator = () => {
       <div class="kpi-sub">Assets ${fmt(totalAssets)}</div>
     </div>
     <div class="kpi ${savingsRate>=20?'green':savingsRate>=10?'amber':'red'}">
-      <div class="kpi-label">Savings Rate</div>
+      <div class="kpi-label">Current-Year Savings Rate</div>
       <div class="kpi-value">${fmtPct(savingsRate)}</div>
       <div class="kpi-sub">${fmt(surplus)}/yr · target 20%+</div>
     </div>
@@ -1755,7 +1759,7 @@ const NetWorthNavigator = () => {
     <div class="health-card" style="border-color:${srColor}33;background:${srColor}08;">
       <div class="health-card-icon">💰</div>
       <div class="health-card-body">
-        <div class="health-card-label">Savings Rate</div>
+        <div class="health-card-label">Current-Year Savings Rate</div>
         <div class="health-card-value" style="color:${srColor};">${fmtPct(savingsRate)}</div>
         <div class="health-card-bench">${savingsRate>=20?'✓ Wealth-building pace':savingsRate>=10?'↑ Adequate — aim for 20%+':'⚠ At risk — below 10%'}</div>
       </div>
@@ -1823,7 +1827,7 @@ const NetWorthNavigator = () => {
       <table class="data">
         <thead><tr><th>Asset</th><th class="r">Value</th><th class="r">% of Total</th><th>Growth Rate</th></tr></thead>
         <tbody>
-          <tr><td>Investments</td><td class="num">${fmt(assets.investments)}</td><td class="num">${totalAssets>0?((assets.investments/totalAssets)*100).toFixed(1):0}%</td><td class="dim">+${assumptions.investmentReturn}%/yr</td></tr>
+          <tr><td>Investments</td><td class="num">${fmt(assets.investments)}</td><td class="num">${totalAssets>0?((assets.investments/totalAssets)*100).toFixed(1):0}%</td><td class="dim">+${assumptions.investmentReturn}%/yr${annualInvestmentContribution>0?` · contrib ${fmt(annualInvestmentContribution)}/yr`:''}</td></tr>
           <tr><td>Real Estate</td><td class="num">${fmt(assets.realEstate)}</td><td class="num">${totalAssets>0?((assets.realEstate/totalAssets)*100).toFixed(1):0}%</td><td class="dim">+${assumptions.realEstateAppreciation}%/yr</td></tr>
           <tr><td>Cash</td><td class="num">${fmt(assets.cash)}</td><td class="num">${totalAssets>0?((assets.cash/totalAssets)*100).toFixed(1):0}%</td><td class="dim">No growth</td></tr>
           <tr><td>Other Illiquid</td><td class="num">${fmt(assets.other)}</td><td class="num">${totalAssets>0?((assets.other/totalAssets)*100).toFixed(1):0}%</td><td class="dim">+${assumptions.otherAssetGrowth||0}%/yr</td></tr>
@@ -1897,8 +1901,8 @@ const NetWorthNavigator = () => {
   </div>
   <div style="margin-top:14px;padding:12px 16px;background:${surplus>=0?'#f0fdf4':'#fef2f2'};border-radius:8px;border:1px solid ${surplus>=0?'#bbf7d0':'#fecaca'};display:flex;gap:32px;flex-wrap:wrap;">
     <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Total Annual Income</span><br><strong style="font-size:1.1rem;color:#16a34a;font-family:'SF Mono',monospace;">${fmt(totalAnnualIncome)}</strong></div>
-    <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Annual Surplus</span><br><strong style="font-size:1.1rem;color:${surplus>=0?'#16a34a':'#dc2626'};font-family:'SF Mono',monospace;">${surplus>=0?'+':''}${fmt(surplus)}</strong></div>
-    <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Savings Rate</span><br><strong style="font-size:1.1rem;color:${srColor};font-family:'SF Mono',monospace;">${fmtPct(savingsRate)}</strong></div>
+    <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Current-Year Surplus</span><br><strong style="font-size:1.1rem;color:${surplus>=0?'#16a34a':'#dc2626'};font-family:'SF Mono',monospace;">${surplus>=0?'+':''}${fmt(surplus)}</strong></div>
+    <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Current-Year Savings Rate</span><br><strong style="font-size:1.1rem;color:${srColor};font-family:'SF Mono',monospace;">${fmtPct(savingsRate)}</strong></div>
     <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Monthly Take-Home</span><br><strong style="font-size:1.1rem;color:#1d4ed8;font-family:'SF Mono',monospace;">${fmt(totalAnnualIncome/12)}</strong></div>
   </div>
   <p style="font-size:0.72rem;color:#94a3b8;margin-top:10px;">Note: salary stops at retirement. Passive and other income continue through retirement and are netted against drawdown requirements.</p>
@@ -2141,7 +2145,7 @@ const NetWorthNavigator = () => {
         <li><strong>No currency risk.</strong> Exchange rates are held static at the export-date snapshot. Multi-currency portfolios may be materially affected by rate fluctuations not reflected here.</li>
         <li><strong>No sequence-of-returns risk beyond Monte Carlo.</strong> The base-case projection applies a constant annual return. The Monte Carlo simulation (Note 6) partially addresses sequence risk but assumes independent, identically distributed (IID) normally distributed returns — each year's return is drawn independently with no modelling of return correlation, momentum, or autocorrelation. This may understate tail risk in severe market dislocations.</li>
         <li><strong>Illiquid assets excluded from retirement drawdown.</strong> Real estate and other illiquid assets grow passively in the model and are not drawn upon in retirement. Only the investment portfolio services retirement withdrawals.</li>
-        <li><strong>Liability amortisation defaults.</strong> Where no end year is specified on a liability sub-item, mortgages are amortised linearly over 25 years and all other liabilities over 5 years from today. Actual amortisation schedules may differ.</li>
+        <li><strong>Liability amortisation defaults.</strong> Where no end year is specified on a liability sub-item, mortgages are amortised linearly over 25 years and all other liabilities over 5 years from today. Actual amortisation schedules may differ. Liability balances affect net worth only; scheduled debt payments must be entered as expense categories to affect savings, surplus, and cashflow charts.</li>
       </ul>
     </div>
   </div>
@@ -2153,6 +2157,7 @@ const NetWorthNavigator = () => {
       <p>The projections are sensitive to the following assumptions, which are user-defined and applied consistently across all scenarios unless otherwise stated:</p>
       <ul>
         <li><strong>Investment return (${assumptions.investmentReturn}% p.a.).</strong> Applied to the liquid investment portfolio (pre- and post-retirement). This is a nominal, pre-fee return. Adviser fees, fund management charges, and transaction costs are not deducted.</li>
+        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)} today).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. Contribution growth rates, where entered, increase each item's annual contribution over time. The model does not cap contributions to calculated surplus, so users should enter affordable amounts.</li>
         <li><strong>Real estate appreciation (${assumptions.realEstateAppreciation}% p.a.).</strong> Applied uniformly to the entire real estate portfolio. Regional, property-type, and leverage effects are not modelled.</li>
         <li><strong>Salary growth (${assumptions.salaryGrowth}% p.a.).</strong> Applied to earned income until the stated retirement age, after which salary is assumed to cease.</li>
         <li><strong>Passive income growth (${assumptions.passiveGrowth}% p.a.) and other income growth (${assumptions.otherIncomeGrowth}% p.a.).</strong> Continued post-retirement unless an end year is specified on the income sub-item.</li>
@@ -2217,7 +2222,7 @@ const NetWorthNavigator = () => {
     <div class="note-body">
       <p>Seven scorecard tiles provide a snapshot of current financial health. All metrics use today's values unless stated otherwise. Thresholds are general guidelines derived from common personal finance benchmarks and are not actuarial standards.</p>
       <ul>
-        <li><strong>Savings Rate.</strong> Formula: (Annual Income − Current Annual Expenses) ÷ Annual Income. Thresholds: ≥20% = green (wealth-building); 10–19% = amber (adequate); &lt;10% = red (at risk). Income uses today's totals across all income streams. Expenses use today's entered totals. Surplus is undeployed by default — see Surplus Deployment (Note 11) to model putting it to work.</li>
+        <li><strong>Current-Year Savings Rate.</strong> Formula: (Annual Income − Current Annual Expenses − Planned Expenses active in the report year) ÷ Annual Income. Thresholds: ≥20% = green (wealth-building); 10–19% = amber (adequate); &lt;10% = red (at risk). Income uses today's totals across all income streams. Liability balances do not generate cashflow payments automatically; enter debt service as expense categories to include those payments in savings.</li>
         <li><strong>NW Multiple.</strong> Formula: Current Net Worth ÷ Annual Salary. Benchmarked against Fidelity age-based targets: 1× at 30, 3× at 40, 7× at 55, 10× at retirement age. Intermediate ages are linearly interpolated between brackets. Green = at or above target; amber = 75–99% of target; red = below 75%. Requires a non-zero salary to calculate.</li>
         <li><strong>Debt Ratio.</strong> Formula: Total Liabilities ÷ Total Assets. Thresholds: &lt;30% = green (healthy leverage); 30–49% = amber (moderate); ≥50% = red (high leverage). A ratio above 50% means liabilities exceed half of total assets.</li>
         <li><strong>Emergency Fund.</strong> Formula: Cash Balance ÷ (Current Annual Expenses ÷ 12). Expressed in months of expenses covered. Thresholds: ≥6 months = green; 3–5 months = amber; &lt;3 months = red. Uses the cash asset field only — other liquid assets are excluded.</li>
@@ -2234,7 +2239,7 @@ const NetWorthNavigator = () => {
     <div class="note-body">
       <p>The Retirement Health card addresses two questions. <strong>Q1</strong> assesses whether the projected investment portfolio at retirement is sufficient. <strong>Q2</strong> (Monte Carlo, Note 6) assesses whether it will last.</p>
       <p><strong>Required Nest Egg</strong> = Day-1 Nominal Retirement Expense ÷ Safe Withdrawal Rate. Day-1 expenses are the sum of all retirement budget categories inflated from today to retirement date at each category's growth rate, with no phase-outs applied (conservative upper bound).</p>
-      <p><strong>Projected Investments at Retirement</strong> = the investment portfolio balance in the base-case wealthProjection at the retirement age entry. This reflects investment compounding and drawdown (if enabled) but does not include undeployed surplus — surplus must be actively invested via the Surplus Deployment section to appear here.</p>
+      <p><strong>Projected Investments at Retirement</strong> = the investment portfolio balance in the base-case wealthProjection at the retirement age entry. This reflects investment compounding, any annual contributions entered on investment items, and drawdown if enabled. Surplus beyond explicitly entered contributions remains undeployed unless modelled in the Surplus Deployment section.</p>
       <p><strong>Retirement Gap</strong> = Projected Investments − Required Nest Egg. Negative = shortfall.</p>
       <p>The <strong>overall verdict</strong> is a 6-state classification combining Q1 (on track vs gap) and Q2 (≥80% strong, 60–79% caution, &lt;60% weak): Strong · Moderate risk · High risk · Gap with strong odds · Gap detected · High risk with gap and low odds.</p>
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
@@ -2267,7 +2272,7 @@ const NetWorthNavigator = () => {
   <div class="note-block">
     <div class="note-heading"><span class="note-num">11.</span> Surplus Deployment Scenarios</div>
     <div class="note-body">
-      <p>The Surplus Deployment section models three strategies for allocating annual pre-retirement savings surplus. All three scenarios use the actual year-by-year surplus from the base projection (which reflects salary growth, expense inflation, and one-time costs) rather than a fixed annual figure. The FI Age shown in each tile uses the same per-year nominal threshold as the main FI Age calculation (Note 5) and is therefore directly comparable. Scenarios are illustrative only — they do not update the base projection or any other metric in the report.</p>
+      <p>The Surplus Deployment section models three strategies for allocating annual pre-retirement savings surplus. All three scenarios use the actual year-by-year surplus from the base projection (which reflects salary growth, expense inflation, and one-time costs) rather than a fixed annual figure. Annual contributions entered on investment items are already included in the base projection; Surplus Deployment should be read as additional deployment of remaining surplus. The FI Age shown in each tile uses the same per-year nominal threshold as the main FI Age calculation (Note 5) and is therefore directly comparable. Scenarios are illustrative only — they do not update the base projection or any other metric in the report.</p>
     </div>
   </div>
   <hr class="note-rule"/>
@@ -2845,8 +2850,12 @@ const mIdx = cols.findIndex(c =>
   }, [income]);
   
   const annualSavings = useMemo(() => {
-    return annualIncome - (expenses.current || 0);
-  }, [annualIncome, expenses.current]);
+    const currentCalYear = new Date().getFullYear();
+    const currentYearOTETotal = normalizedOneTimeExpenses
+      .filter((e) => e.year <= currentCalYear && currentCalYear <= (e.endYear || e.year))
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+    return annualIncome - (expenses.current || 0) - currentYearOTETotal;
+  }, [annualIncome, expenses.current, normalizedOneTimeExpenses]);
   
   const savingsRate = useMemo(() => {
     return annualIncome > 0 ? (annualSavings / annualIncome) * 100 : 0;
@@ -3125,9 +3134,16 @@ const mIdx = cols.findIndex(c =>
         const postRetIncome = yearPassive_calc + yearOtherIncome_calc;
         drawdownAmount = Math.max(0, inflationAdjustedExpense + oneTimeExpense - postRetIncome);
       }
-      // Surplus (yearSavings) is NOT automatically reinvested — it is undeployed until the user acts.
-      // To model surplus deployment, use the Surplus Deployment section in the Dashboard tab.
-      investmentBalance = Math.max(0, investmentBalance * (1 + assumptions.investmentReturn / 100) - drawdownAmount);
+      const yearInvestmentContribution = age < profile.retirementAge
+        ? (assets.investmentItems || []).reduce((sum, item) => {
+            const base = item.annualContrib || 0;
+            const growthRate = (item.contribGrowthRate || 0) / 100;
+            return sum + base * Math.pow(1 + growthRate, i);
+          }, 0)
+        : 0;
+      // Planned investment-item contributions are deployed into the base projection.
+      // Other surplus remains undeployed until the user models it in Surplus Deployment.
+      investmentBalance = Math.max(0, investmentBalance * (1 + assumptions.investmentReturn / 100) + yearInvestmentContribution - drawdownAmount);
       realEstateValue = realEstateValue * (1 + assumptions.realEstateAppreciation / 100);
       otherAssetValue = otherAssetValue * (1 + (assumptions.otherAssetGrowth || 0) / 100);
 
@@ -3655,7 +3671,7 @@ const mIdx = cols.findIndex(c =>
               {debtFreeAge ? (
                 <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '1.25rem', borderTop: '2px solid rgba(52,211,153,0.5)' }}>
                   <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
-                    🔓 Debt Free <InfoTooltip text="The projected age when all your liabilities reach zero, based on the end years set on each liability item. Set end years on your mortgage and loans in the Finances tab." />
+                    🔓 Debt Free <InfoTooltip text="The projected age when all your liabilities reach zero, based on the end years set on each liability item. Set end years on mortgages, loans, and other liabilities in the Finances tab. This is a balance-sheet metric; debt payments must be entered as expenses to affect savings." />
                   </div>
                   <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: '#34d399', lineHeight: 1.1, marginBottom: '0.35rem' }}>Age {debtFreeAge}</div>
                   <div style={{ fontSize: '0.72rem', color: '#4b5563' }}>{debtFreeAge - profile.currentAge}y away · {new Date().getFullYear() + (debtFreeAge - profile.currentAge)}</div>
@@ -3663,7 +3679,7 @@ const mIdx = cols.findIndex(c =>
               ) : (
                 <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '1.25rem', borderTop: '2px solid rgba(107,114,128,0.3)' }}>
                   <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
-                    🔓 Debt Free <InfoTooltip text="The projected age when all your liabilities reach zero. Set end years on your mortgage and loans in the Finances tab to activate this." />
+                    🔓 Debt Free <InfoTooltip text="The projected age when all your liabilities reach zero. Set end years on mortgages, loans, and other liabilities in the Finances tab to activate this. This is a balance-sheet metric; debt payments must be entered as expenses to affect savings." />
                   </div>
                   <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: '#4b5563', lineHeight: 1.1, marginBottom: '0.35rem' }}>—</div>
                   <div style={{ fontSize: '0.72rem', color: '#4b5563' }}>Set liability end years to calculate</div>
@@ -3773,7 +3789,7 @@ const mIdx = cols.findIndex(c =>
               const _ta = (assets.cash || 0) + (assets.investments || 0) + (assets.realEstate || 0) + (assets.other || 0);
               const _tl = (liabilities.mortgage || 0) + (liabilities.loans || 0) + (liabilities.other || 0);
 
-              // 1. Savings Rate
+              // 1. Current-year savings rate
               const srVal  = savingsRate;
               const srColor = srVal >= 20 ? '#22c55e' : srVal >= 10 ? '#eab308' : '#ef4444';
               const srBg    = srVal >= 20 ? 'rgba(34,197,94,0.07)' : srVal >= 10 ? 'rgba(234,179,8,0.07)' : 'rgba(239,68,68,0.07)';
@@ -3873,10 +3889,10 @@ const mIdx = cols.findIndex(c =>
                   <div style={{ fontSize: '0.6rem', color: '#4b5563', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.45rem' }}>Financial Health</div>
                   <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
 
-                  {/* 1. Savings Rate */}
+                  {/* 1. Current-year savings rate */}
                   <div style={tileStyle(srBg, srBdr)}>
                     <div>
-                      <div style={labelStyle}>💰 Savings Rate <InfoTooltip text={`Annual savings ÷ gross income. Savings = income minus current expenses (${formatCurrency(annualSavings, currency, exchangeRates)}/yr undeployed surplus). Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Higher rates compress the time to retirement significantly. Use Surplus Deployment in the Dashboard tab to model putting this to work.`} /></div>
+                      <div style={labelStyle}>💰 Current-year savings rate <InfoTooltip text={`Current-year savings ÷ gross income. Savings = income minus current expenses and any Planned Expenses active this calendar year (${formatCurrency(annualSavings, currency, exchangeRates)}/yr current surplus). Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Liability balances are not cashflow payments; add debt service as expense categories if you want those payments reflected here.`} /></div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                         <span style={valueStyle(srColor)}>{srVal.toFixed(1)}%</span>
                         <span style={{ fontSize: '0.65rem', color: '#4b5563' }}>{formatCurrency(annualSavings, currency, exchangeRates)}/yr</span>
@@ -3995,7 +4011,7 @@ const mIdx = cols.findIndex(c =>
                 Your wealth trajectory from age {profile.currentAge} to {profile.lifeExpectancy}
               </p>
               <p style={{ fontSize: '0.78rem', color: '#4b5563', marginBottom: '1.25rem' }}>
-                ⚠ Pre-retirement savings are not auto-deployed — asset growth only. See Surplus Deployment below to model investing your surplus.
+                ⚠ Only investment-item annual contributions are included in the base projection. Any remaining surplus stays undeployed unless modeled in Surplus Deployment below.
               </p>
               <ResponsiveContainer width="100%" height={450} style={{ overflow: 'visible' }}>
                 <AreaChart data={wealthProjection} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
@@ -4976,7 +4992,7 @@ const mIdx = cols.findIndex(c =>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: surplusOpen ? '0.85rem' : 0 }}>
                       <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         💸 Surplus Deployment
-                        <InfoTooltip text={`Your annual pre-retirement surplus (total income minus expenses) sits undeployed by default. These three strategies show what happens to your FI Age and retirement wealth if you actively deploy it. Important: all strategies operate pre-retirement only — surplus deployment stops at your Planned Retirement Age. Post-retirement, passive and other non-salary income is automatically netted against investment drawdown, so there is no double-counting between pre- and post-retirement phases.`} />
+                        <InfoTooltip text={`Your annual pre-retirement surplus (total income minus expenses) sits undeployed by default except for any annual contributions you explicitly entered on investment items. These three strategies show what happens to your FI Age and retirement wealth if you actively deploy additional surplus. Important: all strategies operate pre-retirement only — surplus deployment stops at your Planned Retirement Age. Post-retirement, passive and other non-salary income is automatically netted against investment drawdown, so there is no double-counting between pre- and post-retirement phases.`} />
                       </div>
                       {!hasFutureSurplus
                         ? <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>No surplus — expenses meet or exceed income throughout projection</span>
@@ -4985,7 +5001,7 @@ const mIdx = cols.findIndex(c =>
                           </button>
                       }
                     </div>
-                    {surplusOpen && hasFutureSurplus && <div style={{ fontSize: '0.72rem', color: '#6b7280', marginBottom: '0.85rem', lineHeight: 1.5 }}>Use your pre-retirement surplus to see if you can retire faster — or pay off debt sooner. Each strategy uses your year-by-year actual surplus, which grows dynamically with your salary and expenses.</div>}
+                    {surplusOpen && hasFutureSurplus && <div style={{ fontSize: '0.72rem', color: '#6b7280', marginBottom: '0.85rem', lineHeight: 1.5 }}>Use your pre-retirement surplus to see if you can retire faster — or pay off debt sooner. Each strategy uses your year-by-year actual surplus, which grows dynamically with your salary and expenses. If you already entered annual contributions under Investments, treat these scenarios as additional deployment on top of the base projection.</div>}
                     {surplusOpen && hasFutureSurplus && (
                       <div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
@@ -5390,7 +5406,7 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ marginBottom: '1.25rem' }}>
                         <div style={{ fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                           Q1 — How much do you need, and are you on track?
-                          <InfoTooltip text={`Will your investments be large enough to retire on the day you plan to? Required Nest Egg = retirement budget (inflated to retirement day) ÷ SWR — the lump sum needed for withdrawals to theoretically last indefinitely. Projected Investments = current portfolio compounded to retirement, without new savings (use Surplus Deployment in the Dashboard tab to model those). The funding bar shows % covered. Note: nest egg uses Day 1 budget conservatively — Survival Odds (Q2) accounts for phase-outs and is more precise.`} />
+                          <InfoTooltip text={`Will your investments be large enough to retire on the day you plan to? Required Nest Egg = retirement budget (inflated to retirement day) ÷ SWR — the lump sum needed for withdrawals to theoretically last indefinitely. Projected Investments = current portfolio compounded to retirement plus any annual contributions entered on investment items. Use Surplus Deployment in the Dashboard tab to model deploying additional surplus. The funding bar shows % covered. Note: nest egg uses Day 1 budget conservatively — Survival Odds (Q2) accounts for phase-outs and is more precise.`} />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', alignItems: 'stretch', marginBottom: '0.85rem' }}>
@@ -5425,7 +5441,7 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ padding: '1rem', background: 'rgba(96,165,250,0.07)', borderRadius: '10px', border: '1px solid rgba(96,165,250,0.18)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                               Projected Investments at {profile.retirementAge}
-                              <InfoTooltip text={`Your projected Investment portfolio at retirement age ${profile.retirementAge}, based on your current investments compounding at your assumed return. Only liquid Investments count toward the SWR-based nest egg target — real estate and other illiquid assets are excluded. Surplus is not automatically reinvested; deploy it via Surplus Deployment in the Dashboard tab to improve this figure.`} />
+                              <InfoTooltip text={`Your projected Investment portfolio at retirement age ${profile.retirementAge}, based on your current investments compounding at your assumed return plus any annual contributions entered on investment items. Only liquid Investments count toward the SWR-based nest egg target — real estate and other illiquid assets are excluded. Any surplus beyond entered contributions is not automatically reinvested; model that via Surplus Deployment in the Dashboard tab.`} />
                             </div>
                             <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 }}>{formatCurrencyDecimal(projectedWealth, currency, exchangeRates)}</div>
                             <div style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.35rem' }}>on current trajectory</div>
@@ -5539,7 +5555,7 @@ const mIdx = cols.findIndex(c =>
                                       const returnDelta = solvedReturn !== null ? Math.round((solvedReturn - assumptions.investmentReturn) * 10) / 10 : null;
                                       return (
                                       <div style={{ padding: '0.85rem', background: returnNA ? 'rgba(255,255,255,0.02)' : 'rgba(245,158,11,0.07)', borderRadius: '8px', border: `1px solid ${returnNA ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.2)'}` }}>
-                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The return needed on your Investment portfolio to reach your Required Nest Egg, with everything else unchanged. Only liquid Investments are included — illiquid assets are excluded. Converting illiquid wealth to Investments would reduce the return required. Any savings you accumulate are assumed uninvested. To model the effect of deploying your surplus, see Surplus Deployment in the Dashboard tab. Displayed value is rounded to one decimal place, so entering it back may produce a very small residual gap in edge cases.`} /></div>
+                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The return needed on your Investment portfolio to reach your Required Nest Egg, with everything else unchanged. Only liquid Investments are included — illiquid assets are excluded. Converting illiquid wealth to Investments would reduce the return required. Annual contributions entered on investment items are already included in the base projection; any surplus beyond those contributions is assumed uninvested unless modeled in Surplus Deployment. Displayed value is rounded to one decimal place, so entering it back may produce a very small residual gap in edge cases.`} /></div>
                                         {returnNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Would require unrealistic returns (&gt;30%/yr)</div>
                                           : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace' }}>{solvedReturn}%/yr {returnDelta !== null && returnDelta > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#f59e0b', opacity: 0.75 }}>(+{returnDelta}pp)</span>}</div>}
                                         <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{returnNA ? '' : `on Investments only · your current rate is ${assumptions.investmentReturn}% · rounded to 0.1%`}</div>
@@ -7050,7 +7066,10 @@ const mIdx = cols.findIndex(c =>
                   <div style={{ marginBottom: '0.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Investments</span>
+                        <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                          Investments
+                          <InfoTooltip text="Amount is today's balance. Contrib is the planned annual addition to that item before retirement; contrib growth increases that annual addition each year. Contributions are added to the base projection and therefore affect Dashboard charts, FI Age, Retirement Health, Monte Carlo starting wealth, and the HTML report. Keep the contribution affordable: the model does not automatically cap it to your calculated surplus." />
+                        </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -7085,7 +7104,7 @@ const mIdx = cols.findIndex(c =>
                 {expandedCategories.investmentItems && (
                   <div style={{ marginTop: '0.75rem', marginLeft: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                     {(assets.investmentItems || []).map((item) => (
-                      <div key={item.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
+                      <div key={item.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <input
                           type="text"
                           value={item.name}
@@ -7112,9 +7131,34 @@ const mIdx = cols.findIndex(c =>
                             const total = newItems.reduce((sum, i) => sum + i.amount, 0);
                             setAssets({ ...assets, investmentItems: newItems, investments: total });
                           }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                          <span style={{ fontSize: '0.68rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>contrib</span>
+                          <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="110px"
+                            onChange={(aed) => {
+                              const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, annualContrib: aed } : i);
+                              setAssets({ ...assets, investmentItems: newItems });
+                            }} />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                          <span style={{ fontSize: '0.68rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>contrib growth</span>
+                          <input
+                            type="number"
+                            value={item.contribGrowthRate || 0}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (!isNaN(v) && v >= 0 && v <= 30) {
+                                const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribGrowthRate: v } : i);
+                                setAssets({ ...assets, investmentItems: newItems });
+                              }
+                            }}
+                            title="Annual growth rate applied to this contribution amount"
+                            style={{ width: '52px', padding: '0.45rem 0.35rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '6px', color: '#34d399', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
+                          />
+                          <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
+                        </div>
                         <button
                           onClick={() => {
-                            let newItems = assets.investmentItems.filter(i => i.id !== item.id); if (newItems.length === 0) newItems = [{ id: 1, name: 'Investment', amount: 0 }];
+                            let newItems = assets.investmentItems.filter(i => i.id !== item.id); if (newItems.length === 0) newItems = [{ id: 1, name: 'Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0 }];
                             const total = newItems.reduce((sum, i) => sum + i.amount, 0);
                             setAssets({ ...assets, investmentItems: newItems, investments: total });
                           }}
@@ -7138,7 +7182,7 @@ const mIdx = cols.findIndex(c =>
                         const newId = assets.investmentItems.length > 0 ? Math.max(...assets.investmentItems.map(i => i.id)) + 1 : 1;
                         setAssets({ 
                           ...assets, 
-                          investmentItems: [...assets.investmentItems, { id: newId, name: 'New Investment', amount: 0 }]
+                          investmentItems: [...assets.investmentItems, { id: newId, name: 'New Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0 }]
                         });
                       }}
                       style={{
@@ -7314,7 +7358,7 @@ const mIdx = cols.findIndex(c =>
             }}>
               <h3 style={{ fontSize: '1.3rem', fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 💳 Liabilities
-                <InfoTooltip text="Money you owe. Set the 'end year' field on each item — the balance amortizes linearly to zero by that year. Without an end year, a default term is used: 25 years for mortgages, 5 years for loans and other liabilities." />
+                <InfoTooltip text="Money you owe. Set the 'end year' field on each item — the balance amortizes linearly to zero by that year. These balances affect net worth only; they do not reduce savings by themselves. To model cashflow for any debt type, enter the full annual payment as an expense category with a phase-out year matching the payoff year, while keeping the liability here for net worth accuracy. Avoid double-counting if a payment is already included in another expense category." />
               </h3>
               <p style={{ fontSize: '0.85rem', color: '#9ca3af', marginBottom: '1.5rem' }}>All values in {currency}</p>
               

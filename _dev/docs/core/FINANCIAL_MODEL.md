@@ -81,11 +81,17 @@ One-time expenses:
 ### Asset Growth
 
 ```
-investments(y+1) = max(0, investments(y) × (1 + investmentReturn) − drawdown(y))
+investmentContribution(y) =
+  Σ item.annualContrib × (1 + item.contribGrowthRate)^yearsSinceToday
+  [pre-retirement only; defaults to 0]
+
+investments(y+1) = max(0, investments(y) × (1 + investmentReturn) + investmentContribution(y) − drawdown(y))
 realEstate(y+1)  = realEstate(y) × (1 + realEstateAppreciation)
 otherAssets(y+1)  = otherAssets(y) × (1 + otherAssetGrowth)
 cash(y)          = constant (earns 0%, not compounded)
 ```
+
+Annual investment contributions are optional fields on investment sub-items. They flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, and HTML report charts. The model does not cap these contributions to calculated savings capacity; users should enter affordable planned contributions.
 
 ### Liability Amortization (Linear)
 
@@ -96,6 +102,8 @@ For each liability sub-item with endYear:
 
 If no sub-items: total amortized linearly over default term (25yr mortgage, 5yr loans)
 ```
+
+Liability balances are balance-sheet items only. They affect net worth and debt-free age, but they do **not** create cashflow expenses or reduce savings automatically. Until first-class debt-service fields are added, users should model scheduled payments for any liability type (mortgage, car loan, personal loan, credit card plan, other debt) as expense categories with a phase-out year matching the payoff year, while keeping the liability entry for net worth accuracy. For amortising loans, use the full principal + interest cash payment because both portions reduce investable cashflow. Avoid double-counting if the same payment is already included inside another expense category.
 
 ### Drawdown (Post-Retirement)
 
@@ -167,7 +175,7 @@ successProbability = successCount / 1000 × 100
 
 | # | Metric | Formula | Green | Amber | Red |
 |---|--------|---------|-------|-------|-----|
-| 1 | **Savings Rate** | `(income − expenses) / income × 100` | ≥ 20% | 10–19% | < 10% |
+| 1 | **Current-Year Savings Rate** | `(income − current expenses − current-year planned expenses) / income × 100` | ≥ 20% | 10–19% | < 10% |
 | 2 | **NW Multiple** | `netWorth / salary` vs interpolated Fidelity target | ≥ 100% of target | 75–99% of target | < 75% of target |
 | 3 | **Debt Ratio** | `liabilities / assets × 100` | < 30% | 30–49% | ≥ 50% |
 | 4 | **Emergency Fund** | `cash / monthlyExpenses` (months) | ≥ 6 mo | 3–5 mo | < 3 mo |
@@ -231,13 +239,11 @@ Shows how much additional monthly investment closes the gap.
 Starting from retirement-year investments:
   For each extra year (1–30):
     investments = investments × (1 + r)
-    netSavings = max(0, (salary + passive + other) − preRetExpenses)
-    investments += netSavings            [salary/income grow at configured rates]
     
     If investments ≥ updated nest egg: return extra years needed
 ```
 
-Shows how many additional working years close the gap, including continued salary contributions.
+Shows how many additional working years close the gap by giving the existing projected retirement portfolio extra compounding time only. It intentionally does not add extra savings during the delayed years, matching the UI's conservative "no other changes" framing.
 
 ### Lever 3: Higher Return
 
@@ -260,11 +266,12 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 | Decision | Rationale | Impact |
 |----------|-----------|--------|
 | **Cash excluded from Monte Carlo** | Cash is allocated annually as an emergency fund, not a growth asset | MC uses liquid investments only |
-| **Surplus not auto-reinvested** | Conservative assumption — shows what happens without action | User can adjust via surplus deployment |
+| **Only explicit investment contributions enter the base projection** | Planned annual contributions belong on investment sub-items; unallocated surplus remains a scenario input | Base projection includes entered contributions; Surplus Deployment remains useful for testing additional year-by-year surplus strategies |
 | **Cash earns 0%** | Pragmatic — emergency fund, not income-generating | Cash balance is constant across projection |
 | **Linear amortization** | Simplification accepted by owner | Slightly overestimates debt in early years vs actual amortization schedule |
+| **Liability balances do not imply payments** | Balance sheet and cashflow are deliberately separate | Keep liabilities for net worth; enter full debt-service payments as expenses to affect savings |
 | **NW Multiple uses salary only** | Fidelity standard benchmark | Passive/other income excluded from denominator |
-| **Higher Return lever ignores contributions** | Conservative — shows required return from existing assets alone | Gives a floor estimate |
+| **Higher Return lever keeps the base projection unchanged except return** | Shows required return after current balances and entered annual contributions are already reflected in projected wealth | Gives an isolated return lever estimate |
 | **Drawdown timing: age > (not >=)** | Conservative — retirement-year expenses paid from final salary year | Standard practice |
 
 ---

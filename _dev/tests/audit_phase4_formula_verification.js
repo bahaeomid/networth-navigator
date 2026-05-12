@@ -36,6 +36,24 @@ assertClose(2000000 - 1500000, 500000, 'F4: Funding Gap');
 // Income=120000, Expenses=80000 → (40000/120000) × 100 = 33.33%
 assertClose((120000 - 80000) / 120000 * 100, 33.33, 'F5: Savings Rate');
 
+// --- Formula 5b: Current-year savings rate includes active planned expenses ---
+assertClose((120000 - 80000 - 10000) / 120000 * 100, 25, 'F5b: Current-Year Savings Rate includes active OTEs');
+
+// --- Formula 5c: Annual investment contribution growth ---
+{
+  const items = [
+    { annualContrib: 12000, contribGrowthRate: 0 },
+    { annualContrib: 6000, contribGrowthRate: 5 },
+  ];
+  const yearIndex = 2;
+  const contribution = items.reduce((sum, item) => {
+    const base = item.annualContrib || 0;
+    const growthRate = (item.contribGrowthRate || 0) / 100;
+    return sum + base * Math.pow(1 + growthRate, yearIndex);
+  }, 0);
+  assertClose(contribution, 18615, 'F5c: Annual investment contribution with growth');
+}
+
 // --- Formula 6: NW Multiple (NetWorth / AnnualSalary) ---
 // NW=500000, Salary=120000 → 500000/120000 = 4.1667
 assertClose(500000 / 120000, 4.1667, 'F6: NW Multiple');
