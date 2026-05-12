@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-12 by Session 10
+**Last updated:** 2026-05-12 by Session 11
 
 ---
 
@@ -64,8 +64,8 @@
 | NEW-50 | Gap-closing levers no longer matched applied-input outcomes after contribution-model update | HIGH | J | FIXED | 9 | Replaced closed-form/compounding-only lever logic with actionable parity solvers for Save More, Retire Later, and Higher Return |
 | NEW-51 | Collapsed Investments header hid contribution activity when lump-sum balance was zero | MEDIUM | J | FIXED | 9 | Added annual-contribution badge beside Investments total in collapsed header |
 | NEW-52 | Export HTML report interpolates user strings without escape (XSS regression) | CRITICAL | K | OPEN | - | Maps to A9 FINDING-01; escape all liability/dependent output with `escapeHtml` |
-| NEW-53 | Retirement boundary mismatch causes one-year drawdown offset | HIGH | K | OPEN | - | Maps to A9 FINDING-02; align salary stop, retirement switch, drawdown gate, and chart semantics |
-| NEW-54 | Monte Carlo withdrawal onset out of parity with deterministic/runway | HIGH | K | OPEN | - | Maps to A9 FINDING-03; enforce same retirement-boundary convention across engines |
+| NEW-53 | Retirement boundary mismatch causes one-year drawdown offset | HIGH | K | FIXED | 11 | Drawdown boundary aligned to `age >= retirementAge` in deterministic + runway surfaces; docs/tooltips synced |
+| NEW-54 | Monte Carlo withdrawal onset out of parity with deterministic/runway | HIGH | K | FIXED | 11 | Deterministic/runway now match MC year-0 withdrawal convention; parity contract documented + harness updated |
 | NEW-55 | Audit harness mixes advisory scripts into pass/fail gating | MEDIUM | K | OPEN | - | Maps to A9 FINDING-04; split advisory reporters or harden with assertions |
 | NEW-56 | Docs index current-ground-truth pointers stale vs registry | LOW | K | OPEN | - | Maps to A9 FINDING-05; update docs index links to latest active/full audit lineage |
 <!-- Additional findings will be added during phase execution -->
@@ -805,3 +805,53 @@ Reviewed and re-validated the main connected surfaces after lever fixes:
 3. NEW-54
 4. NEW-55
 5. NEW-56
+
+---
+
+## SESSION 11 - 2026-05-12 - Codex
+
+**Picking up from:** Session 10 remediation plan (A9 intake).  
+**Open findings at session start:** NEW-52, NEW-53, NEW-54, NEW-55, NEW-56.  
+**Session goal:** Fix the two HIGH retirement-model parity/timing findings (NEW-53, NEW-54) using the selected boundary convention (`drawdown starts at age >= retirementAge`), then re-verify release chain.
+
+### NEW-53 - Retirement boundary mismatch causes one-year drawdown offset (HIGH -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Aligned deterministic drawdown and exhaustion boundary checks to start at retirement age:
+- `wealthProjection` drawdown gate changed from `age > retirementAge` to `age >= retirementAge`.
+- Drawdown exhaustion tracking gate changed to `age >= retirementAge`.
+- Retirement Runway `simulateRunway` drawdown gate changed to `age >= retirementAge`.
+- User-facing/model documentation synced to this convention in app notes/tooltips and `_dev/docs/core/FINANCIAL_MODEL.md`.
+
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-54 - Monte Carlo withdrawal onset out of parity with deterministic/runway (HIGH -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Kept Monte Carlo withdrawal onset at simulation year 0 (retirement-age transition year), and aligned deterministic/runway to the same convention via NEW-53. Added explicit parity commentary in the MC loop and updated projection audit harness to assert the new onset rule.
+
+**Files changed:** `src/App.jsx`, `_dev/tests/auditor2_projection.js`, `_dev/tests/auditor1_projection_test.js`
+
+### Verification Chain (Session 11)
+
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run test:smoke` -> PASS (12 Playwright tests)
+
+## SESSION 11 CLOSE - 2026-05-12
+
+**Findings resolved this session:** 2 - NEW-53, NEW-54  
+**Findings blocked:** 0  
+**Findings deferred:** 0  
+**Overall progress:** 53 fixed / 56 tracked (94.6% fixed)
+
+**Key observations this session:**
+- The retirement boundary convention is now explicit and consistent: salary stops at retirement age, retirement expenses apply at retirement age, and drawdown starts at retirement age.
+- Monte Carlo and deterministic/runway engines now share the same withdrawal-onset contract.
+- The remaining CRITICAL issue is NEW-52 (export-path XSS regression), followed by process/doc gaps NEW-55 and NEW-56.
+
+**Next session priority:**
+1. NEW-52
+2. NEW-55
+3. NEW-56

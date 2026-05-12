@@ -108,7 +108,7 @@ Liability balances are balance-sheet items only. They affect net worth and debt-
 ### Drawdown (Post-Retirement)
 
 ```
-If enableDrawdown AND age > retirementAge:
+If enableDrawdown AND age ≥ retirementAge:
   postRetIncome = passive(y) + other(y)
   drawdown(y) = max(0, totalExpenses(y) − postRetIncome)
   Deducted from investments only

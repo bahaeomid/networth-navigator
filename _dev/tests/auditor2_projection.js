@@ -70,18 +70,18 @@ function testDrawdown() {
   // Test ages
   const testCases = [
     { age: 54, shouldDrawdown: false },
-    { age: 55, shouldDrawdown: false }, // Retirement year - no drawdown yet
-    { age: 56, shouldDrawdown: true },  // First year WITH drawdown
+    { age: 55, shouldDrawdown: true },  // Retirement year - drawdown starts
+    { age: 56, shouldDrawdown: true },
     { age: 60, shouldDrawdown: true },
   ];
   
   testCases.forEach(({ age, shouldDrawdown }) => {
-    const actual = age > retirementAge;
+    const actual = age >= retirementAge;
     console.log(`  Age ${age}: drawdown = ${actual} (expected: ${shouldDrawdown})`);
     assert(actual === shouldDrawdown, `Age ${age} drawdown logic correct`);
   });
   
-  console.log('  ✓ PASS - Drawdown starts at age > retirementAge\n');
+  console.log('  ✓ PASS - Drawdown starts at age >= retirementAge\n');
 }
 
 // Test 2.4: OTE Two-Segment Inflation

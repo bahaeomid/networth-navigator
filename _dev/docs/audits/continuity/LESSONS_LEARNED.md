@@ -187,3 +187,25 @@ Findings in batch: NEW-52, NEW-53, NEW-54, NEW-55, NEW-56 (planning intake)
 - `wealthProjection` and `simulateRunway` currently delay drawdown until `age > retirementAge`, while cashflow income and expense transitions trigger at retirement age.
 - Monte Carlo withdrawal onset currently follows a different retirement-year boundary behavior than deterministic/runway projections.
 - Export report assumptions/dependent/liability sections should be re-reviewed as a group whenever template logic changes.
+
+---
+
+## Batch Synthesis - Session 11 - 2026-05-12
+Findings in batch: NEW-53, NEW-54
+
+### Patterns observed
+
+1. Timing/parity issues often come from small boundary operators (`>` vs `>=`) rather than major algorithm errors.
+2. Retirement model trust depends on all engines sharing one boundary contract, not just matching formulas in isolation.
+3. Advisory test scripts can stay useful, but core parity assumptions should be codified in assertion-based harnesses.
+
+### Principles extracted
+
+- **Encode boundary conventions as executable checks:** If retirement starts at a specific boundary, enforce it in tests so future refactors cannot silently drift.
+- **Align docs/tooltips in the same change as logic fixes:** Financial timing assumptions should never rely on implicit code behavior.
+
+### Codebase-specific observations
+
+- `wealthProjection` and `simulateRunway` now start drawdown at `age >= retirementAge`.
+- Monte Carlo year-0 withdrawal now explicitly documents the same retirement-age transition convention.
+- Projection harness `_dev/tests/auditor2_projection.js` now asserts retirement-year drawdown onset.

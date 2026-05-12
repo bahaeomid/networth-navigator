@@ -174,7 +174,7 @@ const TOOLTIPS = {
   netWorth: "Total assets minus total liabilities. Liabilities amortize linearly to their end year — set end years on mortgages and loans in the Finances tab to reflect scheduled payoffs. Liability balances affect net worth only; debt payments must be entered as expenses to affect savings.",
   retirementReadiness: "Survival odds: % of 1,000 market scenarios where your money lasts through your life expectancy. Above 80% = strong plan. Below 60% = review your retirement budget or savings rate. Uses your Retirement Budget (entered in today's terms, inflated to retirement day) as the annual withdrawal amount.",
   yearsToRetirement: "Years until your planned retirement age. FI Age (in the Retirement Health card) shows the earliest you could theoretically retire based on current savings — ideally it lands before or at this date.",
-  drawdown: "When enabled, retirement expenses are withdrawn annually from your Investments balance — simulating the real depletion of your portfolio during retirement. Withdrawals are funded from Investments only (stocks, ETFs, index funds, retirement accounts), since real estate appreciates passively and other assets are treated as illiquid. The annual withdrawal equals your inflation-adjusted retirement expenses, reduced by any passive or other income continuing through retirement — only the net shortfall is withdrawn from your portfolio to cover your retirement expenses. Disable to see gross asset growth without any depletion effect.",
+  drawdown: "When enabled, retirement expenses are withdrawn annually from your Investments balance starting at retirement age — simulating the real depletion of your portfolio during retirement. Withdrawals are funded from Investments only (stocks, ETFs, index funds, retirement accounts), since real estate appreciates passively and other assets are treated as illiquid. The annual withdrawal equals your inflation-adjusted retirement expenses, reduced by any passive or other income continuing through retirement — only the net shortfall is withdrawn from your portfolio to cover your retirement expenses. Disable to see gross asset growth without any depletion effect.",
 };
 
 // Global tooltip state — a simple pub/sub so the popup renders at the root level
@@ -517,7 +517,9 @@ const runMonteCarloSimulation = (portfolioAssets, yearsToProject, annualContribu
       const investmentReturn = assumptions.investmentReturn + _z * assumptions.investmentStdDev;
       investments = investments * (1 + investmentReturn / 100);
       investments += annualContribution;
-      // Apply pre-computed phase-out-aware withdrawal for this year
+      // Apply pre-computed phase-out-aware withdrawal for this year.
+      // Year 0 is the retirement year transition (retirementAge -> retirementAge+1),
+      // matching deterministic/runway drawdown onset at age >= retirementAge.
       investments -= yearlyWithdrawals[year];
       // Deduct any one-time expense scheduled for this calendar year
       const calYear = safeRetCalYear + year;
@@ -2195,7 +2197,7 @@ const NetWorthNavigator = () => {
     <div class="note-heading"><span class="note-num">5.</span> Retirement Projections and Financial Independence Age</div>
     <div class="note-body">
       <p>The <strong>Financial Independence (FI) Age</strong> is defined as the earliest age at which the projected investment portfolio balance equals or exceeds the Required Nest Egg for that year, calculated as the nominal retirement expense divided by the safe withdrawal rate. The FI Age uses a per-year nominal threshold — the required portfolio size increases each year with expense inflation, so it is not a fixed target calculated once at retirement date. For the Required Nest Egg formula and its caveats, see Note 9.</p>
-      <p>The <strong>drawdown simulation</strong> (when enabled) deducts net retirement expenses (gross expenses less passive and other income) from the investment portfolio annually, post-retirement. Only the liquid investment portfolio is drawn upon — real estate and other illiquid assets grow passively and are excluded (see Note 2). The portfolio balance is floored at zero; exhaustion age is the first year the balance reaches zero.</p>
+      <p>The <strong>drawdown simulation</strong> (when enabled) deducts net retirement expenses (gross expenses less passive and other income) from the investment portfolio annually, starting at the retirement-age transition year. Only the liquid investment portfolio is drawn upon — real estate and other illiquid assets grow passively and are excluded (see Note 2). The portfolio balance is floored at zero; exhaustion age is the first year the balance reaches zero.</p>
     </div>
   </div>
   <hr class="note-rule"/>
@@ -2206,7 +2208,7 @@ const NetWorthNavigator = () => {
       <p>Retirement survival probability is estimated using <strong>1,000 independent Monte Carlo simulations</strong>. In each simulation, annual investment returns are drawn from a normal distribution parameterised by the user's stated expected return (${assumptions.investmentReturn}% p.a.) and standard deviation (${assumptions.investmentStdDev}% p.a.) using the Box-Muller transform. The simulation:</p>
       <ul>
         <li>Operates on the liquid investment portfolio only, starting from its projected balance at retirement date</li>
-        <li>Applies per-year nominal withdrawal amounts computed from the retirement budget, including category-specific growth rates and phase-out schedules</li>
+        <li>Applies per-year nominal withdrawal amounts computed from the retirement budget, including category-specific growth rates and phase-out schedules (year 0 is the retirement-age transition year)</li>
         <li>Nets passive and other income against withdrawals (only the shortfall is drawn from investments)</li>
         <li>Incorporates one-time post-retirement expenses using the two-segment inflation approach described in Note 8</li>
         <li>Records a simulation as successful if the portfolio balance remains above zero through life expectancy</li>
@@ -3097,7 +3099,7 @@ const mIdx = cols.findIndex(c =>
       const wealth = totalAssets - totalLiabilities;
 
       // Track first year investments hit zero under drawdown
-      if (assumptions.enableDrawdown && age > profile.retirementAge && investmentBalance === 0 && exhaustionAge === null) {
+      if (assumptions.enableDrawdown && age >= profile.retirementAge && investmentBalance === 0 && exhaustionAge === null) {
         exhaustionAge = age;
       }
 
@@ -3148,10 +3150,10 @@ const mIdx = cols.findIndex(c =>
 
       // Apply growth AFTER push so next year's data reflects compounding from this year
       // Phase 4A — Drawdown Toggle: withdraw retirement expenses from investmentBalance
-      // Rules: only when enabled, only AFTER the retirement entry year (age > retirementAge),
+      // Rules: only when enabled, starting at retirement age (age >= retirementAge),
       // from Investments only (liquid/market assets). Capped at 0 — balance can't go negative.
       let drawdownAmount = 0;
-      if (assumptions.enableDrawdown && age > profile.retirementAge) {
+      if (assumptions.enableDrawdown && age >= profile.retirementAge) {
         // Net passive and other income against the withdrawal — only the shortfall comes from investments.
         // Salary is zeroed post-retirement. Passive/other income continues and reduces the draw needed.
         // This prevents double-counting: post-retirement passive income isn't accumulated elsewhere.
@@ -5784,7 +5786,7 @@ const mIdx = cols.findIndex(c =>
                   })();
                   const netWithdrawal = Math.max(0, inflationAdjusted + oneTimeAmount - passiveInRet - otherInRet);
                   result.push({ age: age, balance: Math.round(Math.max(0, balance)) });
-                  if (age > profile.retirementAge) {
+                  if (age >= profile.retirementAge) {
                     balance = Math.max(0, balance * (1 + safeReturn / 100) - netWithdrawal);
                   } else {
                     balance = Math.max(0, balance * (1 + safeReturn / 100));

@@ -114,5 +114,5 @@ console.log("\n=== Summary of Critical Issues Found ===");
 console.log("1. Sub-item sync: currentNetWorth uses top-level rollups, annualIncome sums sub-items");
 console.log("2. NW Multiple denominator inconsistency: uses income.salary (top-level) while annualIncome uses sub-item sum");
 console.log("3. Negative savings masked by Math.max(0, ...) in savings calculation");
-console.log("4. Drawdown timing: age > retirementAge excludes retirement year from drawdown");
+console.log("4. Drawdown timing convention updated: drawdown now starts at age >= retirementAge; keep deterministic/runway/MC onset aligned");
 console.log("5. Linear amortization doesn't model real mortgage interest payments (documented limitation)");
