@@ -988,6 +988,14 @@ const NetWorthNavigator = () => {
   const [expensePhaseOutYears, setExpensePhaseOutYears] = useState(DEFAULT_STATE.expensePhaseOutYears);
   const [retExpensePhaseOutYears, setRetExpensePhaseOutYears] = useState(DEFAULT_STATE.retExpensePhaseOutYears);
   const [projectionTargetYear, setProjectionTargetYear] = useState(new Date().getFullYear() + 5);
+  const [preRetChartTargetYear, setPreRetChartTargetYear] = useState(() => {
+    const y = new Date().getFullYear();
+    return y + (DEFAULT_STATE.profile.retirementAge - DEFAULT_STATE.profile.currentAge);
+  });
+  const [cashFlowTargetYear, setCashFlowTargetYear] = useState(() => {
+    const y = new Date().getFullYear();
+    return y + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge);
+  });
   const [hiddenCalcLines, setHiddenCalcLines] = useState({});
   const [hiddenAssetLines, setHiddenAssetLines] = useState({});
   const [selectedChartCats, setSelectedChartCats] = useState([]);
@@ -1014,7 +1022,7 @@ const NetWorthNavigator = () => {
   const [surplusSplitInvest, setSurplusSplitInvest] = useState(100);
   const [surplusSplitDebt, setSurplusSplitDebt] = useState(0);
 
-  const RUNWAY_DEFAULT_CONSERVATIVE_OFFSET = -3;
+  const RUNWAY_DEFAULT_CONSERVATIVE_OFFSET = 0;
   const RUNWAY_DEFAULT_OPTIMISTIC_OFFSET = 3;
   const RUNWAY_DEFAULT_PESS_SPEND = 0;
   const RUNWAY_DEFAULT_OPT_SPEND = 25;
@@ -1178,6 +1186,8 @@ const NetWorthNavigator = () => {
           runwayOptimisticOffset,
           runwayPessSpend,
           runwayOptSpend,
+          preRetChartTargetYear,
+          cashFlowTargetYear,
         };
         localStorage.setItem('nwn_autosave', JSON.stringify(dataToSave));
       } catch (e) {
@@ -1189,7 +1199,7 @@ const NetWorthNavigator = () => {
       expenseCategories, expenseCalculator, retirementBudget, expenseGrowthRates,
       expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retExpenseGrowthRates,
       lifeEvents, assumptions, normalizedOneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt,
-      runwayConservativeOffset, runwayOptimisticOffset, runwayPessSpend, runwayOptSpend]);
+      runwayConservativeOffset, runwayOptimisticOffset, runwayPessSpend, runwayOptSpend, preRetChartTargetYear, cashFlowTargetYear]);
 
   // Auto-restore from localStorage on mount
   useEffect(() => {
@@ -1221,10 +1231,12 @@ const NetWorthNavigator = () => {
       if (data.nestEggSwr !== undefined) setNestEggSwr(clampSwr(data.nestEggSwr));
       if (data.surplusSplitInvest !== undefined) setSurplusSplitInvest(data.surplusSplitInvest);
       if (data.surplusSplitDebt !== undefined) setSurplusSplitDebt(data.surplusSplitDebt);
-      setRunwayConservativeOffset(Math.min(-1, parseNumericOrDefault(data.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET)));
+      setRunwayConservativeOffset(Math.max(-8, Math.min(0, parseNumericOrDefault(data.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET))));
       setRunwayOptimisticOffset(Math.max(1, Math.min(8, parseNumericOrDefault(data.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))));
       setRunwayPessSpend(Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))));
       setRunwayOptSpend(Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))));
+      if (data.preRetChartTargetYear !== undefined) setPreRetChartTargetYear(data.preRetChartTargetYear);
+      if (data.cashFlowTargetYear !== undefined) setCashFlowTargetYear(data.cashFlowTargetYear);
     } catch (e) {
       // Corrupted or unavailable — start with defaults
     }
@@ -1297,6 +1309,8 @@ const NetWorthNavigator = () => {
       runwayOptimisticOffset,
       runwayPessSpend,
       runwayOptSpend,
+      preRetChartTargetYear,
+      cashFlowTargetYear,
     };
     
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
@@ -2485,10 +2499,12 @@ new Chart(document.getElementById('allocChart'),{
           setNestEggSwr(clampSwr(imported.nestEggSwr));
           if (imported.surplusSplitInvest !== undefined) setSurplusSplitInvest(imported.surplusSplitInvest);
           if (imported.surplusSplitDebt   !== undefined) setSurplusSplitDebt(imported.surplusSplitDebt);
-          setRunwayConservativeOffset(Math.min(-1, parseNumericOrDefault(imported.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET)));
+          setRunwayConservativeOffset(Math.max(-8, Math.min(0, parseNumericOrDefault(imported.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET))));
           setRunwayOptimisticOffset(Math.max(1, Math.min(8, parseNumericOrDefault(imported.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))));
           setRunwayPessSpend(Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))));
           setRunwayOptSpend(Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))));
+          if (imported.preRetChartTargetYear !== undefined) setPreRetChartTargetYear(imported.preRetChartTargetYear);
+          if (imported.cashFlowTargetYear !== undefined) setCashFlowTargetYear(imported.cashFlowTargetYear);
           alert('Data imported successfully! All values are in AED — switch currency above if needed.');
         } else {
           alert('Incompatible file format. Please use a file exported from NetWorth Navigator.');
@@ -2868,7 +2884,7 @@ const mIdx = cols.findIndex(c =>
   const annualUndeployedSurplus = useMemo(() => {
     return annualSavings - annualInvestmentContribution;
   }, [annualSavings, annualInvestmentContribution]);
-  
+
   // Compute projected annual expenses for any given year using per-category growth rates
   const getProjectedExpenses = (targetYear, opts) => {
     const _opts = opts !== undefined ? opts : {};
@@ -3161,6 +3177,21 @@ const mIdx = cols.findIndex(c =>
     data.exhaustionAge = exhaustionAge;
     return data;
   }, [profile, assets, liabilities, income, expenses, expenseCalculator, expenseGrowthRates, expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retirementBudget, retExpenseGrowthRates, assumptions, normalizedOneTimeExpenses]);
+
+  const clampedCashFlowTargetYear = useMemo(() => {
+    const y = new Date().getFullYear();
+    const max = y + (profile.lifeExpectancy - profile.currentAge);
+    return Math.max(y, Math.min(cashFlowTargetYear, max));
+  }, [cashFlowTargetYear, profile.currentAge, profile.lifeExpectancy]);
+
+  const cashFlowTargetAge = useMemo(() => {
+    const y = new Date().getFullYear();
+    return profile.currentAge + (clampedCashFlowTargetYear - y);
+  }, [clampedCashFlowTargetYear, profile.currentAge]);
+
+  const cashFlowChartData = useMemo(() => {
+    return wealthProjection.filter((d) => d.year <= clampedCashFlowTargetYear);
+  }, [wealthProjection, clampedCashFlowTargetYear]);
   
   const retirementMetrics = useMemo(() => {
     const retirementData = wealthProjection.find(d => d.age === profile.retirementAge);
@@ -4606,18 +4637,33 @@ const mIdx = cols.findIndex(c =>
 
             {/* Income vs Expenses — full lifecycle chart, lives in Overview */}
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '2rem', marginBottom: '2rem', position: 'relative', zIndex: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   Cash Flow Over Time
                   <InfoTooltip text="Pre-retirement income includes salary (grows annually), passive income, and other income. At retirement, salary stops — but passive and other income (rental, dividends, etc.) continue for life. Pre-retirement expenses grow category-by-category; at retirement the model switches to your Retirement Budget, inflated each year at your assumed inflation rate." />
                 </h3>
-
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Chart Through:</span>
+                  <TargetYearInput
+                    value={clampedCashFlowTargetYear}
+                    onChange={setCashFlowTargetYear}
+                    minYear={new Date().getFullYear()}
+                    maxYear={new Date().getFullYear() + (profile.lifeExpectancy - profile.currentAge)}
+                  />
+                  <button
+                    onClick={() => setCashFlowTargetYear(new Date().getFullYear() + (profile.retirementAge - profile.currentAge))}
+                    style={{ padding: '0.42rem 0.65rem', background: clampedCashFlowTargetYear === (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${clampedCashFlowTargetYear === (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: '8px', color: clampedCashFlowTargetYear === (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) ? '#a78bfa' : '#9ca3af', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' }}
+                  >
+                    Retirement
+                  </button>
+                  <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>Age {cashFlowTargetAge}</span>
+                </div>
               </div>
               <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '1.5rem' }}>
-                Annual cash flows throughout your life stages
+                Annual cash flows throughout your life stages (shown through {clampedCashFlowTargetYear})
               </p>
               <ResponsiveContainer width="100%" height={450} style={{ overflow: 'visible' }}>
-                <LineChart data={wealthProjection} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
+                <LineChart data={cashFlowChartData} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" />
                   <XAxis dataKey="age" stroke="#9ca3af" />
                   <YAxis stroke="#9ca3af" tickFormatter={(value) => formatCurrency(value, currency, exchangeRates)} />
@@ -4626,7 +4672,7 @@ const mIdx = cols.findIndex(c =>
                     contentStyle={{ background: 'rgba(10,22,40,0.96)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: '10px', backdropFilter: 'blur(8px)', color: '#e8e9ed' }}
                     content={({ active, payload, label }) => {
                       if (!active || !payload || !payload.length) return null;
-                      const pt = wealthProjection.find(d => d.age === label);
+                      const pt = cashFlowChartData.find(d => d.age === label);
                       const currentYear = new Date().getFullYear();
                       const year = pt?.year ?? (currentYear + (label - profile.currentAge));
                       const wealthMilestone = wealthMilestones.find(m => m.age === label);
@@ -4787,13 +4833,15 @@ const mIdx = cols.findIndex(c =>
                   <Legend content={<CustomLegend />} />
                   
                   {/* Retirement marker */}
-                  <ReferenceLine
-                    x={profile.retirementAge}
-                    stroke="#a78bfa" strokeDasharray="3 3" strokeWidth={2}
-                    label={(props) => <RotatedRefLabel {...props} value="Retirement" fill="#a78bfa" />}
-                  />
+                  {clampedCashFlowTargetYear >= (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) && (
+                    <ReferenceLine
+                      x={profile.retirementAge}
+                      stroke="#a78bfa" strokeDasharray="3 3" strokeWidth={2}
+                      label={(props) => <RotatedRefLabel {...props} value="Retirement" fill="#a78bfa" />}
+                    />
+                  )}
                   {/* Portfolio Exhaustion marker */}
-                  {wealthProjection.exhaustionAge && (
+                  {wealthProjection.exhaustionAge && wealthProjection.exhaustionAge <= cashFlowTargetAge && (
                     <ReferenceLine
                       x={wealthProjection.exhaustionAge}
                       stroke="#f87171" strokeDasharray="4 3" strokeWidth={2}
@@ -4807,7 +4855,9 @@ const mIdx = cols.findIndex(c =>
                     return normalizedOneTimeExpenses.map(e => {
                       const currentYear = new Date().getFullYear();
                       const x1 = profile.currentAge + (e.year - currentYear);
-                      const x2 = profile.currentAge + ((e.endYear || e.year) - currentYear);
+                      const x2Raw = profile.currentAge + ((e.endYear || e.year) - currentYear);
+                      const x2 = Math.min(x2Raw, cashFlowTargetAge);
+                      if (x1 > cashFlowTargetAge) return null;
                       if (!(e.endYear && e.endYear > e.year)) return null;
                       const myIndex = bandIndex++;
                       const fillOpacity = myIndex % 2 === 0 ? 0.06 : 0.10;
@@ -5843,7 +5893,7 @@ const mIdx = cols.findIndex(c =>
                           {/* Return slider */}
                           <div style={{ marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
                             {(() => {
-                              const pessMin = Math.max(-8, 1 - assumptions.investmentReturn);
+                              const pessMin = Math.max(-8, -assumptions.investmentReturn);
                               const clampedOffset = Math.max(pessMin, runwayConservativeOffset);
                               if (clampedOffset !== runwayConservativeOffset) setRunwayConservativeOffset(clampedOffset);
                               return (
@@ -5852,10 +5902,10 @@ const mIdx = cols.findIndex(c =>
                                     <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Return offset</span>
                                     <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: '#f87171', fontWeight: '700' }}>{runwayConservativeOffset}pp</span>
                                   </div>
-                                  <input type="range" min={pessMin} max={-1} step={1} value={runwayConservativeOffset}
+                                  <input type="range" min={pessMin} max={0} step={1} value={runwayConservativeOffset}
                                     onChange={function(e) { setRunwayConservativeOffset(parseRangeInputValue(e.target, runwayConservativeOffset)); }}
                                     style={{ width: '100%', accentColor: '#f87171' }} />
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>{pessMin}pp</span><span>−1pp</span></div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>{pessMin}pp</span><span>0pp</span></div>
                                 </>
                               );
                             })()}
@@ -6165,13 +6215,16 @@ const mIdx = cols.findIndex(c =>
                 rateOverrideDelta: highDelta,
               });
 
-              // Build chart data: each year from now until lifeExpectancy (but show up to retirement for clarity)
+              const clampedPreRetChartTargetYear = Math.max(currentYear, Math.min(preRetChartTargetYear, retirementYear));
+              const preRetChartTargetAge = profile.currentAge + (clampedPreRetChartTargetYear - currentYear);
+
+              // Build chart data for pre-retirement timeline up to selected target year
               const CHART_CAT_LINES = expenseCategories;
               // OTEs that are relevant for the chart range (for dot/band rendering)
-              const activeOTEsForChart = normalizedOneTimeExpenses.filter(e => e.year <= currentYear + (profile.retirementAge - profile.currentAge));
+              const activeOTEsForChart = normalizedOneTimeExpenses.filter(e => e.year <= clampedPreRetChartTargetYear);
 
               const chartData = [];
-              const chartYearsMax = profile.retirementAge - profile.currentAge; // pre-retirement only
+              const chartYearsMax = Math.max(0, clampedPreRetChartTargetYear - currentYear);
               for (let y = currentYear; y <= currentYear + chartYearsMax; y++) {
                 const years = y - currentYear;
                 const row = { year: y, age: profile.currentAge + years };
@@ -6363,66 +6416,84 @@ const mIdx = cols.findIndex(c =>
                         <h3 style={{ fontSize: '1.3rem', fontWeight: '600', marginBottom: '0.25rem' }}>📈 Pre-retirement Expenses Over Time <InfoTooltip text="Values compounded annually at each category's individual growth rate. Categories phase out from their set end year onwards." /></h3>
                         <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Pre-retirement only · per-category growth rates · click legend to show/hide.</p>
                       </div>
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          onClick={() => setChartCatDropdownOpen(o => !o)}
-                          style={{
-                            padding: '0.45rem 0.9rem',
-                            background: selectedChartCats.length > 0 ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${selectedChartCats.length > 0 ? 'rgba(96,165,250,0.5)' : 'rgba(255,255,255,0.15)'}`,
-                            borderRadius: '8px',
-                            color: selectedChartCats.length > 0 ? '#60a5fa' : '#9ca3af',
-                            cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600',
-                            display: 'flex', alignItems: 'center', gap: '0.4rem'
-                          }}
-                        >
-                          🔍 Drill down {selectedChartCats.length > 0 ? `(${selectedChartCats.length})` : ''}
-                          <span style={{ fontSize: '0.65rem' }}>{chartCatDropdownOpen ? '▲' : '▼'}</span>
-                        </button>
-                        {chartCatDropdownOpen && (
-                          <>
-                            <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setChartCatDropdownOpen(false)} />
-                            <div style={{
-                              position: 'absolute', right: 0, top: '110%', zIndex: 999,
-                              background: '#0d1e35', border: '1px solid rgba(96,165,250,0.3)',
-                              borderRadius: '10px', padding: '0.75rem', width: '230px',
-                              boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <span style={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select categories to overlay</span>
-                                <span style={{ color: '#60a5fa', cursor: 'pointer', fontSize: '0.7rem' }} onClick={() => setSelectedChartCats([])}>clear all</span>
-                              </div>
-                              {[
-                                { groupLabel: 'Essential', groupColor: '#ef4444', cats: CHART_CAT_LINES.filter(c => (expenseTags[c.key] || c.group) === 'essential') },
-                                { groupLabel: 'Discretionary', groupColor: '#60a5fa', cats: CHART_CAT_LINES.filter(c => (expenseTags[c.key] || c.group) === 'disc') },
-                              ].map(({ groupLabel, groupColor, cats }) => (
-                                <div key={groupLabel} style={{ marginBottom: '0.6rem' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem', paddingBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: groupColor }} />
-                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600 }}>{groupLabel}</span>
-                                  </div>
-                                  {cats.map(cat => {
-                                    const sel = selectedChartCats.includes(cat.key);
-                                    return (
-                                      <div key={cat.key}
-                                        onClick={() => setSelectedChartCats(prev => sel ? prev.filter(k => k !== cat.key) : [...prev, cat.key])}
-                                        style={{
-                                          display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                          padding: '0.3rem 0.4rem 0.3rem 1rem', borderRadius: '5px', cursor: 'pointer',
-                                          background: sel ? `${cat.color}18` : 'transparent', marginBottom: '0.1rem'
-                                        }}
-                                      >
-                                        <div style={{ width: '8px', height: '2px', background: cat.color, borderRadius: '1px', opacity: sel ? 1 : 0.3, flexShrink: 0 }} />
-                                        <span style={{ fontSize: '0.77rem', color: sel ? '#d1d5db' : '#6b7280', flex: 1 }}>{cat.label}</span>
-                                        <span style={{ fontSize: '0.68rem', color: sel ? '#9ca3af' : '#4b5563' }}>{sel ? 'on' : 'off'}</span>
-                                      </div>
-                                    );
-                                  })}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Chart Through:</span>
+                          <TargetYearInput
+                            value={clampedPreRetChartTargetYear}
+                            onChange={setPreRetChartTargetYear}
+                            minYear={currentYear}
+                            maxYear={retirementYear}
+                          />
+                          <button
+                            onClick={() => setPreRetChartTargetYear(retirementYear)}
+                            style={{ padding: '0.42rem 0.65rem', background: clampedPreRetChartTargetYear === retirementYear ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${clampedPreRetChartTargetYear === retirementYear ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: '8px', color: clampedPreRetChartTargetYear === retirementYear ? '#a78bfa' : '#9ca3af', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' }}
+                          >
+                            Retirement
+                          </button>
+                          <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>Age {preRetChartTargetAge}</span>
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            onClick={() => setChartCatDropdownOpen(o => !o)}
+                            style={{
+                              padding: '0.45rem 0.9rem',
+                              background: selectedChartCats.length > 0 ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.05)',
+                              border: `1px solid ${selectedChartCats.length > 0 ? 'rgba(96,165,250,0.5)' : 'rgba(255,255,255,0.15)'}`,
+                              borderRadius: '8px',
+                              color: selectedChartCats.length > 0 ? '#60a5fa' : '#9ca3af',
+                              cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600',
+                              display: 'flex', alignItems: 'center', gap: '0.4rem'
+                            }}
+                          >
+                            🔍 Drill down {selectedChartCats.length > 0 ? `(${selectedChartCats.length})` : ''}
+                            <span style={{ fontSize: '0.65rem' }}>{chartCatDropdownOpen ? '▲' : '▼'}</span>
+                          </button>
+                          {chartCatDropdownOpen && (
+                            <>
+                              <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setChartCatDropdownOpen(false)} />
+                              <div style={{
+                                position: 'absolute', right: 0, top: '110%', zIndex: 999,
+                                background: '#0d1e35', border: '1px solid rgba(96,165,250,0.3)',
+                                borderRadius: '10px', padding: '0.75rem', width: '230px',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select categories to overlay</span>
+                                  <span style={{ color: '#60a5fa', cursor: 'pointer', fontSize: '0.7rem' }} onClick={() => setSelectedChartCats([])}>clear all</span>
                                 </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
+                                {[
+                                  { groupLabel: 'Essential', groupColor: '#ef4444', cats: CHART_CAT_LINES.filter(c => (expenseTags[c.key] || c.group) === 'essential') },
+                                  { groupLabel: 'Discretionary', groupColor: '#60a5fa', cats: CHART_CAT_LINES.filter(c => (expenseTags[c.key] || c.group) === 'disc') },
+                                ].map(({ groupLabel, groupColor, cats }) => (
+                                  <div key={groupLabel} style={{ marginBottom: '0.6rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem', paddingBottom: '0.2rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: groupColor }} />
+                                      <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600 }}>{groupLabel}</span>
+                                    </div>
+                                    {cats.map(cat => {
+                                      const sel = selectedChartCats.includes(cat.key);
+                                      return (
+                                        <div key={cat.key}
+                                          onClick={() => setSelectedChartCats(prev => sel ? prev.filter(k => k !== cat.key) : [...prev, cat.key])}
+                                          style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                            padding: '0.3rem 0.4rem 0.3rem 1rem', borderRadius: '5px', cursor: 'pointer',
+                                            background: sel ? `${cat.color}18` : 'transparent', marginBottom: '0.1rem'
+                                          }}
+                                        >
+                                          <div style={{ width: '8px', height: '2px', background: cat.color, borderRadius: '1px', opacity: sel ? 1 : 0.3, flexShrink: 0 }} />
+                                          <span style={{ fontSize: '0.77rem', color: sel ? '#d1d5db' : '#6b7280', flex: 1 }}>{cat.label}</span>
+                                          <span style={{ fontSize: '0.68rem', color: sel ? '#9ca3af' : '#4b5563' }}>{sel ? 'on' : 'off'}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem', marginTop: '0.75rem' }}>
@@ -8127,6 +8198,8 @@ const mIdx = cols.findIndex(c =>
                   setSelectedChartCats([]);
                   setSensitivityCatPicker(DEFAULT_EXPENSE_CATEGORIES[0].key);
                   setProjectionTargetYear(new Date().getFullYear() + 5);
+                  setPreRetChartTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.retirementAge - DEFAULT_STATE.profile.currentAge));
+                  setCashFlowTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge));
                   setSurplusSplitInvest(100);
                   setSurplusSplitDebt(0);
                   setExpenseViewMode('annual');
