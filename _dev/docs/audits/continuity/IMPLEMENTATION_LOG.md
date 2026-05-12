@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-12 by Session 9
+**Last updated:** 2026-05-12 by Session 10
 
 ---
 
@@ -63,6 +63,11 @@
 | NEW-49 | HTML report Save More methodology note referenced generic surplus offset | LOW | I | FIXED | 8 | Report note now uses undeployed surplus after entered annual investment contributions |
 | NEW-50 | Gap-closing levers no longer matched applied-input outcomes after contribution-model update | HIGH | J | FIXED | 9 | Replaced closed-form/compounding-only lever logic with actionable parity solvers for Save More, Retire Later, and Higher Return |
 | NEW-51 | Collapsed Investments header hid contribution activity when lump-sum balance was zero | MEDIUM | J | FIXED | 9 | Added annual-contribution badge beside Investments total in collapsed header |
+| NEW-52 | Export HTML report interpolates user strings without escape (XSS regression) | CRITICAL | K | OPEN | - | Maps to A9 FINDING-01; escape all liability/dependent output with `escapeHtml` |
+| NEW-53 | Retirement boundary mismatch causes one-year drawdown offset | HIGH | K | OPEN | - | Maps to A9 FINDING-02; align salary stop, retirement switch, drawdown gate, and chart semantics |
+| NEW-54 | Monte Carlo withdrawal onset out of parity with deterministic/runway | HIGH | K | OPEN | - | Maps to A9 FINDING-03; enforce same retirement-boundary convention across engines |
+| NEW-55 | Audit harness mixes advisory scripts into pass/fail gating | MEDIUM | K | OPEN | - | Maps to A9 FINDING-04; split advisory reporters or harden with assertions |
+| NEW-56 | Docs index current-ground-truth pointers stale vs registry | LOW | K | OPEN | - | Maps to A9 FINDING-05; update docs index links to latest active/full audit lineage |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -735,3 +740,68 @@ Reviewed and re-validated the main connected surfaces after lever fixes:
 
 - Replaced `_dev/tests/auditor2_gap_levers.js` with parity assertions that verify applying each recommended lever closes the modeled gap.
 - Updated `_dev/tests/auditor1_gap_levers.js` to reflect current design intent and defer formula spot checks to the executable Auditor 2 harness.
+
+---
+
+## SESSION 10 - 2026-05-12 - Codex
+
+**Picking up from:** A9 full `codebase-auditor` report and user-requested targeted retirement-boundary review.
+**Open findings at session start:** NEW-52 through NEW-56 (all from A9).
+**Session goal:** Run AFI continuation protocol for A9, normalize findings into continuity tracking, and produce a sequenced remediation plan for implementation.
+**Session end status:** PLAN READY - pending implementation
+
+### Continuation State Summary (A9 intake)
+
+- Prior sessions: 9 (Sessions 1-9)
+- Last session date: 2026-05-12
+- New actionable findings from A9: 5
+  - CRITICAL: NEW-52
+  - HIGH: NEW-53, NEW-54
+  - MEDIUM: NEW-55
+  - LOW: NEW-56
+- Blocked findings at session start: None
+- Deferred findings carried from prior sessions: NEW-21, NEW-25, NEW-27, NEW-43
+
+### A9 Finding Normalization (AFI mapping)
+
+- FINDING-01 -> NEW-52 (CRITICAL) Export HTML XSS regression
+- FINDING-02 -> NEW-53 (HIGH) Retirement boundary one-year offset
+- FINDING-03 -> NEW-54 (HIGH) Monte Carlo withdrawal-parity mismatch
+- FINDING-04 -> NEW-55 (MEDIUM) Advisory-vs-gating test harness signal quality
+- FINDING-05 -> NEW-56 (LOW) Documentation index pointer drift
+
+### Remediation Plan (ordered per AFI severity/dependency rules)
+
+1. NEW-52 (CRITICAL): Patch all unescaped export interpolations and re-run report-export security regression checks.
+2. NEW-53 (HIGH): Choose and implement single retirement-boundary convention across deterministic/runway engines and chart timing semantics.
+3. NEW-54 (HIGH): Align Monte Carlo withdrawal-onset logic to the same convention chosen in NEW-53; re-verify parity across all projection surfaces.
+4. NEW-55 (MEDIUM): Reclassify auditor1 scripts as advisory or convert critical invariants to assertions so "pass" reflects gating intent.
+5. NEW-56 (LOW): Update docs/audits index pointers to the current active/full audit lineage after code fixes land.
+
+### Verification Plan for Session 11
+
+- Unit/audit chain: `npm run test:audits`
+- Release chain: `npm run test:release`
+- Targeted parity checks:
+  - Retirement age boundary snapshots around `retirementAge-1`, `retirementAge`, `retirementAge+1`
+  - Deterministic vs runway vs Monte Carlo withdrawal-onset parity for the same scenario
+  - HTML export rendering sanity with escaped special-character names
+
+## SESSION 10 CLOSE - 2026-05-12
+
+**Findings resolved this session:** 0 - planning-only session  
+**Findings blocked:** 0  
+**Findings deferred:** 0 (no new deferrals)  
+**Overall progress:** 51 fixed / 56 tracked (91.1% fixed, with 5 newly opened from A9)
+
+**Key observations this session:**
+- The user-reported one-year offset is confirmed by code-path boundary conditions and push-before-update timeline semantics.
+- Current documentation partially acknowledges this convention, but UI copy implies retirement-transition semantics that can be interpreted differently.
+- Release pipeline passing does not imply absence of material risks; dedicated audit findings remain authoritative for GO/NO-GO.
+
+**Next session priority:**
+1. NEW-52
+2. NEW-53
+3. NEW-54
+4. NEW-55
+5. NEW-56

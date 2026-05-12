@@ -164,3 +164,26 @@ Findings in batch: Post-audit runway follow-up closures
 	- reset-vs-baseline runway control parity,
 	- reset-vs-baseline runway years parity after re-import.
 - `_dev/tests/verify_full_element_coverage.mjs` now includes 8 `Runway Control Parity` checks in the generated report, and `_dev/tests/run_all_audits.js` executes that verifier when artifacts exist.
+
+---
+
+## Batch Synthesis - Session 10 - 2026-05-12
+Findings in batch: NEW-52, NEW-53, NEW-54, NEW-55, NEW-56 (planning intake)
+
+### Patterns observed
+
+1. High-confidence regressions can reappear in adjacent output paths when escaping/safety patterns are applied inconsistently across template sections.
+2. Boundary-condition assumptions in financial timelines must be encoded once and reused across engines; local condition drift creates cross-surface story breaks.
+3. "All tests passed" messaging can be misleading when advisory analyzers share the same runner surface as gating checks.
+
+### Principles extracted
+
+- **Treat timeline boundaries as a shared contract:** Retirement transition semantics (start-of-year vs end-of-year) must be explicit and implemented identically in deterministic, stochastic, and charting surfaces.
+- **Security fixes need path-complete coverage:** When one output template section escapes user data, all sibling sections that interpolate user input must follow the same pattern.
+- **Separate advisory diagnostics from pass/fail tests:** Non-gating checks should be clearly labeled and should not dilute release-gate interpretation.
+
+### Codebase-specific observations
+
+- `wealthProjection` and `simulateRunway` currently delay drawdown until `age > retirementAge`, while cashflow income and expense transitions trigger at retirement age.
+- Monte Carlo withdrawal onset currently follows a different retirement-year boundary behavior than deterministic/runway projections.
+- Export report assumptions/dependent/liability sections should be re-reviewed as a group whenever template logic changes.
