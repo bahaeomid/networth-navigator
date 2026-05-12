@@ -226,12 +226,12 @@ Triggered when projected wealth at retirement < required nest egg. The UI comput
 ### Lever 1: Save More
 
 ```
-gap = nestEgg − projectedWealth
-annuityFactor = ((1 + r)^years − 1) / r        where r = investmentReturn/100
-extraMonthly = (gap / annuityFactor) / 12
+Solve extra annual contribution (binary search):
+  projectedInvestments(retirementAge, returnAssumption, extraAnnual) >= requiredNestEgg(retirementAge)
+extraMonthly = ceil(extraAnnual / 12)
 ```
 
-Shows how much additional monthly investment closes the gap.
+Shows how much additional monthly investment closes the gap when added as a new investment contribution stream (0% contribution growth) on top of existing investment-item contributions.
 
 This lever is additional to the annual contributions entered on investment sub-items, because those contributions are already included in `projectedWealth`. Only undeployed surplus can offset the displayed monthly amount:
 
@@ -244,22 +244,24 @@ If annual investment contributions exceed current-year savings, the base model s
 ### Lever 2: Retire Later
 
 ```
-Starting from retirement-year investments:
-  For each extra year (1–30):
-    investments = investments × (1 + r)
-    
-    If investments ≥ updated nest egg: return extra years needed
+For each extra year (1–30):
+  candidateAge = plannedRetirementAge + years
+  if projectedInvestments(candidateAge, returnAssumption, extraAnnual=0)
+     >= requiredNestEgg(candidateAge):
+    return years
 ```
 
-Shows how many additional working years close the gap by giving the existing projected retirement portfolio extra compounding time only. It intentionally does not add extra savings during the delayed years, matching the UI's conservative "no other changes" framing.
+Shows how many additional working years close the gap when only retirement age changes. Existing investment-item annual contributions continue through the later retirement date.
 
 ### Lever 3: Higher Return
 
 ```
-neededReturn = (nestEgg / currentInvestments)^(1/years) − 1
+Solve return assumption (binary search):
+  projectedInvestments(retirementAge, returnAssumption, extraAnnual=0) >= requiredNestEgg(retirementAge)
+displayedReturn = ceil(returnAssumption * 10) / 10
 ```
 
-Shows what CAGR is needed to close the gap through returns alone (no additional savings).
+Shows the investment return assumption needed to close the gap with current balances and existing investment-item annual contributions unchanged.
 
 ### Combination Guidance
 
@@ -279,7 +281,7 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 | **Linear amortization** | Simplification accepted by owner | Slightly overestimates debt in early years vs actual amortization schedule |
 | **Liability balances do not imply payments** | Balance sheet and cashflow are deliberately separate | Keep liabilities for net worth; enter full debt-service payments as expenses to affect savings |
 | **NW Multiple uses salary only** | Fidelity standard benchmark | Passive/other income excluded from denominator |
-| **Higher Return lever keeps the base projection unchanged except return** | Shows required return after current balances and entered annual contributions are already reflected in projected wealth | Gives an isolated return lever estimate |
+| **Higher Return lever keeps the base projection unchanged except return** | Solves required return after current balances and entered annual contributions are reflected in projected wealth | Gives an isolated return-lever estimate with actionable parity to changing the return assumption |
 | **Drawdown timing: age > (not >=)** | Conservative — retirement-year expenses paid from final salary year | Standard practice |
 
 ---

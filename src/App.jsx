@@ -2244,9 +2244,9 @@ const NetWorthNavigator = () => {
       <p>The <strong>overall verdict</strong> is a 6-state classification combining Q1 (on track vs gap) and Q2 (≥80% strong, 60–79% caution, &lt;60% weak): Strong · Moderate risk · High risk · Gap with strong odds · Gap detected · High risk with gap and low odds.</p>
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
-        <li><strong>Save More.</strong> The additional monthly investment required to accumulate the gap amount by retirement, assuming contributions compound at the investment return using a future-value annuity formula. Annual contributions entered on investment items are already included in the base projection; this amount is additional to those contributions. Only undeployed surplus (${fmt(undeployedSurplus)}/yr today) can offset the additional requirement.</li>
-        <li><strong>Retire Later.</strong> The number of additional working years (beyond planned retirement) needed for your existing investment portfolio to reach the required nest egg through extra compounding time only. No additional savings contributions are assumed in this lever (conservative). Displays "Gap too large" if not achievable within 30 extra years.</li>
-        <li><strong>Higher Return.</strong> The CAGR required for existing investments alone (no new contributions) to reach the required nest egg by retirement, solved via: (Required Nest Egg ÷ Current Investments)^(1 ÷ Years) − 1. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
+        <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. Only undeployed surplus (${fmt(undeployedSurplus)}/yr today) can offset the additional requirement.</li>
+        <li><strong>Retire Later.</strong> The number of additional working years needed if Planned Retirement Age changes and all other inputs remain unchanged. Existing investment-item annual contributions continue through the later retirement date. Displays "Gap too large" if not achievable within 30 extra years or before life expectancy.</li>
+        <li><strong>Higher Return.</strong> The Investment return assumption required to reach the required nest egg by retirement with current investment balances and entered annual contributions unchanged. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
       <p>All three levers are illustrative. A combination strategy will always close the gap more efficiently than any single lever in isolation.</p>
     </div>
@@ -5315,7 +5315,6 @@ const mIdx = cols.findIndex(c =>
 
               // Gap-closing calcs — always computed, shown as N/A when not applicable
               const yearsToRetire = profile.retirementAge - profile.currentAge;
-              const r = assumptions.investmentReturn / 100;
               let extraMonthly = null;
               let extraYears = null;
               let solvedReturn = null;
@@ -5323,50 +5322,94 @@ const mIdx = cols.findIndex(c =>
               let retireLaterna = false;
               let retireLaterBeyondLife = false;
               let returnNA = false;
+              const currentYearForLevers = new Date().getFullYear();
+              const requiredNestEggForLever = (candidateRetirementAge) => {
+                if (nestEggSwr <= 0) return Infinity;
+                const candidateCalYear = currentYearForLevers + (candidateRetirementAge - profile.currentAge);
+                const yearsAhead = candidateRetirementAge - profile.currentAge;
+                const nominalExpense = expenseCategories.reduce((sum, cat) => {
+                  const po = retExpensePhaseOutYears[cat.key];
+                  if (po && candidateCalYear >= po) return sum;
+                  const base = retirementBudget[cat.key] || 0;
+                  const rate = (retExpenseGrowthRates[cat.key] || 0) / 100;
+                  return sum + base * Math.pow(1 + rate, yearsAhead);
+                }, 0);
+                return nominalExpense / (nestEggSwr / 100);
+              };
+              const projectedInvestmentsForLever = (candidateRetirementAge, returnPct, extraAnnualContribution) => {
+                const years = Math.max(0, candidateRetirementAge - profile.currentAge);
+                const rate = Math.max(0, returnPct || 0) / 100;
+                let balance = assets.investments || 0;
+                for (let i = 0; i < years; i++) {
+                  const plannedContrib = (assets.investmentItems || []).reduce((sum, item) => {
+                    const base = item.annualContrib || 0;
+                    const growthRate = (item.contribGrowthRate || 0) / 100;
+                    return sum + base * Math.pow(1 + growthRate, i);
+                  }, 0);
+                  balance = Math.max(0, balance * (1 + rate) + plannedContrib + (extraAnnualContribution || 0));
+                }
+                return balance;
+              };
               if (yearsToRetire > 0 && !onTrack) {
-                // Save more
-                const annuityFactor = r > 0 ? (Math.pow(1 + r, yearsToRetire) - 1) / r : yearsToRetire;
-                const extraAnnual = annuityFactor > 0 ? Math.round(absGap / annuityFactor) : null;
-                extraMonthly = extraAnnual ? Math.round(extraAnnual / 12) : null;
-                if (extraMonthly === null) saveMoreNA = true;
-                // Retire later — conservative, no-other-changes model.
-                // Only extends compounding time on investments already projected at planned retirement.
-                // Does NOT assume any extra savings are invested during the added years.
+                // Save More: solve the extra flat annual contribution that closes the gap
+                // when entered as a new investment item with 0% contribution growth.
                 {
-                  const retData = wealthProjection.find(function(d) { return d.age === profile.retirementAge; });
-                  if (retData) {
-                    let extInv = retData.investments;
-                    let computedExtraYears = null;
-                    for (let yr = 1; yr <= 30; yr++) {
-                      // Compound existing retirement balance for one additional year.
-                      extInv = extInv * (1 + r);
-                      const candidateAge = profile.retirementAge + yr;
-                      const candidateCalYear = new Date().getFullYear() + (candidateAge - profile.currentAge);
-                      const candidateNestEgg = nestEggSwr > 0 ? getRetNominalForYear(candidateCalYear) / (nestEggSwr / 100) : 0;
-                      if (extInv >= candidateNestEgg) { computedExtraYears = yr; break; }
+                  let hi = Math.max(absGap / Math.max(yearsToRetire, 1), 1000);
+                  let guard = 0;
+                  while (guard < 40 && projectedInvestmentsForLever(profile.retirementAge, assumptions.investmentReturn, hi) < requiredNestEgg) {
+                    hi *= 2;
+                    guard += 1;
+                  }
+                  if (guard >= 40) {
+                    saveMoreNA = true;
+                  } else {
+                    let lo = 0;
+                    for (let iter = 0; iter < 50; iter++) {
+                      const mid = (lo + hi) / 2;
+                      if (projectedInvestmentsForLever(profile.retirementAge, assumptions.investmentReturn, mid) >= requiredNestEgg) hi = mid;
+                      else lo = mid;
                     }
-                    if (computedExtraYears !== null) {
-                      const candidateRetAge = profile.retirementAge + computedExtraYears;
-                      if (candidateRetAge >= profile.lifeExpectancy) {
-                        retireLaterBeyondLife = true;
-                      } else {
-                        extraYears = computedExtraYears;
-                      }
+                    extraMonthly = Math.ceil(hi / 12);
+                  }
+                }
+
+                // Retire Later: solve the first later retirement age that closes the gap
+                // under the same inputs, including investment-item contributions through
+                // the new retirement date.
+                {
+                  let firstBeyondLife = false;
+                  for (let yr = 1; yr <= 30; yr++) {
+                    const candidateAge = profile.retirementAge + yr;
+                    const candidateNestEgg = requiredNestEggForLever(candidateAge);
+                    const candidateInvestments = projectedInvestmentsForLever(candidateAge, assumptions.investmentReturn, 0);
+                    if (candidateInvestments >= candidateNestEgg) {
+                      if (candidateAge >= profile.lifeExpectancy) firstBeyondLife = true;
+                      else extraYears = yr;
+                      break;
                     }
                   }
-                  if (extraYears === null) retireLaterna = true;
+                  if (extraYears === null) {
+                    retireLaterna = true;
+                    retireLaterBeyondLife = firstBeyondLife;
+                  }
                 }
-                // Higher return — solve for the investment return needed so that investments
-                // alone reach requiredNestEgg. SWR applies to liquid investments only;
-                // real estate and other illiquid assets are excluded from both sides.
-                // Surplus stays undeployed — consistent with base scenario.
+
+                // Higher Return: solve the investment return that closes the gap with
+                // current balances and entered annual contributions unchanged.
                 {
-                  if (assets.investments > 0) {
-                    const neededCagr = Math.pow(requiredNestEgg / assets.investments, 1 / yearsToRetire) - 1;
-                    const neededReturnPct = Math.round(neededCagr * 1000) / 10;
-                    if (neededReturnPct > 30) { returnNA = true; }
-                    else { solvedReturn = neededReturnPct; returnNA = false; }
-                  } else { returnNA = true; }
+                  if (projectedInvestmentsForLever(profile.retirementAge, 30, 0) < requiredNestEgg) {
+                    returnNA = true;
+                  } else {
+                    let lo = Math.max(0, assumptions.investmentReturn);
+                    let hi = 30;
+                    for (let iter = 0; iter < 50; iter++) {
+                      const mid = (lo + hi) / 2;
+                      if (projectedInvestmentsForLever(profile.retirementAge, mid, 0) >= requiredNestEgg) hi = mid;
+                      else lo = mid;
+                    }
+                    solvedReturn = Math.min(30, Math.ceil(hi * 10) / 10);
+                    returnNA = false;
+                  }
                 }
               }
 
@@ -5547,23 +5590,23 @@ const mIdx = cols.findIndex(c =>
                                 <div>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                                     <div style={{ padding: '0.85rem', background: saveMoreNA ? 'rgba(255,255,255,0.02)' : 'rgba(96,165,250,0.07)', borderRadius: '8px', border: `1px solid ${saveMoreNA ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario — assumes a fixed monthly amount invested immediately each month at your preset Investment return of ${assumptions.investmentReturn}%/yr, compounded annually until retirement. Annual contributions entered on investment items are already included in the base projection; this number is additional to those contributions. Only undeployed surplus can offset it: current surplus minus entered annual investment contributions. All other factors remain unchanged from your base scenario.`} /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario. This is solved as an annualized contribution: adding ${extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'the shown monthly amount × 12'}/yr as a new investment item with 0% contribution growth should close the retirement gap, all else unchanged. Annual contributions already entered on investment items are included in the base projection. Only undeployed surplus can offset it: current surplus minus entered annual investment contributions.`} /></div>
                                       {saveMoreNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Not calculable</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrencyDecimal(extraMonthly, currency, exchangeRates)}/mo</div>}
-                                      <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>constant monthly amount · invested at {assumptions.investmentReturn}%/yr · compounded until retirement</div>
+                                      <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>add as {extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'monthly × 12'}/yr contribution · invested at {assumptions.investmentReturn}%/yr</div>
                                       {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo (today) can offset this{annualInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(annualInvestmentContribution / 12, currency, exchangeRates)}/mo already committed` : ''}</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="Conservative estimate: how many extra years are needed if you only delay retirement and let your existing investments compound longer. No additional savings are invested in this lever, so this is intentionally strict. In reality, if you keep saving and invest the extra surplus while working longer, the required delay is usually shorter. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, and continues those contributions through the later retirement date. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
                                       {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>{retireLaterBeyondLife ? 'Would require retiring at or after life expectancy' : 'Gap too large to close by working longer'}</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
-                                      <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · no other changes`}</div>
+                                      <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · contributions continue`}</div>
                                     </div>
                                     {(() => {
                                       const returnDelta = solvedReturn !== null ? Math.round((solvedReturn - assumptions.investmentReturn) * 10) / 10 : null;
                                       return (
                                       <div style={{ padding: '0.85rem', background: returnNA ? 'rgba(255,255,255,0.02)' : 'rgba(245,158,11,0.07)', borderRadius: '8px', border: `1px solid ${returnNA ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.2)'}` }}>
-                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The return needed on your Investment portfolio to reach your Required Nest Egg, with everything else unchanged. Only liquid Investments are included — illiquid assets are excluded. Converting illiquid wealth to Investments would reduce the return required. Annual contributions entered on investment items are already included in the base projection; any surplus beyond those contributions is assumed uninvested unless modeled in Surplus Deployment. Displayed value is rounded to one decimal place, so entering it back may produce a very small residual gap in edge cases.`} /></div>
+                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Higher return <InfoTooltip text={`The Investment return assumption needed to reach your Required Nest Egg, with everything else unchanged. The solver includes current liquid Investments plus annual contributions entered on investment items; illiquid assets are excluded. Any surplus beyond entered contributions is assumed uninvested unless modeled in Surplus Deployment. Displayed value is rounded up to one decimal place so entering it back should close the gap or leave a small surplus.`} /></div>
                                         {returnNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Would require unrealistic returns (&gt;30%/yr)</div>
                                           : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f59e0b', fontFamily: 'JetBrains Mono, monospace' }}>{solvedReturn}%/yr {returnDelta !== null && returnDelta > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '600', color: '#f59e0b', opacity: 0.75 }}>(+{returnDelta}pp)</span>}</div>}
                                         <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{returnNA ? '' : `on Investments only · your current rate is ${assumptions.investmentReturn}% · rounded to 0.1%`}</div>
@@ -7079,6 +7122,11 @@ const mIdx = cols.findIndex(c =>
                           <InfoTooltip text="Amount is today's balance. Contrib is the planned annual addition to that item before retirement; contrib growth increases that annual addition each year. Contributions are added to the base projection and therefore affect Dashboard charts, FI Age, Retirement Health, Monte Carlo starting wealth, and the HTML report. Keep the contribution affordable: the model does not automatically cap it to your calculated surplus." />
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
+                        {annualInvestmentContribution > 0 && (
+                          <span style={{ fontSize: '0.68rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.12rem 0.4rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
+                            +{formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr contrib
+                          </span>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span>

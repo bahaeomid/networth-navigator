@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-12 by Session 8
+**Last updated:** 2026-05-12 by Session 9
 
 ---
 
@@ -61,6 +61,8 @@
 | NEW-47 | Investment contribution fields lacked local explanatory tooltips | MEDIUM | I | FIXED | 8 | Added inline tooltips for Annual contrib and Growth fields |
 | NEW-48 | Current-year savings-rate tooltip did not disclose contribution treatment | LOW | I | FIXED | 8 | Tooltip now states contributions are deployment of savings, not expenses, and defines undeployed surplus |
 | NEW-49 | HTML report Save More methodology note referenced generic surplus offset | LOW | I | FIXED | 8 | Report note now uses undeployed surplus after entered annual investment contributions |
+| NEW-50 | Gap-closing levers no longer matched applied-input outcomes after contribution-model update | HIGH | J | FIXED | 9 | Replaced closed-form/compounding-only lever logic with actionable parity solvers for Save More, Retire Later, and Higher Return |
+| NEW-51 | Collapsed Investments header hid contribution activity when lump-sum balance was zero | MEDIUM | J | FIXED | 9 | Added annual-contribution badge beside Investments total in collapsed header |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -685,3 +687,51 @@ Selectors were hardened to avoid ambiguous role/text matches (tab-name regex anc
 ### Verification Chain (Session 8)
 
 - `npm run test:release` -> PASS
+
+---
+
+## SESSION 9 - 2026-05-12 - Codex
+
+**Picking up from:** User-reported post-change parity concerns across levers and calculation surfaces.
+**Open findings at session start:** Retirement Health levers appeared non-actionable after annual contribution support; collapsed investment header lacked contribution visibility.
+**Session goal:** Restore actionable parity of gap-closing levers, add contribution cue in collapsed Investment header, and re-verify cross-surface calculations.
+
+### NEW-50 - Gap-closing levers no longer matched applied-input outcomes after contribution-model update (HIGH -> FIXED)
+
+**Status:** FIXED  
+**Problem:** `Save More`, `Retire Later`, and `Higher Return` were still using legacy simplifying formulas that did not align with current base projection behavior once investment-item annual contributions and contribution growth were integrated. Users applying the recommended values could observe over/under-shoot.
+
+**Fix applied:** Replaced lever math in `src/App.jsx` with actionable parity solvers:
+- `Save More`: binary-searches extra annual contribution needed to close the gap at planned retirement, then displays monthly equivalent.
+- `Retire Later`: finds first later retirement age (up to +30 years) where projected investments meet the updated required nest egg, while continuing existing contribution streams.
+- `Higher Return`: binary-searches the return assumption needed to close the gap with current balances and entered contributions unchanged.
+
+Tooltip and methodology text were updated to match the new behavior in app and HTML report notes.
+
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-51 - Collapsed Investments header hid contribution activity when lump-sum balance was zero (MEDIUM -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Added a compact contribution badge in the collapsed Investments header that shows total entered annual contributions (`+X/yr contrib`) whenever contribution total is positive, independent of current lump-sum balance.
+
+**Files changed:** `src/App.jsx`
+
+### Cross-Surface Calculation Review (Session 9)
+
+Reviewed and re-validated the main connected surfaces after lever fixes:
+- Retirement Health card + levers
+- Surplus Deployment scenarios
+- Retirement Runway scenarios and control parity
+- Project to a Future Year + What-If
+- Key dashboard and Financial Health metrics
+
+**Evidence:**
+- `npm run test:release` -> PASS
+- `npm run test:audits` -> PASS
+- `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+### Test Harness Updates (Session 9)
+
+- Replaced `_dev/tests/auditor2_gap_levers.js` with parity assertions that verify applying each recommended lever closes the modeled gap.
+- Updated `_dev/tests/auditor1_gap_levers.js` to reflect current design intent and defer formula spot checks to the executable Auditor 2 harness.
