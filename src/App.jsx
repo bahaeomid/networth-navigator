@@ -2887,6 +2887,14 @@ const mIdx = cols.findIndex(c =>
     return annualSavings - annualInvestmentContribution;
   }, [annualSavings, annualInvestmentContribution]);
 
+  const investmentContributionExceedsCurrentSavings = useMemo(() => {
+    return annualInvestmentContribution > 0 && annualInvestmentContribution > annualSavings;
+  }, [annualInvestmentContribution, annualSavings]);
+
+  const investmentContributionSavingsShortfall = useMemo(() => {
+    return Math.max(0, annualInvestmentContribution - annualSavings);
+  }, [annualInvestmentContribution, annualSavings]);
+
   // Compute projected annual expenses for any given year using per-category growth rates
   const getProjectedExpenses = (targetYear, opts) => {
     const _opts = opts !== undefined ? opts : {};
@@ -7198,6 +7206,12 @@ const mIdx = cols.findIndex(c =>
                         {annualInvestmentContribution > 0 && (
                           <span style={{ fontSize: '0.68rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.12rem 0.4rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
                             +{formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr contrib
+                          </span>
+                        )}
+                        {investmentContributionExceedsCurrentSavings && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.66rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.12rem 0.36rem', whiteSpace: 'nowrap' }}>
+                            ⚠ over savings
+                            <InfoTooltip text={`Entered annual contributions (${formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr) exceed your current-year savings (${formatCurrencyDecimal(annualSavings, currency, exchangeRates)}/yr) by ${formatCurrencyDecimal(investmentContributionSavingsShortfall, currency, exchangeRates)}/yr. This is allowed; treat it as a stretch target unless you plan to reallocate cashflow.`} />
                           </span>
                         )}
                       </div>
