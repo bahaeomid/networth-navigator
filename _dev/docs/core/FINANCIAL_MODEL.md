@@ -92,7 +92,7 @@ otherAssets(y+1)  = otherAssets(y) × (1 + otherAssetGrowth)
 cash(y)          = constant (earns 0%, not compounded)
 ```
 
-Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year and can optionally end before retirement. The entered contribution amount is nominal in the start year; contribution growth compounds from that start year forward, not from today. The end year is inclusive. If no end year is set, the contribution continues through the final pre-retirement contribution year. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, Assets Over Time drilldown overlays, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning when planned investment contributions exceed projected savings surplus in any pre-retirement year, summarizes the affected range and examples, and directs users to the Cash Flow Over Time chart for full year-by-year context.
+Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year and can optionally end before retirement. The entered contribution amount is nominal in the From year; contribution growth compounds from that From year forward, not from today, and applies only through the inclusive To year. If no To year is set, the contribution continues through the final pre-retirement contribution year. Projection charts are annual opening snapshots: a contribution made during calendar year 2030 is included in `investments(2031)`, not the opening 2030 plotted point. This is consistent with drawdown timing, where the retirement-age plotted point is the opening balance before that year's retirement drawdown is applied into the next plotted point. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, Assets Over Time drilldown overlays, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning when planned investment contributions exceed projected savings surplus in any pre-retirement year, summarizes the affected range and examples, and directs users to the Cash Flow Over Time chart for full year-by-year context.
 
 ### Liability Amortization (Linear)
 
@@ -232,7 +232,7 @@ Solve extra annual contribution (binary search):
 extraMonthly = ceil(extraAnnual / 12)
 ```
 
-Shows how much additional monthly investment closes the gap when added as a new investment contribution stream (0% contribution growth) on top of existing investment-item contributions. This is a flat gap-closing lever, not the dynamic full-surplus scenario shown in Surplus Deployment.
+Shows how much additional monthly investment closes the gap when added as a new investment contribution stream (0% contribution growth) on top of existing investment-item contributions. The monthly value is rounded up so applying it closes the gap instead of leaving a small shortfall. This is a flat gap-closing lever, not the dynamic full-surplus scenario shown in Surplus Deployment.
 
 This lever is additional to the annual contributions entered on investment sub-items, because those contributions are already included in `projectedWealth`. Only undeployed surplus can offset the displayed monthly amount:
 

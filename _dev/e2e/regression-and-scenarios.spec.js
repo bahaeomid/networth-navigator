@@ -463,6 +463,33 @@ test('regression: assets over time investment drilldown includes annual contribu
   await expect(tooltip).toContainText(/Contribution Fund[\s\S]*AED\s(?!0(?:\D|$))[0-9]/);
 });
 
+test('regression: event marker legends toggle marker visibility state across charts', async ({ page }) => {
+  attachDialogHandler(page);
+  await page.goto('/');
+
+  await tabByName(page, 'Dashboard').click();
+
+  const milestoneButtons = page.getByRole('button', { name: 'Financial Milestone' });
+  await expect(milestoneButtons.first()).toHaveAttribute('aria-pressed', 'true');
+  expect(await milestoneButtons.count()).toBeGreaterThanOrEqual(3);
+
+  await milestoneButtons.first().click();
+  const milestoneCount = await milestoneButtons.count();
+  for (let i = 0; i < milestoneCount; i++) {
+    await expect(milestoneButtons.nth(i)).toHaveAttribute('aria-pressed', 'false');
+  }
+
+  const plannedExpenseButtons = page.getByRole('button', { name: 'Planned Expense' });
+  expect(await plannedExpenseButtons.count()).toBeGreaterThanOrEqual(1);
+  await expect(plannedExpenseButtons.first()).toHaveAttribute('aria-pressed', 'true');
+
+  await plannedExpenseButtons.first().click();
+  const plannedExpenseCount = await plannedExpenseButtons.count();
+  for (let i = 0; i < plannedExpenseCount; i++) {
+    await expect(plannedExpenseButtons.nth(i)).toHaveAttribute('aria-pressed', 'false');
+  }
+});
+
 test('regression: retire-later recommendation is reproducible and runway percentages are normalized', async ({ page }) => {
   attachDialogHandler(page);
   await page.goto('/');

@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 by Session 19
+**Last updated:** 2026-05-16 by Session 20
 
 ---
 
@@ -93,6 +93,9 @@
 | NEW-79 | Multi-year over-savings tooltip was too verbose for compact header space | LOW | O | FIXED | 18 | Tooltip now summarizes count/range with first/largest gaps and points users to Cash Flow Over Time for details |
 | NEW-80 | Project-to-Future-Year selector still showed the redundant AT label | LOW | O | FIXED | 18 | Project selector now uses the same compact chart-year display option |
 | NEW-81 | Investment annual contributions could not stop before retirement | MEDIUM | P | FIXED | 19 | Added inclusive contribution To year with compact stacked From/To UI and updated all contribution projection paths |
+| NEW-82 | Contribution timing looked offset because charts use opening annual snapshots | LOW | Q | FIXED | 20 | Kept the established push-then-grow convention and clarified From year/To year tooltip/docs copy |
+| NEW-83 | Investment From/To controls made the row visually unbalanced | LOW | Q | FIXED | 20 | Repacked the year controls as compact inline mini-rows inside the existing annual-contribution cell |
+| NEW-84 | Event marker legends were passive labels instead of visibility controls | LOW | Q | FIXED | 20 | Financial Milestone, Life Event, and Planned Expense legends now toggle marker/band visibility on applicable charts |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -1343,3 +1346,49 @@ Applied to Asset Allocation, Cash Flow, Pre-retirement Expenses, and Project to 
 **Findings blocked:** 0
 **Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Investment contribution phasing now supports start and inclusive end years across UI, calculations, docs, reports, and verification.
+
+---
+
+## SESSION 20 - 2026-05-16 - Codex
+
+**Picking up from:** User observations after the investment contribution To-year rollout.
+**Open findings at session start:** NEW-82 through NEW-84.
+**Session goal:** Clarify the contribution timing convention, rebalance the compact investment row, and make event-marker legends interactive without changing projection math.
+
+### NEW-82 - Contribution timing looked offset because charts use opening annual snapshots (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Confirmed the existing `wealthProjection` convention is consistent with the prior drawdown fix: each plotted year is an opening snapshot, then that year's contribution/growth/drawdown is applied into the next plotted year. Kept the calculation basis unchanged and updated tooltips/docs/report copy to clarify From year, To year, contribution growth, and why a 2030 contribution first appears in the 2031 plotted balance.
+
+### NEW-83 - Investment From/To controls made the row visually unbalanced (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Repacked the contribution-window controls into two compact inline mini-rows inside the annual-contribution cell. The From year and To year labels remain visible but no longer add a second tall label stack beside the amount input.
+
+### NEW-84 - Event marker legends were passive labels instead of visibility controls (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Replaced passive event legends with toggle buttons for Financial Milestone, Life Event, and Planned Expense markers. Net Worth and Assets Over Time expose milestone/life toggles; Cash Flow and Pre-retirement Expenses also expose Planned Expense toggles that hide single-year dots and recurring OTE bands.
+
+### Verification Chain (Session 20)
+
+- `npm run lint` -> PASS
+- `npm run build` -> PASS (existing Vite chunk-size warning only)
+- `npx playwright test _dev/e2e/regression-and-scenarios.spec.js -g "event marker legends|investment warning flags|to-year stops|assets over time investment drilldown" --reporter=list` -> PASS (4 tests)
+- `node _dev/tests/audit_phase4_formula_verification.js` -> PASS
+- `node _dev/tests/auditor2_gap_levers.js` -> PASS
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` -> PASS
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS (existing Vite chunk-size warning only)
+  - `npm run test:smoke` -> PASS (`16/16`)
+- Final artifact refresh: `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 20 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 3 - NEW-82, NEW-83, NEW-84
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Contribution timing is explicit, the investment contribution row is more balanced, and event marker legends now control chart marker visibility.

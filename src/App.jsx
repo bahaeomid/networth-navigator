@@ -151,7 +151,7 @@ const TOOLTIPS = {
   retirementAge: "The age you plan to stop working. Income stops and retirement expenses begin at this age.",
   lifeExpectancy: "Expected age of death for planning purposes. Standard is 90-95 years.",
   cash: "Liquid cash in bank accounts, emergency funds. Low/no growth expected.",
-  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution fields to model planned ongoing additions over a From/To year window; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the affected year(s).",
+  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution fields to model planned ongoing additions over a From year/To year window; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the affected year(s).",
   realEstate: "Property value (your home + investment properties). Appreciates based on real estate rate.",
   otherAssets: "Other valuable assets: business equity, collectibles, precious metals, vehicles, etc. Treated as illiquid — this category appreciates at the Other growth rate but does not contribute to SWR drawdown capacity. Only Investments and Cash are considered liquid for retirement funding purposes.",
   mortgage: "Outstanding mortgage balance on all properties. This affects net worth only; it does not create a cashflow expense. To reflect the payment in savings, enter the full annual principal + interest payment as a Pre-Retirement expense category with 0% growth and a phase-out year matching the loan payoff year. Keep the liability here for net worth accuracy. Avoid double-counting if that payment is already included in another expense category.",
@@ -807,16 +807,41 @@ const buildDefaultExpenseState = (cats) => {
 };
 
 // Extracted to module scope to prevent re-creation on every render
-const MilestoneLegend = () => (
-  <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap', marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
-    {Object.entries(MILESTONE_COLORS).filter(([key]) => key !== 'retirement' && key !== 'expense').map(([key, { color, label }]) => (
-      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, border: '2px solid white' }} />
-        <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>{label}</span>
-      </div>
-    ))}
-  </div>
-);
+const EventMarkerLegend = ({ hiddenMarkers, onToggle, includeExpense = false }) => {
+  const markerKeys = includeExpense ? ['milestone', 'life', 'expense'] : ['milestone', 'life'];
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      {markerKeys.map((key) => {
+        const { color, label } = MILESTONE_COLORS[key];
+        const isHidden = hiddenMarkers[key];
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={!isHidden}
+            onClick={() => onToggle(key)}
+            title={`${isHidden ? 'Show' : 'Hide'} ${label} markers`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.25rem 0.45rem',
+              background: isHidden ? 'rgba(255,255,255,0.04)' : 'transparent',
+              border: `1px solid ${isHidden ? 'rgba(255,255,255,0.08)' : 'transparent'}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              opacity: isHidden ? 0.38 : 1,
+              transition: 'opacity 0.2s, background 0.2s, border-color 0.2s'
+            }}
+          >
+            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, border: '2px solid white', display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.82rem', color, fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 // Extracted to module scope to prevent re-creation on every render
 const ExchangeRateInput = ({ currency, exchangeRates, setExchangeRates, fxStatus }) => {
@@ -1097,6 +1122,7 @@ const NetWorthNavigator = () => {
   const [fxStatus, setFxStatus] = useState('cached');
   const [activeTab, setActiveTab] = useState('profile');
   const [hiddenLines, setHiddenLines] = useState({});
+  const [hiddenEventMarkers, setHiddenEventMarkers] = useState({});
   const [nestEggSwr, setNestEggSwr] = useState(4);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({ surplusDeployment: true });
@@ -2327,7 +2353,7 @@ const NetWorthNavigator = () => {
       <p>The projections are sensitive to the following assumptions, which are user-defined and applied consistently across all scenarios unless otherwise stated:</p>
       <ul>
         <li><strong>Investment return (${assumptions.investmentReturn}% p.a.).</strong> Applied to the liquid investment portfolio (pre- and post-retirement). This is a nominal, pre-fee return. Adviser fees, fund management charges, and transaction costs are not deducted.</li>
-        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If From/To years are set, that item contributes only within that inclusive pre-retirement window; contribution growth compounds from the From year forward. The model does not cap contributions to calculated surplus; the app flags any pre-retirement years where planned contributions exceed projected savings so users can review affordability.</li>
+        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If From year/To year values are set, that item contributes only within that inclusive pre-retirement window; contribution growth compounds from the From year forward and stops after the To year. Projection charts show annual opening snapshots, so contributions made during a calendar year first appear in the following year's plotted balance. The model does not cap contributions to calculated surplus; the app flags any pre-retirement years where planned contributions exceed projected savings so users can review affordability.</li>
         <li><strong>Real estate appreciation (${assumptions.realEstateAppreciation}% p.a.).</strong> Applied uniformly to the entire real estate portfolio. Regional, property-type, and leverage effects are not modelled.</li>
         <li><strong>Salary growth (${assumptions.salaryGrowth}% p.a.).</strong> Applied to earned income until the stated retirement age, after which salary is assumed to cease.</li>
         <li><strong>Passive income growth (${assumptions.passiveGrowth}% p.a.) and other income growth (${assumptions.otherIncomeGrowth}% p.a.).</strong> Continued post-retirement unless an end year is specified on the income sub-item.</li>
@@ -2414,7 +2440,7 @@ const NetWorthNavigator = () => {
       <p>The <strong>overall verdict</strong> is a 6-state classification combining Q1 (on track vs gap) and Q2 (≥80% strong, 60–79% caution, &lt;60% weak): Strong · Moderate risk · High risk · Gap with strong odds · Gap detected · High risk with gap and low odds.</p>
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
-        <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. This is not the dynamic full-surplus scenario; those year-by-year strategies are shown separately in Surplus Deployment. Only undeployed current-year surplus (${fmt(undeployedSurplus)}/yr in ${currentYear}, after investment contributions active this year) can offset the additional requirement.</li>
+        <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. The displayed monthly value is rounded up so entering it should close the gap rather than leave a small shortfall. This is not the dynamic full-surplus scenario; those year-by-year strategies are shown separately in Surplus Deployment. Only undeployed current-year surplus (${fmt(undeployedSurplus)}/yr in ${currentYear}, after investment contributions active this year) can offset the additional requirement.</li>
         <li><strong>Retire Later.</strong> The number of additional working years needed if Planned Retirement Age changes and all other inputs remain unchanged. Existing investment-item annual contributions continue through the later retirement date unless their To year ends sooner. Displays "Gap too large" if not achievable within 30 extra years or before life expectancy.</li>
         <li><strong>Higher Return.</strong> The Investment return assumption required to reach the required nest egg by retirement with current investment balances and entered annual contributions unchanged. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
@@ -3625,7 +3651,10 @@ const mIdx = cols.findIndex(c =>
   const CustomDot = (props) => {
     const { cx, cy, payload } = props;
     const milestones = getMilestoneEvents();
-    const allAtAge = milestones.filter(m => m.age === payload.age);
+    const allAtAge = milestones.filter(m =>
+      m.age === payload.age &&
+      ((m.type === 'milestone' && !hiddenEventMarkers.milestone) || (m.type === 'life' && !hiddenEventMarkers.life) || m.type === 'retirement')
+    );
     
     // Prefer non-retirement events — retirement has its own vertical line
     const milestone = allAtAge.find(m => m.type !== 'retirement') || allAtAge[0];
@@ -3651,12 +3680,12 @@ const mIdx = cols.findIndex(c =>
     const age = payload.age;
     const year = currentYear + (age - profile.currentAge);
     
-    const wealthMilestone = wealthMilestones.find(m => m.age === age);
-    const lifeEvent = lifeEvents.find(e => e.year === year);
+    const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === age) : null;
+    const lifeEvent = !hiddenEventMarkers.life ? lifeEvents.find(e => e.year === year) : null;
     // Only single-year OTEs get dots; recurring OTEs (with endYear > year) are shown via band
-    const singleYearOTE = normalizedOneTimeExpenses.find(e =>
+    const singleYearOTE = !hiddenEventMarkers.expense ? normalizedOneTimeExpenses.find(e =>
       e.year === year && !(e.endYear && e.endYear > e.year)
-    );
+    ) : null;
     
     // Composite dot: when milestone and life event coincide
     if (wealthMilestone && lifeEvent) {
@@ -3698,6 +3727,10 @@ const mIdx = cols.findIndex(c =>
   
   const toggleLine = (dataKey) => {
     setHiddenLines(prev => ({ ...prev, [dataKey]: !prev[dataKey] }));
+  };
+
+  const toggleEventMarker = (markerKey) => {
+    setHiddenEventMarkers(prev => ({ ...prev, [markerKey]: !prev[markerKey] }));
   };
   
   // Fixed CustomLegend - always visible, updates on click
@@ -4336,8 +4369,8 @@ const mIdx = cols.findIndex(c =>
                       const pt = netWorthChartData.find(d => d.age === label);
                       const currentYear = new Date().getFullYear();
                       const year = pt?.year ?? (currentYear + (label - profile.currentAge));
-                      const wealthMilestone = wealthMilestones.find(m => m.age === label);
-                      const lifeEvent = lifeEvents.find(e => e.year === year);
+                      const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === label) : null;
+                      const lifeEvent = !hiddenEventMarkers.life ? lifeEvents.find(e => e.year === year) : null;
 
                       const isDebtFree = debtFreeAge === label;
                       return (
@@ -4457,7 +4490,7 @@ const mIdx = cols.findIndex(c =>
                   />
                 </AreaChart>
               </ResponsiveContainer>
-              <MilestoneLegend />
+              <EventMarkerLegend hiddenMarkers={hiddenEventMarkers} onToggle={toggleEventMarker} />
             </div>
 
             {/* Asset Charts Grid - 2 Columns */}
@@ -4859,9 +4892,9 @@ const mIdx = cols.findIndex(c =>
                         content={({ active, payload, label }) => {
                           if (!active || !payload || !payload.length) return null;
                           const dataPoint = assetChartData.find(d => d.age === label);
-                          const wealthMilestone = wealthMilestones.find(m => m.age === label);
+                          const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === label) : null;
                           const year = currentYear + (label - profile.currentAge);
-                          const lifeEvent = lifeEvents.find(e => e.year === year);
+                          const lifeEvent = !hiddenEventMarkers.life ? lifeEvents.find(e => e.year === year) : null;
                           return (
                             <div style={{ padding: '0.75rem', minWidth: '210px' }}>
                               <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#60a5fa', marginBottom: '0.4rem' }}>
@@ -4958,10 +4991,10 @@ const mIdx = cols.findIndex(c =>
                       <Line type="monotone" dataKey="totalAssets" name="Total" stroke="#22c55e" strokeWidth={3}
                         dot={(props) => {
                           const { cx, cy, payload } = props;
-                          const wealthMilestone = wealthMilestones.find(m => m.age === payload.age);
+                          const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === payload.age) : null;
                           if (wealthMilestone) return <circle key={payload.age} cx={cx} cy={cy} r={6} fill="#34d399" stroke="white" strokeWidth={2} />;
                           const yr = currentYear + (payload.age - profile.currentAge);
-                          if (lifeEvents.find(e => e.year === yr)) return <circle key={payload.age} cx={cx} cy={cy} r={5} fill="#60a5fa" stroke="white" strokeWidth={2} />;
+                          if (!hiddenEventMarkers.life && lifeEvents.find(e => e.year === yr)) return <circle key={payload.age} cx={cx} cy={cy} r={5} fill="#60a5fa" stroke="white" strokeWidth={2} />;
                           return null;
                         }}
                         activeDot={{ r: 5 }} hide={hiddenAssetLines['totalAssets']}
@@ -4982,14 +5015,7 @@ const mIdx = cols.findIndex(c =>
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap', marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
-                    {Object.entries(MILESTONE_COLORS).filter(([key]) => key !== 'retirement' && key !== 'expense').map(([key, { color, label }]) => (
-                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, border: '2px solid white' }} />
-                        <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>{label}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <EventMarkerLegend hiddenMarkers={hiddenEventMarkers} onToggle={toggleEventMarker} />
                 </div>
               );
             })()}
@@ -5038,9 +5064,9 @@ const mIdx = cols.findIndex(c =>
                       const pt = cashFlowChartData.find(d => d.age === label);
                       const currentYear = new Date().getFullYear();
                       const year = pt?.year ?? (currentYear + (label - profile.currentAge));
-                      const wealthMilestone = wealthMilestones.find(m => m.age === label);
-                      const lifeEvent = lifeEvents.find(e => e.year === year);
-                      const oneTimeHits = normalizedOneTimeExpenses.filter(e => year >= e.year && year <= (e.endYear || e.year));
+                      const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === label) : null;
+                      const lifeEvent = !hiddenEventMarkers.life ? lifeEvents.find(e => e.year === year) : null;
+                      const oneTimeHits = !hiddenEventMarkers.expense ? normalizedOneTimeExpenses.filter(e => year >= e.year && year <= (e.endYear || e.year)) : [];
                       const isPreRetirement = label < profile.retirementAge;
                       return (
                         <div style={{ minWidth: '230px' }}>
@@ -5213,7 +5239,7 @@ const mIdx = cols.findIndex(c =>
                   )}
                   
                   {/* OTE shaded bands — only when expenses line is visible; vertical labels; alternating opacity */}
-                  {!hiddenLines.expenses && (() => {
+                  {!hiddenLines.expenses && !hiddenEventMarkers.expense && (() => {
                     let bandIndex = 0;
                     return normalizedOneTimeExpenses.map(e => {
                       const currentYear = new Date().getFullYear();
@@ -5242,20 +5268,7 @@ const mIdx = cols.findIndex(c =>
                   <Line type="monotone" dataKey="savings" stroke="#60a5fa" strokeWidth={2} name="Savings" dot={false} hide={hiddenLines.savings} />
                 </LineChart>
               </ResponsiveContainer>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '8px', height: '8px', background: '#34d399', borderRadius: '50%', border: '2px solid white' }} />
-                  <span style={{ fontSize: '0.8rem', color: '#34d399', fontWeight: 600 }}>Financial Milestone</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '8px', height: '8px', background: '#60a5fa', borderRadius: '50%', border: '2px solid white' }} />
-                  <span style={{ fontSize: '0.8rem', color: '#60a5fa', fontWeight: 600 }}>Life Event</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '8px', height: '8px', background: '#f59e0b', borderRadius: '50%', border: '2px solid white' }} />
-                  <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600 }}>Planned Expense</span>
-                </div>
-              </div>
+              <EventMarkerLegend hiddenMarkers={hiddenEventMarkers} onToggle={toggleEventMarker} includeExpense />
 
               {/* ── Surplus Deployment — collapsible subsection ── */}
               {(() => {
@@ -6003,14 +6016,14 @@ const mIdx = cols.findIndex(c =>
                                 <div>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                                     <div style={{ padding: '0.85rem', background: saveMoreNA ? 'rgba(255,255,255,0.02)' : 'rgba(96,165,250,0.07)', borderRadius: '8px', border: `1px solid ${saveMoreNA ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario. This is solved as an annualized contribution: adding ${extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'the shown monthly amount × 12'}/yr as a new investment item with 0% contribution growth should close the retirement gap, all else unchanged. Annual contributions already entered on investment items are included in the base projection within their configured From/To windows. This is not the dynamic full-surplus scenario; use Surplus Deployment for that. Only undeployed current-year surplus can offset it: current surplus minus investment contributions active this year.`} /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario. This is solved as an annualized contribution and rounded up to a whole monthly amount, so applying it may leave a small surplus rather than falling just short. Adding ${extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'the shown monthly amount × 12'}/yr as a new investment item with 0% contribution growth should close the retirement gap, all else unchanged. Annual contributions already entered on investment items are included in the base projection within their configured From year/To year windows. This is not the dynamic full-surplus scenario; use Surplus Deployment for that. Only undeployed current-year surplus can offset it: current surplus minus investment contributions active this year.`} /></div>
                                       {saveMoreNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Not calculable</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrencyDecimal(extraMonthly, currency, exchangeRates)}/mo</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>add as {extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'monthly × 12'}/yr contribution · invested at {assumptions.investmentReturn}%/yr</div>
                                       {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed current-year surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo can offset this{currentYearInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(currentYearInvestmentContribution / 12, currency, exchangeRates)}/mo active contributions` : ''}</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, applying each item's configured From/To contribution window. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, applying each item's configured From year/To year contribution window. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
                                       {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>{retireLaterBeyondLife ? 'Would require retiring at or after life expectancy' : 'Gap too large to close by working longer'}</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · contribution windows honored`}</div>
@@ -6911,10 +6924,16 @@ const mIdx = cols.findIndex(c =>
                           contentStyle={{ background: 'rgba(10,22,40,0.96)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: '10px', backdropFilter: 'blur(8px)', color: '#e8e9ed' }}
                           content={({ active, payload, label }) => {
                             if (!active || !payload || !payload.length) return null;
-                            const pt = chartData.find(d => d.year === label);
+                            const rawPt = chartData.find(d => d.year === label);
+                            const pt = rawPt ? {
+                              ...rawPt,
+                              lifeEventLabel: hiddenEventMarkers.life ? null : rawPt.lifeEventLabel,
+                              activeOTEsList: hiddenEventMarkers.expense ? [] : rawPt.activeOTEsList,
+                              singleYearOTEsList: hiddenEventMarkers.expense ? [] : rawPt.singleYearOTEsList
+                            } : rawPt;
                             const yearsFrom = label - currentYear;
                             // Check for wealth milestone - get actual net worth from wealthProjection
-                            const wealthMilestone = wealthMilestones.find(m => m.age === pt?.age);
+                            const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === pt?.age) : null;
                             const wealthData = wealthProjection.find(d => d.age === pt?.age);
                             return (
                               <div style={{ minWidth: '200px' }}>
@@ -6927,7 +6946,7 @@ const mIdx = cols.findIndex(c =>
                                   )}
                                   {wealthMilestone && <span style={{ fontSize: '0.7rem', color: '#34d399', display: 'block', marginTop: '0.15rem' }}>💰 {wealthMilestone.label} USD</span>}
                                   {pt?.lifeEventLabel && <span style={{ fontSize: '0.7rem', color: '#60a5fa', display: 'block', marginTop: '0.15rem' }}>🔵 {pt.lifeEventLabel}</span>}
-                                  {pt?.activeOTEsList?.length > 0 && (() => {
+                                  {!hiddenEventMarkers.expense && pt?.activeOTEsList?.length > 0 && (() => {
                                     // Filter OTEs to only those relevant to the currently visible lines
                                     // In drill-down mode: show only OTEs belonging to a visible subcategory line
                                     // In aggregate mode: show all active OTEs
@@ -7004,9 +7023,9 @@ const mIdx = cols.findIndex(c =>
                         <Line type="monotone" dataKey="total" name="Total (incl. planned)" stroke="#22c55e" strokeWidth={3}
                           dot={(props) => {
                             const { cx, cy, payload } = props;
-                            const hasMilestone = wealthMilestones.find(m => m.age === payload.age);
-                            const hasLifeEvent = !!payload.lifeEventLabel;
-                             const hasSingleOTE = (payload.singleYearOTEsList || []).length > 0;
+                            const hasMilestone = !hiddenEventMarkers.milestone && wealthMilestones.find(m => m.age === payload.age);
+                            const hasLifeEvent = !hiddenEventMarkers.life && !!payload.lifeEventLabel;
+                            const hasSingleOTE = !hiddenEventMarkers.expense && (payload.singleYearOTEsList || []).length > 0;
                             if (hasMilestone && hasLifeEvent) {
                               return <g key={payload.year}><circle cx={cx} cy={cy} r={7} fill="none" stroke="#34d399" strokeWidth={2.5} strokeOpacity={0.85} /><circle cx={cx} cy={cy} r={4} fill="#60a5fa" stroke="white" strokeWidth={1.5} /></g>;
                             }
@@ -7026,7 +7045,7 @@ const mIdx = cols.findIndex(c =>
                         <Line type="monotone" dataKey="essential" name="Essential" stroke="#ef4444" strokeWidth={2} strokeDasharray="6 3"
                           dot={(props) => {
                             const { cx, cy, payload } = props;
-                            const hasSingleOTE = (payload.singleYearOTEsList || []).some(e => {
+                            const hasSingleOTE = !hiddenEventMarkers.expense && (payload.singleYearOTEsList || []).some(e => {
                               const cat = expenseCategories.find(c => c.key === e.category);
                               return cat && (expenseTags[cat.key] || cat.group) === 'essential';
                             });
@@ -7037,7 +7056,7 @@ const mIdx = cols.findIndex(c =>
                         <Line type="monotone" dataKey="discretionary" name="Discretionary" stroke="#60a5fa" strokeWidth={2} strokeDasharray="6 3"
                           dot={(props) => {
                             const { cx, cy, payload } = props;
-                            const hasSingleOTE = (payload.singleYearOTEsList || []).some(e => {
+                            const hasSingleOTE = !hiddenEventMarkers.expense && (payload.singleYearOTEsList || []).some(e => {
                               const cat = expenseCategories.find(c => c.key === e.category);
                               return cat && (expenseTags[cat.key] || cat.group) !== 'essential';
                             });
@@ -7050,7 +7069,7 @@ const mIdx = cols.findIndex(c =>
                             dot={(props) => {
                               const { cx, cy, payload } = props;
                               // Show OTE dot ONLY for single-year OTEs that belong to this category
-                              const hasOTE = (payload.singleYearOTEsList || []).some(e => e.category === cat.key);
+                              const hasOTE = !hiddenEventMarkers.expense && (payload.singleYearOTEsList || []).some(e => e.category === cat.key);
                               if (hasOTE) return <circle cx={cx} cy={cy} r={5} fill="#f59e0b" stroke="white" strokeWidth={2} key={payload.year} />;
                               return null;
                             }}
@@ -7065,7 +7084,7 @@ const mIdx = cols.findIndex(c =>
                         />
 
                         {/* OTE shaded bands — filtered by visible lines; vertical rotated labels to avoid overlap */}
-                        {(() => {
+                        {!hiddenEventMarkers.expense && (() => {
                           // Determine which aggregate lines are visible
                           const totalVisible = !hiddenCalcLines['total'];
                           const essentialVisible = !hiddenCalcLines['essential'];
@@ -7119,21 +7138,7 @@ const mIdx = cols.findIndex(c =>
                         })()}
                       </LineChart>
                     </ResponsiveContainer>
-                        {/* Milestone indicators - matching Overview style */}
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{ width: '8px', height: '8px', background: '#34d399', borderRadius: '50%', border: '2px solid white' }} />
-                            <span style={{ fontSize: '0.8rem', color: '#34d399', fontWeight: 600 }}>Financial Milestone</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{ width: '8px', height: '8px', background: '#60a5fa', borderRadius: '50%', border: '2px solid white' }} />
-                            <span style={{ fontSize: '0.8rem', color: '#60a5fa', fontWeight: 600 }}>Life Event</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{ width: '8px', height: '8px', background: '#f59e0b', borderRadius: '50%', border: '2px solid white' }} />
-                            <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600 }}>Planned Expense</span>
-                          </div>
-                        </div>
+                        <EventMarkerLegend hiddenMarkers={hiddenEventMarkers} onToggle={toggleEventMarker} includeExpense />
                   </div>
 
                   {/* ─── Phase 3B: Future Year Projection Panel ─── */}
@@ -7573,7 +7578,7 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.34rem', flexWrap: 'nowrap', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
                         <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flex: '0 0 auto' }}>
                           Investments
-                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution window. Annual contrib is the planned addition each year from the From year through the inclusive To year; blank/default To means the final pre-retirement contribution year. Growth compounds from the From year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the affected year(s) to review in Cash Flow Over Time." />
+                          <InfoTooltip text="Balance is always today's current balance for that investment item - it does not change based on the contribution window. Annual contrib is the planned addition made in each calendar year from the From year through the inclusive To year; blank/default To year means the final pre-retirement contribution year. Balance charts show annual opening snapshots, so a contribution made during 2030 first appears in the 2031 balance point. Contribution growth applies only inside the From year to To year window. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the affected year(s) to review in Cash Flow Over Time." />
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace', flex: '0 0 auto' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
                         {annualInvestmentContribution > 0 && (() => {
@@ -7589,7 +7594,7 @@ const mIdx = cols.findIndex(c =>
                           const singleEndYear = singleItem ? getContributionEndYear(singleItem, cy, retirementYear) : null;
                           const showFromYear = isSingle && singleStartYear > cy;
                           const showToYear = isSingle && Boolean(singleItem?.contribEndYear);
-                          const intervalText = (item) => `${item.name}: +${formatCurrencyDecimal(item.annualContrib, currency, exchangeRates)}/yr from ${getContributionStartYear(item, cy)} to ${getContributionEndYear(item, cy, retirementYear)}`;
+                          const intervalText = (item) => `${item.name}: +${formatCurrencyDecimal(item.annualContrib, currency, exchangeRates)}/yr from year ${getContributionStartYear(item, cy)} to year ${getContributionEndYear(item, cy, retirementYear)}`;
                           if (isStaged) {
                             return (
                               <span style={{ fontSize: '0.58rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.08rem 0.26rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.16rem', flex: '0 0 auto' }}>
@@ -7695,11 +7700,11 @@ const mIdx = cols.findIndex(c =>
                               setAssets({ ...assets, investmentItems: newItems, investments: total });
                             }} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 58px' : 'minmax(0, 1fr)', columnGap: '0.45rem', rowGap: '0.25rem', alignItems: 'end' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the From year — enter what you plan to contribute in that year. Contributions run from From through To, inclusive, and default through the final pre-retirement contribution year. Contribution growth compounds from the From year forward. Balance (today's value) and the contribution window are independent — the balance field always reflects the current balance today." /></span>
-                          {(item.annualContrib || 0) > 0 && <div style={{ gridColumn: 2, gridRow: '1 / span 2', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '0.22rem', alignSelf: 'stretch' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
-                              <span style={{ fontSize: '0.52rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', lineHeight: 1 }}>From</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 66px' : 'minmax(0, 1fr)', columnGap: '0.4rem', rowGap: '0.25rem', alignItems: 'end' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the From year - enter what you plan to contribute in that calendar year. Contributions run from the From year through the inclusive To year, and default through the final pre-retirement contribution year. Contribution growth applies only inside that From year to To year window. Balance charts show annual opening snapshots, so the contribution affects the following year's plotted balance." /></span>
+                          {(item.annualContrib || 0) > 0 && <div style={{ gridColumn: 2, gridRow: '1 / span 2', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '0.18rem', alignSelf: 'end' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px' }}>
+                              <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>From</span>
                               <ContribStartYearInput
                                 value={item.contribStartYear || currentCalendarYear}
                                 onChange={(yr) => {
@@ -7714,12 +7719,12 @@ const mIdx = cols.findIndex(c =>
                                 minYear={currentCalendarYear}
                                 maxYear={maxContributionStartYear}
                                 width="58px"
-                                title="First calendar year this annual contribution is made"
-                                style={{ padding: '0.18rem 0.2rem', fontSize: '0.68rem' }}
+                                title="From year: first calendar year this annual contribution is made"
+                                style={{ padding: 0, height: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', width: '100%' }}
                               />
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
-                              <span style={{ fontSize: '0.52rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', lineHeight: 1 }}>To</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px' }}>
+                              <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>To</span>
                               <ContribStartYearInput
                                 value={item.contribEndYear || maxContributionStartYear}
                                 onChange={(yr) => {
@@ -7731,8 +7736,8 @@ const mIdx = cols.findIndex(c =>
                                 minYear={item.contribStartYear || currentCalendarYear}
                                 maxYear={maxContributionStartYear}
                                 width="58px"
-                                title="Final calendar year this annual contribution is made"
-                                style={{ padding: '0.18rem 0.2rem', fontSize: '0.68rem' }}
+                                title="To year: final calendar year this annual contribution is made"
+                                style={{ padding: 0, height: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', width: '100%' }}
                               />
                             </div>
                           </div>}
@@ -7743,7 +7748,7 @@ const mIdx = cols.findIndex(c =>
                               }} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Growth <InfoTooltip text="Annual rate at which this contribution grows, compounding from the contribution start year forward. Example: 3%/yr means the year-2 contribution is 3% higher than year-1, and so on." /></span>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Growth <InfoTooltip text="Annual rate at which this contribution grows inside the From year to To year window. Example: 3%/yr means the contribution in the second active contribution year is 3% higher than the From year amount." /></span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                             <input
                               type="number"
@@ -8648,6 +8653,7 @@ const mIdx = cols.findIndex(c =>
                   setExpenseCategories(DEFAULT_EXPENSE_CATEGORIES);
                   setNestEggSwr(4);
                   setHiddenLines({});
+                  setHiddenEventMarkers({});
                   setHiddenCalcLines({});
                   setHiddenAssetLines({});
                   setSensitivityAdj([]);
