@@ -1,0 +1,383 @@
+{
+  "generatedAt": "2026-05-16T03:53:38.438Z",
+  "sourceCaptureGeneratedAt": "2026-05-16T03:53:14.968Z",
+  "sourceExtractedGeneratedAt": "2026-05-16T03:53:14.968Z",
+  "totals": {
+    "checks": 44,
+    "passed": 44,
+    "failed": 0
+  },
+  "elementSummary": [
+    {
+      "element": "5 Key Metrics",
+      "pass": 5,
+      "fail": 0
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "pass": 7,
+      "fail": 0
+    },
+    {
+      "element": "Pre-retirement Expenses Over Time",
+      "pass": 1,
+      "fail": 0
+    },
+    {
+      "element": "Project to a Future Year",
+      "pass": 3,
+      "fail": 0
+    },
+    {
+      "element": "What-If Scenarios",
+      "pass": 3,
+      "fail": 0
+    },
+    {
+      "element": "Net Worth Over Time",
+      "pass": 1,
+      "fail": 0
+    },
+    {
+      "element": "Assets Over Time",
+      "pass": 1,
+      "fail": 0
+    },
+    {
+      "element": "Cash Flow Over Time",
+      "pass": 1,
+      "fail": 0
+    },
+    {
+      "element": "Surplus Deployment",
+      "pass": 4,
+      "fail": 0
+    },
+    {
+      "element": "Retirement Health",
+      "pass": 4,
+      "fail": 0
+    },
+    {
+      "element": "Retirement Runway",
+      "pass": 6,
+      "fail": 0
+    },
+    {
+      "element": "Runway Control Parity",
+      "pass": 8,
+      "fail": 0
+    }
+  ],
+  "failures": [],
+  "checks": [
+    {
+      "element": "5 Key Metrics",
+      "metric": "Net Worth",
+      "expected": 3200000,
+      "observed": 3200000,
+      "pass": true
+    },
+    {
+      "element": "5 Key Metrics",
+      "metric": "Debt Free Age",
+      "expected": 62,
+      "observed": 62,
+      "pass": true
+    },
+    {
+      "element": "5 Key Metrics",
+      "metric": "First $1M USD Year",
+      "expected": 2027,
+      "observed": 2027,
+      "pass": true
+    },
+    {
+      "element": "5 Key Metrics",
+      "metric": "Years To Planned Retirement",
+      "expected": 18,
+      "observed": 18,
+      "pass": true
+    },
+    {
+      "element": "5 Key Metrics",
+      "metric": "SWR Needed Today",
+      "expected": 83.18675279396825,
+      "observed": 83.2,
+      "pass": true
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "metric": "Savings Rate",
+      "expected": 41.77758620689655,
+      "observed": 41.8,
+      "pass": true
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "metric": "NW Multiple",
+      "expected": 5.333333333333333,
+      "observed": 5.3,
+      "pass": true
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "metric": "Debt Ratio",
+      "expected": 32.631578947368425,
+      "observed": 32.6,
+      "pass": true
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "metric": "Emergency Fund (months)",
+      "expected": 3.405490242530131,
+      "observed": 3.4,
+      "pass": true
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "metric": "Investment Mix",
+      "expected": 12.631578947368421,
+      "observed": 12.6,
+      "pass": true
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "metric": "Retirement Funding",
+      "expected": 14.938219827834216,
+      "observed": 15,
+      "pass": true
+    },
+    {
+      "element": "7 Financial Health Cards",
+      "metric": "Income Replacement",
+      "expected": 40.75531609195402,
+      "observed": 41,
+      "pass": true
+    },
+    {
+      "element": "Pre-retirement Expenses Over Time",
+      "metric": "Current Annual Total",
+      "expected": 405228,
+      "observed": 405200,
+      "pass": true
+    },
+    {
+      "element": "Project to a Future Year",
+      "metric": "Low Scenario",
+      "expected": 518484,
+      "observed": 518500,
+      "pass": true
+    },
+    {
+      "element": "Project to a Future Year",
+      "metric": "Base Scenario",
+      "expected": 585657,
+      "observed": 585700,
+      "pass": true
+    },
+    {
+      "element": "Project to a Future Year",
+      "metric": "High Scenario",
+      "expected": 691235,
+      "observed": 691200,
+      "pass": true
+    },
+    {
+      "element": "What-If Scenarios",
+      "metric": "Adjusted Scenario Total",
+      "expected": 615430,
+      "observed": 615400,
+      "pass": true
+    },
+    {
+      "element": "What-If Scenarios",
+      "metric": "Delta vs Base (amount)",
+      "expected": 29773,
+      "observed": 29800,
+      "pass": true
+    },
+    {
+      "element": "What-If Scenarios",
+      "metric": "Delta vs Base (%)",
+      "expected": 5.083692331859774,
+      "observed": 5.1,
+      "pass": true
+    },
+    {
+      "element": "Net Worth Over Time",
+      "metric": "Exhaustion Age",
+      "expected": 60,
+      "observed": 60,
+      "pass": true
+    },
+    {
+      "element": "Assets Over Time",
+      "metric": "Current Total Assets",
+      "expected": 4750000,
+      "observed": 4800000,
+      "pass": true
+    },
+    {
+      "element": "Cash Flow Over Time",
+      "metric": "Current Savings (from annual)",
+      "expected": 290772,
+      "observed": 291000,
+      "pass": true
+    },
+    {
+      "element": "Surplus Deployment",
+      "metric": "Invest-All Extra At Retirement",
+      "expected": 8231173.763486639,
+      "observed": 8199999.999999999,
+      "pass": true
+    },
+    {
+      "element": "Surplus Deployment",
+      "metric": "Clear Debt First Debt-Free Age",
+      "expected": 43,
+      "observed": 43,
+      "pass": true
+    },
+    {
+      "element": "Surplus Deployment",
+      "metric": "Custom Split 100/0 FI Age",
+      "expected": 62,
+      "observed": 62,
+      "pass": true
+    },
+    {
+      "element": "Surplus Deployment",
+      "metric": "Custom Split 0/100 FI Age",
+      "expected": 78,
+      "observed": 78,
+      "pass": true
+    },
+    {
+      "element": "Retirement Health",
+      "metric": "Required Nest Egg",
+      "expected": 12478012.919095239,
+      "observed": 12500000,
+      "pass": true
+    },
+    {
+      "element": "Retirement Health",
+      "metric": "Projected Investments @55",
+      "expected": 1863993,
+      "observed": 1900000,
+      "pass": true
+    },
+    {
+      "element": "Retirement Health",
+      "metric": "Gap",
+      "expected": -10614019.919095239,
+      "observed": -10600000,
+      "pass": true
+    },
+    {
+      "element": "Retirement Health",
+      "metric": "Save More Lever (monthly)",
+      "expected": null,
+      "observed": 27300,
+      "pass": true
+    },
+    {
+      "element": "Retirement Runway",
+      "metric": "Baseline Pessimistic Years",
+      "expected": 5,
+      "observed": 5,
+      "pass": true
+    },
+    {
+      "element": "Retirement Runway",
+      "metric": "Baseline Base Years",
+      "expected": 5,
+      "observed": 5,
+      "pass": true
+    },
+    {
+      "element": "Retirement Runway",
+      "metric": "Baseline Optimistic Years",
+      "expected": 5,
+      "observed": 5,
+      "pass": true
+    },
+    {
+      "element": "Retirement Runway",
+      "metric": "Perturbed Pessimistic Years",
+      "expected": 4,
+      "observed": 4,
+      "pass": true
+    },
+    {
+      "element": "Retirement Runway",
+      "metric": "Perturbed Optimistic Years",
+      "expected": 24,
+      "observed": 24,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Perturbed Pessimistic Return Offset",
+      "expected": -5.5,
+      "observed": -5.5,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Perturbed Pessimistic Spend Increase",
+      "expected": 20,
+      "observed": 20,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Perturbed Optimistic Return Offset",
+      "expected": 6,
+      "observed": 6,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Perturbed Optimistic Spend Cut",
+      "expected": 40,
+      "observed": 40,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Reset Pessimistic Return Matches Baseline",
+      "expected": 0,
+      "observed": 0,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Reset Pessimistic Spend Matches Baseline",
+      "expected": 0,
+      "observed": 0,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Reset Optimistic Return Matches Baseline",
+      "expected": 0,
+      "observed": 0,
+      "pass": true
+    },
+    {
+      "element": "Runway Control Parity",
+      "metric": "Reset Optimistic Spend Matches Baseline",
+      "expected": 0,
+      "observed": 0,
+      "pass": true
+    },
+    {
+      "element": "Retirement Runway",
+      "metric": "Reset Matches Baseline (Pessimistic Years)",
+      "expected": 5,
+      "observed": 5,
+      "pass": true
+    }
+  ]
+}

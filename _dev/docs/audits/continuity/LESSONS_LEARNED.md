@@ -3,7 +3,7 @@
 **Project:** NetWorth Navigator v2.0.0
 **Domain:** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-04-20 (Session 6)
+**Last updated:** 2026-05-16 (Session 13)
 
 ---
 
@@ -232,3 +232,29 @@ Findings in batch: NEW-52, NEW-55, NEW-56
 - Export report liability/dependent interpolations now consistently use `escapeHtml(...)`.
 - `_dev/tests/run_all_audits.js` now reports gating and advisory outcomes separately.
 - Docs index pointers now reference `AUDIT_REPORT_2026-05-12-codebase-auditor-full.md` as current ground truth.
+
+---
+
+## Batch Synthesis - Session 13 - 2026-05-16
+Findings in batch: NEW-57, NEW-58, NEW-59, NEW-60, NEW-61, NEW-62, NEW-63, NEW-64, NEW-65
+
+### Patterns observed
+
+1. Future-dated configuration can accidentally leak into current-year metrics when code sums all configured values instead of only active values.
+2. Tooltip/detail surfaces can diverge from projection logic even when top-level charts remain correct.
+3. UI-control changes are incomplete unless persistence, import/export, reset, tests, and generated verification artifacts are updated together.
+4. Small visual regressions in dense financial cards often come from label wrapping, badge crowding, or ungrouped controls rather than calculation defects.
+
+### Principles extracted
+
+- **Separate configured commitments from active commitments:** For current-year savings and surplus math, gate annual investment contributions by their start year before subtracting them from undeployed surplus.
+- **Make projected breakdowns reconcile to projected totals:** Detail tooltips should use the same balance, contribution, growth, and reconciliation assumptions as the chart category total.
+- **Treat new user-visible state as schema:** Any new chart state must be included in autosave, JSON export, JSON import, and reset behavior before the feature is complete.
+- **Update verification harnesses when selectors or semantics change:** Range-control step/min/max changes and staged-contribution math must be reflected in Playwright capture and full-element coverage checks.
+
+### Codebase-specific observations
+
+- `assetAllocTargetYear` is now persisted across autosave, export, import, and reset.
+- JSON export now writes `runwaySchemaVersion: 2`, preventing freshly exported scenarios from importing through the legacy runway migration path.
+- `_dev/tests/verify_full_element_coverage.mjs` now models retirement-year drawdown and staged investment contributions consistently with `src/App.jsx`.
+- `_dev/e2e/user-scenario-capture.spec.js` should select runway controls by their current step/min/max semantics, not by legacy optimistic/pessimistic bounds.

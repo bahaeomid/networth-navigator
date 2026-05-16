@@ -82,7 +82,8 @@ One-time expenses:
 
 ```
 investmentContribution(y) =
-  Σ item.annualContrib × (1 + item.contribGrowthRate)^yearsSinceToday
+  Σ item.annualContrib × (1 + item.contribGrowthRate)^(calendarYear - item.contribStartYear)
+  only when calendarYear >= item.contribStartYear
   [pre-retirement only; defaults to 0]
 
 investments(y+1) = max(0, investments(y) × (1 + investmentReturn) + investmentContribution(y) − drawdown(y))
@@ -91,7 +92,7 @@ otherAssets(y+1)  = otherAssets(y) × (1 + otherAssetGrowth)
 cash(y)          = constant (earns 0%, not compounded)
 ```
 
-Annual investment contributions are optional fields on investment sub-items. They flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, and HTML report charts. The model does not cap these contributions to calculated savings capacity; users should enter affordable planned contributions.
+Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year. The entered contribution amount is nominal in the start year; contribution growth compounds from that start year forward, not from today. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, and HTML report charts. The model does not cap these contributions to calculated savings capacity; users should enter affordable planned contributions.
 
 ### Liability Amortization (Linear)
 
@@ -236,10 +237,10 @@ Shows how much additional monthly investment closes the gap when added as a new 
 This lever is additional to the annual contributions entered on investment sub-items, because those contributions are already included in `projectedWealth`. Only undeployed surplus can offset the displayed monthly amount:
 
 ```
-undeployedSurplus = currentYearSavings - annualInvestmentContributions
+undeployedSurplus = currentYearSavings - currentYearActiveInvestmentContributions
 ```
 
-If annual investment contributions exceed current-year savings, the base model still honors the entered contribution plan; users should reduce the contribution inputs if they are not affordable.
+Future-starting investment contributions do not reduce current-year undeployed surplus until their start year. If an item's annual contribution exceeds projected savings in its own start year, the base model still honors the entered contribution plan; users should reduce the contribution input if it is not affordable.
 
 ### Lever 2: Retire Later
 
@@ -276,7 +277,7 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 | Decision | Rationale | Impact |
 |----------|-----------|--------|
 | **Cash excluded from Monte Carlo** | Cash is allocated annually as an emergency fund, not a growth asset | MC uses liquid investments only |
-| **Only explicit investment contributions enter the base projection** | Planned annual contributions belong on investment sub-items; unallocated surplus remains a scenario input | Base projection includes entered contributions; Surplus Deployment remains useful for testing additional year-by-year surplus strategies |
+| **Only explicit investment contributions enter the base projection** | Planned annual contributions belong on investment sub-items and may start in future pre-retirement years; unallocated surplus remains a scenario input | Base projection includes entered contributions from their configured start year; Surplus Deployment remains useful for testing additional year-by-year surplus strategies |
 | **Cash earns 0%** | Pragmatic — emergency fund, not income-generating | Cash balance is constant across projection |
 | **Linear amortization** | Simplification accepted by owner | Slightly overestimates debt in early years vs actual amortization schedule |
 | **Liability balances do not imply payments** | Balance sheet and cashflow are deliberately separate | Keep liabilities for net worth; enter full debt-service payments as expenses to affect savings |

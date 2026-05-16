@@ -405,10 +405,12 @@ test('capture user scenario outputs across tabs', async ({ page }) => {
 
   // Runway perturbation sliders
   const runwayPanel = page.locator('div').filter({ hasText: '🛬 Retirement Runway' }).first();
-  const pessReturnSlider = runwayPanel.locator('input[type="range"][max="-1"]').first();
-  const pessSpendSlider = runwayPanel.locator('input[type="range"][min="0"][max="50"]').first();
-  const optReturnSlider = runwayPanel.locator('input[type="range"][min="1"][max="8"]').first();
-  const optSpendSlider = runwayPanel.locator('input[type="range"][min="0"][max="50"]').nth(1);
+  const returnSliders = runwayPanel.locator('input[type="range"][step="0.5"]');
+  const spendSliders = runwayPanel.locator('input[type="range"][min="0"][max="50"][step="5"]');
+  const pessReturnSlider = returnSliders.nth(0);
+  const pessSpendSlider = spendSliders.nth(0);
+  const optReturnSlider = returnSliders.nth(1);
+  const optSpendSlider = spendSliders.nth(1);
   if (await pessReturnSlider.isVisible() && await pessSpendSlider.isVisible() && await optReturnSlider.isVisible() && await optSpendSlider.isVisible()) {
     capture.debug.runwayBefore = {
       pessimisticReturn: await readRangeMeta(pessReturnSlider),
@@ -440,10 +442,12 @@ test('capture user scenario outputs across tabs', async ({ page }) => {
     await tabByName(page, 'Retirement').click();
     await page.waitForTimeout(300);
     const runwayPanelReset = page.locator('div').filter({ hasText: '🛬 Retirement Runway' }).first();
-    const pessReturnSliderReset = runwayPanelReset.locator('input[type="range"][max="-1"]').first();
-    const pessSpendSliderReset = runwayPanelReset.locator('input[type="range"][min="0"][max="50"]').first();
-    const optReturnSliderReset = runwayPanelReset.locator('input[type="range"][min="1"][max="8"]').first();
-    const optSpendSliderReset = runwayPanelReset.locator('input[type="range"][min="0"][max="50"]').nth(1);
+    const returnSlidersReset = runwayPanelReset.locator('input[type="range"][step="0.5"]');
+    const spendSlidersReset = runwayPanelReset.locator('input[type="range"][min="0"][max="50"][step="5"]');
+    const pessReturnSliderReset = returnSlidersReset.nth(0);
+    const pessSpendSliderReset = spendSlidersReset.nth(0);
+    const optReturnSliderReset = returnSlidersReset.nth(1);
+    const optSpendSliderReset = spendSlidersReset.nth(1);
 
     capture.debug.runwayReset = {
       pessimisticReturn: await readRangeMeta(pessReturnSliderReset),

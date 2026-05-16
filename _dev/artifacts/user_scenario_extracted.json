@@ -1,0 +1,276 @@
+{
+  "generatedAt": "2026-05-16T03:53:14.968Z",
+  "inputSummary": {
+    "currentYear": 2026,
+    "profile": {
+      "currentAge": 37,
+      "retirementAge": 55,
+      "lifeExpectancy": 85,
+      "dependents": 2
+    },
+    "totals": {
+      "current": 405228,
+      "retirement": 283657
+    },
+    "assumptions": {
+      "salaryGrowth": 2,
+      "passiveGrowth": 2,
+      "otherIncomeGrowth": 2,
+      "investmentReturn": 6.5,
+      "investmentStdDev": 12,
+      "realEstateAppreciation": 3.5,
+      "realEstateStdDev": 7,
+      "otherAssetGrowth": 0,
+      "otherAssetStdDev": 5,
+      "enableDrawdown": true
+    }
+  },
+  "dashboard": {
+    "baseline": {
+      "netWorth": "AED 3.2M",
+      "debtFreeAge": "62",
+      "firstMillionYear": "2027",
+      "plannedRetirementYears": "18",
+      "savingsRate": "41.8%",
+      "nwMultiple": "5.3×",
+      "debtRatio": "32.6%",
+      "emergencyFundMonths": "3.4",
+      "investmentMix": "12.6%",
+      "retirementFunding": "15%",
+      "incomeReplacement": "41%",
+      "swrNeededToday": "83.2%",
+      "runwaySurvivalOdds": "0%",
+      "investmentsExhaustedAge": "60"
+    },
+    "final": {
+      "netWorth": "AED 3.2M",
+      "debtFreeAge": "62",
+      "firstMillionYear": "2027",
+      "plannedRetirementYears": "18",
+      "savingsRate": "41.8%",
+      "nwMultiple": "5.3×",
+      "debtRatio": "32.6%",
+      "emergencyFundMonths": "3.4",
+      "investmentMix": "12.6%",
+      "retirementFunding": "15%",
+      "incomeReplacement": "41%",
+      "swrNeededToday": "83.2%",
+      "runwaySurvivalOdds": "0%",
+      "investmentsExhaustedAge": "60"
+    }
+  },
+  "surplusDeployment": {
+    "baseline": {
+      "investAllFiAge": "62",
+      "investAllFiStatus": null,
+      "investAllExtraAtRetirement": "+AED 8.2M",
+      "clearDebtDebtFreeAge": "43",
+      "clearDebtFiAge": "78",
+      "clearDebtFiStatus": null,
+      "customInvestPct": "100",
+      "customDebtPct": "0",
+      "customCashPct": "0",
+      "customFiAge": "62",
+      "customFiStatus": null
+    },
+    "debtFirstSnapshot": {
+      "investAllFiAge": "62",
+      "investAllFiStatus": null,
+      "investAllExtraAtRetirement": "+AED 8.2M",
+      "clearDebtDebtFreeAge": "43",
+      "clearDebtFiAge": "78",
+      "clearDebtFiStatus": null,
+      "customInvestPct": "0",
+      "customDebtPct": "100",
+      "customCashPct": "0",
+      "customFiAge": "78",
+      "customFiStatus": null
+    },
+    "investFirstSnapshot": {
+      "investAllFiAge": "62",
+      "investAllFiStatus": null,
+      "investAllExtraAtRetirement": "+AED 8.2M",
+      "clearDebtDebtFreeAge": "43",
+      "clearDebtFiAge": "78",
+      "clearDebtFiStatus": null,
+      "customInvestPct": "100",
+      "customDebtPct": "0",
+      "customCashPct": "0",
+      "customFiAge": "62",
+      "customFiStatus": null
+    }
+  },
+  "preRetirement": {
+    "baselineProjection": {
+      "annualTotal": "AED 405.2K",
+      "monthlyTotal": "AED 33.8K",
+      "lowScenario": "AED 518.5K",
+      "baseScenario": "AED 585.7K",
+      "highScenario": "AED 691.2K",
+      "whatIfAge": null,
+      "whatIfTable": null,
+      "whatIfVsBase": null
+    },
+    "whatIfAdjusted": {
+      "annualTotal": "AED 405.2K",
+      "monthlyTotal": "AED 33.8K",
+      "lowScenario": "AED 518.5K",
+      "baseScenario": "AED 585.7K",
+      "highScenario": "AED 691.2K",
+      "whatIfAge": "42",
+      "whatIfTable": {
+        "low": "AED 518.5K",
+        "base": "AED 585.7K",
+        "high": "AED 691.2K",
+        "yourScenario": "AED 615.4K"
+      },
+      "whatIfVsBase": "+AED 29.8K (+5.1%)"
+    }
+  },
+  "retirementHealth": {
+    "baseline": {
+      "requiredNestEgg": "AED 12.5M",
+      "projectedInvestments": "AED 1.9M",
+      "gapOrSurplus": "-AED 10.6M",
+      "fundedPct": "15%",
+      "saveMore": null,
+      "retireLater": null,
+      "higherReturn": null,
+      "survivalOdds": "0%",
+      "runsOutAge": "60",
+      "verdict": "High risk — funding gap and low survival odds"
+    },
+    "gapDetails": {
+      "requiredNestEgg": "AED 12.5M",
+      "projectedInvestments": "AED 1.9M",
+      "gapOrSurplus": "-AED 10.6M",
+      "fundedPct": "15%",
+      "saveMore": "+AED 27.3K/mo",
+      "retireLater": "Gap too large to close by working longer",
+      "higherReturn": "18.4%/yr (+11.9pp)",
+      "survivalOdds": "0%",
+      "runsOutAge": "60",
+      "verdict": "High risk — funding gap and low survival odds"
+    }
+  },
+  "swrPerturbation": {
+    "swr3": {
+      "requiredNestEgg": "AED 16.6M",
+      "projectedInvestments": "AED 1.9M",
+      "gapOrSurplus": "-AED 14.8M",
+      "fundedPct": "11%",
+      "saveMore": "+AED 38.0K/mo",
+      "retireLater": "Gap too large to close by working longer",
+      "higherReturn": "20.3%/yr (+13.8pp)",
+      "survivalOdds": "0%",
+      "runsOutAge": "60",
+      "verdict": "High risk — funding gap and low survival odds"
+    },
+    "swr4Reset": {
+      "requiredNestEgg": "AED 12.5M",
+      "projectedInvestments": "AED 1.9M",
+      "gapOrSurplus": "-AED 10.6M",
+      "fundedPct": "15%",
+      "saveMore": "+AED 27.3K/mo",
+      "retireLater": "Gap too large to close by working longer",
+      "higherReturn": "18.4%/yr (+11.9pp)",
+      "survivalOdds": "0%",
+      "runsOutAge": "60",
+      "verdict": "High risk — funding gap and low survival odds"
+    },
+    "swr5": {
+      "requiredNestEgg": "AED 10.0M",
+      "projectedInvestments": "AED 1.9M",
+      "gapOrSurplus": "-AED 8.1M",
+      "fundedPct": "19%",
+      "saveMore": "+AED 20.9K/mo",
+      "retireLater": "Gap too large to close by working longer",
+      "higherReturn": "17%/yr (+10.5pp)",
+      "survivalOdds": "0%",
+      "runsOutAge": "60",
+      "verdict": "High risk — funding gap and low survival odds"
+    }
+  },
+  "volatilityPerturbation": {
+    "vol20": {
+      "requiredNestEgg": "AED 12.5M",
+      "projectedInvestments": "AED 1.9M",
+      "gapOrSurplus": "-AED 10.6M",
+      "fundedPct": "15%",
+      "saveMore": "+AED 27.3K/mo",
+      "retireLater": "Gap too large to close by working longer",
+      "higherReturn": "18.4%/yr (+11.9pp)",
+      "survivalOdds": "0%",
+      "runsOutAge": "60",
+      "verdict": "High risk — funding gap and low survival odds"
+    },
+    "vol12Reset": {
+      "requiredNestEgg": "AED 12.5M",
+      "projectedInvestments": "AED 1.9M",
+      "gapOrSurplus": "-AED 10.6M",
+      "fundedPct": "15%",
+      "saveMore": "+AED 27.3K/mo",
+      "retireLater": "Gap too large to close by working longer",
+      "higherReturn": "18.4%/yr (+11.9pp)",
+      "survivalOdds": "0%",
+      "runsOutAge": "60",
+      "verdict": "High risk — funding gap and low survival odds"
+    }
+  },
+  "runway": {
+    "baseline": {
+      "pessimistic": {
+        "years": "5yrs",
+        "exhaustedAge": "60",
+        "survivesTo": null
+      },
+      "base": {
+        "years": "5yrs",
+        "exhaustedAge": "60",
+        "survivesTo": null
+      },
+      "optimistic": {
+        "years": "5yrs",
+        "exhaustedAge": "60",
+        "survivesTo": null
+      },
+      "footnote": "Review spending or boost retirement savings."
+    },
+    "perturbed": {
+      "pessimistic": {
+        "years": "4yrs",
+        "exhaustedAge": "59",
+        "survivesTo": null
+      },
+      "base": {
+        "years": "5yrs",
+        "exhaustedAge": "60",
+        "survivesTo": null
+      },
+      "optimistic": {
+        "years": "24yrs",
+        "exhaustedAge": "79",
+        "survivesTo": null
+      },
+      "footnote": "Review spending or boost retirement savings."
+    },
+    "reset": {
+      "pessimistic": {
+        "years": "5yrs",
+        "exhaustedAge": "60",
+        "survivesTo": null
+      },
+      "base": {
+        "years": "5yrs",
+        "exhaustedAge": "60",
+        "survivesTo": null
+      },
+      "optimistic": {
+        "years": "5yrs",
+        "exhaustedAge": "60",
+        "survivesTo": null
+      },
+      "footnote": "Review spending or boost retirement savings."
+    }
+  }
+}

@@ -218,7 +218,7 @@ const buildWealthProjection = () => {
 
     const totalLiabilities = round(mortgageBalance + loansBalance + otherLiabilities);
 
-    if (assumptions.enableDrawdown && age > profile.retirementAge && investmentBalance === 0 && exhaustionAge === null) {
+    if (assumptions.enableDrawdown && age >= profile.retirementAge && investmentBalance === 0 && exhaustionAge === null) {
       exhaustionAge = age;
     }
 
@@ -241,12 +241,22 @@ const buildWealthProjection = () => {
     });
 
     let drawdownAmount = 0;
-    if (assumptions.enableDrawdown && age > profile.retirementAge) {
+    if (assumptions.enableDrawdown && age >= profile.retirementAge) {
       const postRetIncome = incomeParts.passive + incomeParts.otherIncome;
       drawdownAmount = Math.max(0, inflationAdjustedExpense + oneTimeExpense - postRetIncome);
     }
 
-    investmentBalance = Math.max(0, investmentBalance * (1 + toNum(assumptions.investmentReturn) / 100) - drawdownAmount);
+    const yearInvestmentContribution = age < profile.retirementAge
+      ? (assets.investmentItems || []).reduce((sum, item) => {
+          const base = toNum(item.annualContrib);
+          const startYear = item.contribStartYear || currentYear;
+          if (year < startYear) return sum;
+          const growthRate = toNum(item.contribGrowthRate) / 100;
+          return sum + base * Math.pow(1 + growthRate, year - startYear);
+        }, 0)
+      : 0;
+
+    investmentBalance = Math.max(0, investmentBalance * (1 + toNum(assumptions.investmentReturn) / 100) + yearInvestmentContribution - drawdownAmount);
     realEstateValue = realEstateValue * (1 + toNum(assumptions.realEstateAppreciation) / 100);
     otherAssetValue = otherAssetValue * (1 + toNum(assumptions.otherAssetGrowth) / 100);
   }
@@ -429,7 +439,7 @@ const simulateRunway = (returnRateOffset, spendMultiplier) => {
 
     result.push({ age, balance: round(Math.max(0, balance)) });
 
-    if (age > profile.retirementAge) {
+    if (age >= profile.retirementAge) {
       balance = Math.max(0, balance * (1 + baseReturn / 100) - netWithdrawal);
     } else {
       balance = Math.max(0, balance * (1 + baseReturn / 100));
@@ -445,12 +455,12 @@ const simulateRunway = (returnRateOffset, spendMultiplier) => {
 
 const runwayExpected = {
   baseline: {
-    pessimistic: simulateRunway(-3, 1),
+    pessimistic: simulateRunway(0, 1),
     base: simulateRunway(0, 1),
-    optimistic: simulateRunway(+3, 0.75),
+    optimistic: simulateRunway(0, 1),
   },
   perturbed: {
-    pessimistic: simulateRunway(-4, 1.2),
+    pessimistic: simulateRunway(-5.5, 1.2),
     base: simulateRunway(0, 1),
     optimistic: simulateRunway(+6, 0.6),
   },

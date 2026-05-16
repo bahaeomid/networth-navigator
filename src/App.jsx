@@ -538,7 +538,7 @@ const runMonteCarloSimulation = (portfolioAssets, yearsToProject, annualContribu
 };
 
 // Stable target year input
-const TargetYearInput = ({ value, onChange, minYear, maxYear }) => {
+const TargetYearInput = ({ value, onChange, minYear, maxYear, compact }) => {
   const [display, setDisplay] = React.useState(value.toString());
   const [isFocused, setIsFocused] = React.useState(false);
   React.useEffect(() => {
@@ -568,13 +568,57 @@ const TargetYearInput = ({ value, onChange, minYear, maxYear }) => {
       onFocus={handleFocus}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      style={{
+      style={compact ? {
+        width: '56px', padding: '0.28rem 0.3rem',
+        background: 'rgba(255,255,255,0.07)',
+        border: '1px solid rgba(255,255,255,0.14)',
+        borderRadius: '6px', color: '#9ca3af',
+        fontSize: '0.82rem', fontFamily: 'JetBrains Mono, monospace',
+        textAlign: 'center'
+      } : {
         width: '80px', padding: '0.5rem 0.6rem',
         background: 'rgba(255,255,255,0.08)',
         border: '1px solid rgba(167,139,250,0.4)',
         borderRadius: '8px', color: '#e8e9ed',
         fontSize: '0.95rem', fontFamily: 'JetBrains Mono, monospace',
         textAlign: 'center'
+      }}
+    />
+  );
+};
+
+// Compact year input for investment item contrib start year — same edit pattern as TargetYearInput
+const ContribStartYearInput = ({ value, onChange, minYear, maxYear, width, style }) => {
+  const [display, setDisplay] = React.useState(value.toString());
+  const [isFocused, setIsFocused] = React.useState(false);
+  React.useEffect(() => { if (!isFocused) setDisplay(value.toString()); }, [value, isFocused]);
+  return (
+    <input
+      type="text"
+      value={display}
+      onChange={(e) => { if (/^\d{0,4}$/.test(e.target.value)) setDisplay(e.target.value); }}
+      onFocus={(e) => { setIsFocused(true); e.target.select(); }}
+      onBlur={() => {
+        setIsFocused(false);
+        const parsed = parseInt(display);
+        const clamped = Number.isFinite(parsed) ? Math.max(minYear, Math.min(maxYear, parsed)) : value;
+        onChange(clamped);
+        setDisplay(clamped.toString());
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.target.blur();
+        if (e.key === 'ArrowUp') onChange(Math.min(maxYear, value + 1));
+        if (e.key === 'ArrowDown') onChange(Math.max(minYear, value - 1));
+      }}
+      title="Year contributions begin (arrow keys to adjust)"
+      style={{
+        width: width || '68px', padding: '0.4rem 0.35rem',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '6px', color: '#e8e9ed',
+        fontSize: '0.82rem', fontFamily: 'JetBrains Mono, monospace',
+        textAlign: 'center', outline: 'none',
+        ...(style || {})
       }}
     />
   );
@@ -897,8 +941,8 @@ const NetWorthNavigator = () => {
         { id: 2, name: 'Checking Account', amount: 20000 }
       ],
       investmentItems: [
-        { id: 1, name: 'Savings Account', amount: 100000, annualContrib: 0, contribGrowthRate: 0 },
-        { id: 2, name: 'Investment Portfolio', amount: 200000, annualContrib: 0, contribGrowthRate: 0 }
+        { id: 1, name: 'Savings Account', amount: 100000, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null },
+        { id: 2, name: 'Investment Portfolio', amount: 200000, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null }
       ],
       realEstateItems: [
         { id: 1, name: 'Primary Residence', amount: 600000 },
@@ -998,6 +1042,7 @@ const NetWorthNavigator = () => {
     const y = new Date().getFullYear();
     return y + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge);
   });
+  const [assetAllocTargetYear, setAssetAllocTargetYear] = useState(() => new Date().getFullYear());
   const [hiddenCalcLines, setHiddenCalcLines] = useState({});
   const [hiddenAssetLines, setHiddenAssetLines] = useState({});
   const [selectedChartCats, setSelectedChartCats] = useState([]);
@@ -1025,9 +1070,9 @@ const NetWorthNavigator = () => {
   const [surplusSplitDebt, setSurplusSplitDebt] = useState(0);
 
   const RUNWAY_DEFAULT_CONSERVATIVE_OFFSET = 0;
-  const RUNWAY_DEFAULT_OPTIMISTIC_OFFSET = 3;
+  const RUNWAY_DEFAULT_OPTIMISTIC_OFFSET = 0;
   const RUNWAY_DEFAULT_PESS_SPEND = 0;
-  const RUNWAY_DEFAULT_OPT_SPEND = 25;
+  const RUNWAY_DEFAULT_OPT_SPEND = 0;
 
   const parseNumericOrDefault = (value, fallback) => {
     const parsed = Number(value);
@@ -1188,8 +1233,10 @@ const NetWorthNavigator = () => {
           runwayOptimisticOffset,
           runwayPessSpend,
           runwayOptSpend,
+          runwaySchemaVersion: 2,
           preRetChartTargetYear,
           cashFlowTargetYear,
+          assetAllocTargetYear,
         };
         localStorage.setItem('nwn_autosave', JSON.stringify(dataToSave));
       } catch (e) {
@@ -1201,7 +1248,7 @@ const NetWorthNavigator = () => {
       expenseCategories, expenseCalculator, retirementBudget, expenseGrowthRates,
       expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retExpenseGrowthRates,
       lifeEvents, assumptions, normalizedOneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt,
-      runwayConservativeOffset, runwayOptimisticOffset, runwayPessSpend, runwayOptSpend, preRetChartTargetYear, cashFlowTargetYear]);
+      runwayConservativeOffset, runwayOptimisticOffset, runwayPessSpend, runwayOptSpend, preRetChartTargetYear, cashFlowTargetYear, assetAllocTargetYear]);
 
   // Auto-restore from localStorage on mount
   useEffect(() => {
@@ -1233,12 +1280,13 @@ const NetWorthNavigator = () => {
       if (data.nestEggSwr !== undefined) setNestEggSwr(clampSwr(data.nestEggSwr));
       if (data.surplusSplitInvest !== undefined) setSurplusSplitInvest(data.surplusSplitInvest);
       if (data.surplusSplitDebt !== undefined) setSurplusSplitDebt(data.surplusSplitDebt);
-      setRunwayConservativeOffset(Math.max(-8, Math.min(0, parseNumericOrDefault(data.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET))));
-      setRunwayOptimisticOffset(Math.max(1, Math.min(8, parseNumericOrDefault(data.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))));
-      setRunwayPessSpend(Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))));
-      setRunwayOptSpend(Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))));
+      setRunwayConservativeOffset(data.runwaySchemaVersion === 2 ? Math.max(-8, Math.min(0, parseNumericOrDefault(data.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET))) : RUNWAY_DEFAULT_CONSERVATIVE_OFFSET);
+      setRunwayOptimisticOffset(data.runwaySchemaVersion === 2 ? Math.max(0, Math.min(8, parseNumericOrDefault(data.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))) : RUNWAY_DEFAULT_OPTIMISTIC_OFFSET);
+      setRunwayPessSpend(data.runwaySchemaVersion === 2 ? Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))) : RUNWAY_DEFAULT_PESS_SPEND);
+      setRunwayOptSpend(data.runwaySchemaVersion === 2 ? Math.max(0, Math.min(50, parseNumericOrDefault(data.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))) : RUNWAY_DEFAULT_OPT_SPEND);
       if (data.preRetChartTargetYear !== undefined) setPreRetChartTargetYear(data.preRetChartTargetYear);
       if (data.cashFlowTargetYear !== undefined) setCashFlowTargetYear(data.cashFlowTargetYear);
+      if (data.assetAllocTargetYear !== undefined) setAssetAllocTargetYear(data.assetAllocTargetYear);
     } catch (e) {
       // Corrupted or unavailable — start with defaults
     }
@@ -1311,8 +1359,10 @@ const NetWorthNavigator = () => {
       runwayOptimisticOffset,
       runwayPessSpend,
       runwayOptSpend,
+      runwaySchemaVersion: 2,
       preRetChartTargetYear,
       cashFlowTargetYear,
+      assetAllocTargetYear,
     };
     
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
@@ -1352,7 +1402,7 @@ const NetWorthNavigator = () => {
       .reduce((s,e)=>s+(e.amount||0),0);
     const surplus = totalAnnualIncome - totalPreRetExpenses - currentYearOTETotal;
     const savingsRate = totalAnnualIncome>0 ? (surplus/totalAnnualIncome)*100 : 0;
-    const undeployedSurplus = surplus - annualInvestmentContribution;
+    const undeployedSurplus = surplus - currentYearInvestmentContribution;
     const debtRatio = totalAssets>0 ? (totalLiabilities/totalAssets)*100 : 0;
     const monthlyExpenses = totalPreRetExpenses/12;
     const emergencyMonths = monthlyExpenses>0 ? (assets.cash||0)/monthlyExpenses : 0;
@@ -1701,6 +1751,7 @@ const NetWorthNavigator = () => {
     else items.push({type:'warn', text:`Current-year savings rate of ${fmtPct(savingsRate)} — adequate but below the 20%+ wealth-building threshold`});
     if (successProb >= 80) items.push({type:'good', text:`Monte Carlo: ${successProb}% of simulations succeed — retirement plan is robust`});
     else if (successProb === 0) items.push({type:'bad', text:`Monte Carlo: 0 of 1,000 simulations succeed — portfolio is far too small to fund retirement as planned`});
+    else if (successProb >= MC_CAUTION_THRESHOLD) items.push({type:'warn', text:`Monte Carlo: ${successProb}% survival — caution zone (target 80%+); base-case projection survives, but volatile return sequences pose moderate risk`});
     else items.push({type:'bad', text:`Monte Carlo: only ${successProb}% of simulations succeed — high risk of running out of money in retirement`});
     if (fundingPct >= 100) items.push({type:'good', text:`Retirement fully funded — projected ${fmt(retirementWealth)} exceeds ${fmt(requiredNestEgg)} nest egg target`});
     else if (fundingPct < 50) items.push({type:'bad', text:`Significant funding gap — projected investments are only ${Math.round(fundingPct)}% of the ${fmt(requiredNestEgg)} required nest egg`});
@@ -1738,14 +1789,14 @@ const NetWorthNavigator = () => {
       <div class="kpi-sub">Assets ${fmt(totalAssets)}</div>
     </div>
     <div class="kpi ${savingsRate>=20?'green':savingsRate>=10?'amber':'red'}">
-      <div class="kpi-label">Current-Year Savings Rate</div>
+      <div class="kpi-label">${currentYear} Savings Rate</div>
       <div class="kpi-value">${fmtPct(savingsRate)}</div>
       <div class="kpi-sub">${fmt(surplus)}/yr · target 20%+</div>
     </div>
     <div class="kpi ${successProb>=80?'green':successProb>=60?'amber':'red'}">
       <div class="kpi-label">Monte Carlo</div>
       <div class="kpi-value">${successProb}%</div>
-      <div class="kpi-sub">${successProb>=80?'Scenarios where funds last — target 80%+':successProb===0?'All scenarios fail — portfolio far too small':'Only '+successProb+'% of scenarios succeed · target 80%+'}</div>
+      <div class="kpi-sub">${successProb>=80?'Scenarios where funds last — target 80%+':successProb===0?'All scenarios fail — portfolio far too small':successProb>=60?successProb+'% survive · caution zone — target 80%+':'Only '+successProb+'% survive · high risk — target 80%+'}</div>
     </div>
     <div class="kpi ${fundingPct>=100?'green':fundingPct>=50?'amber':'red'}">
       <div class="kpi-label">Nest Egg Funded</div>
@@ -1775,7 +1826,7 @@ const NetWorthNavigator = () => {
     <div class="health-card" style="border-color:${srColor}33;background:${srColor}08;">
       <div class="health-card-icon">💰</div>
       <div class="health-card-body">
-        <div class="health-card-label">Current-Year Savings Rate</div>
+        <div class="health-card-label">${currentYear} Savings Rate</div>
         <div class="health-card-value" style="color:${srColor};">${fmtPct(savingsRate)}</div>
         <div class="health-card-bench">${savingsRate>=20?'✓ Wealth-building pace':savingsRate>=10?'↑ Adequate — aim for 20%+':'⚠ At risk — below 10%'}</div>
       </div>
@@ -1918,7 +1969,7 @@ const NetWorthNavigator = () => {
   <div style="margin-top:14px;padding:12px 16px;background:${surplus>=0?'#f0fdf4':'#fef2f2'};border-radius:8px;border:1px solid ${surplus>=0?'#bbf7d0':'#fecaca'};display:flex;gap:32px;flex-wrap:wrap;">
     <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Total Annual Income</span><br><strong style="font-size:1.1rem;color:#16a34a;font-family:'SF Mono',monospace;">${fmt(totalAnnualIncome)}</strong></div>
     <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Current-Year Surplus</span><br><strong style="font-size:1.1rem;color:${surplus>=0?'#16a34a':'#dc2626'};font-family:'SF Mono',monospace;">${surplus>=0?'+':''}${fmt(surplus)}</strong></div>
-    <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Current-Year Savings Rate</span><br><strong style="font-size:1.1rem;color:${srColor};font-family:'SF Mono',monospace;">${fmtPct(savingsRate)}</strong></div>
+    <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">${currentYear} Savings Rate</span><br><strong style="font-size:1.1rem;color:${srColor};font-family:'SF Mono',monospace;">${fmtPct(savingsRate)}</strong></div>
     <div><span style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;">Monthly Take-Home</span><br><strong style="font-size:1.1rem;color:#1d4ed8;font-family:'SF Mono',monospace;">${fmt(totalAnnualIncome/12)}</strong></div>
   </div>
   <p style="font-size:0.72rem;color:#94a3b8;margin-top:10px;">Note: salary stops at retirement. Passive and other income continue through retirement and are netted against drawdown requirements.</p>
@@ -2173,7 +2224,7 @@ const NetWorthNavigator = () => {
       <p>The projections are sensitive to the following assumptions, which are user-defined and applied consistently across all scenarios unless otherwise stated:</p>
       <ul>
         <li><strong>Investment return (${assumptions.investmentReturn}% p.a.).</strong> Applied to the liquid investment portfolio (pre- and post-retirement). This is a nominal, pre-fee return. Adviser fees, fund management charges, and transaction costs are not deducted.</li>
-        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)} today).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. Contribution growth rates, where entered, increase each item's annual contribution over time. The model does not cap contributions to calculated surplus, so users should enter affordable amounts.</li>
+        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If a start year is set, that item begins in that calendar year; contribution growth compounds from the start year forward. The model does not cap contributions to calculated surplus, so users should enter affordable amounts.</li>
         <li><strong>Real estate appreciation (${assumptions.realEstateAppreciation}% p.a.).</strong> Applied uniformly to the entire real estate portfolio. Regional, property-type, and leverage effects are not modelled.</li>
         <li><strong>Salary growth (${assumptions.salaryGrowth}% p.a.).</strong> Applied to earned income until the stated retirement age, after which salary is assumed to cease.</li>
         <li><strong>Passive income growth (${assumptions.passiveGrowth}% p.a.) and other income growth (${assumptions.otherIncomeGrowth}% p.a.).</strong> Continued post-retirement unless an end year is specified on the income sub-item.</li>
@@ -2238,7 +2289,7 @@ const NetWorthNavigator = () => {
     <div class="note-body">
       <p>Seven scorecard tiles provide a snapshot of current financial health. All metrics use today's values unless stated otherwise. Thresholds are general guidelines derived from common personal finance benchmarks and are not actuarial standards.</p>
       <ul>
-        <li><strong>Current-Year Savings Rate.</strong> Formula: (Annual Income − Current Annual Expenses − Planned Expenses active in the report year) ÷ Annual Income. Thresholds: ≥20% = green (wealth-building); 10–19% = amber (adequate); &lt;10% = red (at risk). Income uses today's totals across all income streams. Liability balances do not generate cashflow payments automatically; enter debt service as expense categories to include those payments in savings.</li>
+        <li><strong>Current-Year Savings Rate.</strong> Formula: (Annual Income − Current Annual Expenses − Planned Expenses active in the report year) ÷ Annual Income. Investment contributions are treated as deployment of savings, not expenses; undeployed current-year surplus subtracts only contributions active in the report year. Thresholds: ≥20% = green (wealth-building); 10–19% = amber (adequate); &lt;10% = red (at risk). Income uses today's totals across all income streams. Liability balances do not generate cashflow payments automatically; enter debt service as expense categories to include those payments in savings.</li>
         <li><strong>NW Multiple.</strong> Formula: Current Net Worth ÷ Annual Salary. Benchmarked against Fidelity age-based targets: 1× at 30, 3× at 40, 7× at 55, 10× at retirement age. Intermediate ages are linearly interpolated between brackets. Green = at or above target; amber = 75–99% of target; red = below 75%. Requires a non-zero salary to calculate.</li>
         <li><strong>Debt Ratio.</strong> Formula: Total Liabilities ÷ Total Assets. Thresholds: &lt;30% = green (healthy leverage); 30–49% = amber (moderate); ≥50% = red (high leverage). A ratio above 50% means liabilities exceed half of total assets.</li>
         <li><strong>Emergency Fund.</strong> Formula: Cash Balance ÷ (Current Annual Expenses ÷ 12). Expressed in months of expenses covered. Thresholds: ≥6 months = green; 3–5 months = amber; &lt;3 months = red. Uses the cash asset field only — other liquid assets are excluded.</li>
@@ -2260,7 +2311,7 @@ const NetWorthNavigator = () => {
       <p>The <strong>overall verdict</strong> is a 6-state classification combining Q1 (on track vs gap) and Q2 (≥80% strong, 60–79% caution, &lt;60% weak): Strong · Moderate risk · High risk · Gap with strong odds · Gap detected · High risk with gap and low odds.</p>
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
-        <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. Only undeployed surplus (${fmt(undeployedSurplus)}/yr today) can offset the additional requirement.</li>
+        <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. Only undeployed current-year surplus (${fmt(undeployedSurplus)}/yr in ${currentYear}, after active investment contributions) can offset the additional requirement.</li>
         <li><strong>Retire Later.</strong> The number of additional working years needed if Planned Retirement Age changes and all other inputs remain unchanged. Existing investment-item annual contributions continue through the later retirement date. Displays "Gap too large" if not achievable within 30 extra years or before life expectancy.</li>
         <li><strong>Higher Return.</strong> The Investment return assumption required to reach the required nest egg by retirement with current investment balances and entered annual contributions unchanged. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
@@ -2501,12 +2552,13 @@ new Chart(document.getElementById('allocChart'),{
           setNestEggSwr(clampSwr(imported.nestEggSwr));
           if (imported.surplusSplitInvest !== undefined) setSurplusSplitInvest(imported.surplusSplitInvest);
           if (imported.surplusSplitDebt   !== undefined) setSurplusSplitDebt(imported.surplusSplitDebt);
-          setRunwayConservativeOffset(Math.max(-8, Math.min(0, parseNumericOrDefault(imported.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET))));
-          setRunwayOptimisticOffset(Math.max(1, Math.min(8, parseNumericOrDefault(imported.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))));
-          setRunwayPessSpend(Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))));
-          setRunwayOptSpend(Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))));
+          setRunwayConservativeOffset(imported.runwaySchemaVersion === 2 ? Math.max(-8, Math.min(0, parseNumericOrDefault(imported.runwayConservativeOffset, RUNWAY_DEFAULT_CONSERVATIVE_OFFSET))) : RUNWAY_DEFAULT_CONSERVATIVE_OFFSET);
+          setRunwayOptimisticOffset(imported.runwaySchemaVersion === 2 ? Math.max(0, Math.min(8, parseNumericOrDefault(imported.runwayOptimisticOffset, RUNWAY_DEFAULT_OPTIMISTIC_OFFSET))) : RUNWAY_DEFAULT_OPTIMISTIC_OFFSET);
+          setRunwayPessSpend(imported.runwaySchemaVersion === 2 ? Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayPessSpend, RUNWAY_DEFAULT_PESS_SPEND))) : RUNWAY_DEFAULT_PESS_SPEND);
+          setRunwayOptSpend(imported.runwaySchemaVersion === 2 ? Math.max(0, Math.min(50, parseNumericOrDefault(imported.runwayOptSpend, RUNWAY_DEFAULT_OPT_SPEND))) : RUNWAY_DEFAULT_OPT_SPEND);
           if (imported.preRetChartTargetYear !== undefined) setPreRetChartTargetYear(imported.preRetChartTargetYear);
           if (imported.cashFlowTargetYear !== undefined) setCashFlowTargetYear(imported.cashFlowTargetYear);
+          if (imported.assetAllocTargetYear !== undefined) setAssetAllocTargetYear(imported.assetAllocTargetYear);
           alert('Data imported successfully! All values are in AED — switch currency above if needed.');
         } else {
           alert('Incompatible file format. Please use a file exported from NetWorth Navigator.');
@@ -2879,21 +2931,31 @@ const mIdx = cols.findIndex(c =>
     return annualIncome > 0 ? (annualSavings / annualIncome) * 100 : 0;
   }, [annualSavings, annualIncome]);
 
+  const currentCalendarYear = new Date().getFullYear();
+  const maxContributionStartYear = Math.max(
+    currentCalendarYear,
+    currentCalendarYear + (profile.retirementAge - profile.currentAge) - 1
+  );
+
   const annualInvestmentContribution = useMemo(() => {
     return (assets.investmentItems || []).reduce((sum, item) => sum + (item.annualContrib || 0), 0);
   }, [assets.investmentItems]);
 
+  const currentYearInvestmentContribution = useMemo(() => {
+    if (profile.currentAge >= profile.retirementAge) return 0;
+    return (assets.investmentItems || []).reduce((sum, item) => {
+      const base = item.annualContrib || 0;
+      if (base <= 0) return sum;
+      const startYear = item.contribStartYear || currentCalendarYear;
+      if (currentCalendarYear < startYear) return sum;
+      const growthRate = (item.contribGrowthRate || 0) / 100;
+      return sum + base * Math.pow(1 + growthRate, currentCalendarYear - startYear);
+    }, 0);
+  }, [assets.investmentItems, profile.currentAge, profile.retirementAge, currentCalendarYear]);
+
   const annualUndeployedSurplus = useMemo(() => {
-    return annualSavings - annualInvestmentContribution;
-  }, [annualSavings, annualInvestmentContribution]);
-
-  const investmentContributionExceedsCurrentSavings = useMemo(() => {
-    return annualInvestmentContribution > 0 && annualInvestmentContribution > annualSavings;
-  }, [annualInvestmentContribution, annualSavings]);
-
-  const investmentContributionSavingsShortfall = useMemo(() => {
-    return Math.max(0, annualInvestmentContribution - annualSavings);
-  }, [annualInvestmentContribution, annualSavings]);
+    return annualSavings - currentYearInvestmentContribution;
+  }, [annualSavings, currentYearInvestmentContribution]);
 
   // Compute projected annual expenses for any given year using per-category growth rates
   const getProjectedExpenses = (targetYear, opts) => {
@@ -3172,7 +3234,10 @@ const mIdx = cols.findIndex(c =>
         ? (assets.investmentItems || []).reduce((sum, item) => {
             const base = item.annualContrib || 0;
             const growthRate = (item.contribGrowthRate || 0) / 100;
-            return sum + base * Math.pow(1 + growthRate, i);
+            const startYear = item.contribStartYear || currentYear;
+            if (year < startYear) return sum;
+            const yearsSinceStart = year - startYear;
+            return sum + base * Math.pow(1 + growthRate, yearsSinceStart);
           }, 0)
         : 0;
       // Planned investment-item contributions are deployed into the base projection.
@@ -3193,6 +3258,42 @@ const mIdx = cols.findIndex(c =>
     const max = y + (profile.lifeExpectancy - profile.currentAge);
     return Math.max(y, Math.min(cashFlowTargetYear, max));
   }, [cashFlowTargetYear, profile.currentAge, profile.lifeExpectancy]);
+
+  const clampedAssetAllocTargetYear = useMemo(() => {
+    const y = new Date().getFullYear();
+    const max = y + (profile.lifeExpectancy - profile.currentAge);
+    return Math.max(y, Math.min(assetAllocTargetYear, max));
+  }, [assetAllocTargetYear, profile.currentAge, profile.lifeExpectancy]);
+
+  const assetAllocData = useMemo(() => {
+    const row = wealthProjection.find(d => d.year === clampedAssetAllocTargetYear);
+    if (!row) return null;
+    return { investments: row.investments, realEstate: row.realEstate, cash: row.cash, other: row.other };
+  }, [wealthProjection, clampedAssetAllocTargetYear]);
+
+  // Per-item over-savings check: compare each item's contribution against projected savings
+  // at the item's own start year (not current year). Placed after wealthProjection.
+  const overSavingsItems = useMemo(() => {
+    const cy = new Date().getFullYear();
+    return (assets.investmentItems || []).reduce((acc, item) => {
+      if (!(item.annualContrib > 0)) return acc;
+      const startYear = item.contribStartYear || cy;
+      const row = wealthProjection.find(d => d.year === startYear);
+      const projectedSavings = row ? row.savings : annualSavings;
+      if (item.annualContrib > projectedSavings) {
+        acc.push({ id: item.id, name: item.name, annualContrib: item.annualContrib, startYear, projectedSavings, shortfall: item.annualContrib - projectedSavings });
+      }
+      return acc;
+    }, []);
+  }, [assets.investmentItems, wealthProjection, annualSavings]);
+
+  const investmentContributionExceedsCurrentSavings = useMemo(() => {
+    return overSavingsItems.length > 0;
+  }, [overSavingsItems]);
+
+  const investmentContributionSavingsShortfall = useMemo(() => {
+    return overSavingsItems.reduce((sum, i) => sum + i.shortfall, 0);
+  }, [overSavingsItems]);
 
   const cashFlowTargetAge = useMemo(() => {
     const y = new Date().getFullYear();
@@ -3835,6 +3936,7 @@ const mIdx = cols.findIndex(c =>
             
             {/* ── Financial Health Benchmarking Strip ── */}
             {(() => {
+              const scorecardYear = new Date().getFullYear();
               const _ta = (assets.cash || 0) + (assets.investments || 0) + (assets.realEstate || 0) + (assets.other || 0);
               const _tl = (liabilities.mortgage || 0) + (liabilities.loans || 0) + (liabilities.other || 0);
 
@@ -3928,9 +4030,9 @@ const mIdx = cols.findIndex(c =>
               const tileStyle = (bg, bdr) => ({
                 padding: '0.55rem 0.9rem',
                 background: bg, border: `1px solid ${bdr}`, borderRadius: '10px',
-                flex: '1 1 0', minWidth: '120px',
+                flex: '1 1 0', minWidth: '132px',
               });
-              const labelStyle = { fontSize: '0.6rem', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.25rem' };
+              const labelStyle = { fontSize: '0.58rem', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.045em', marginBottom: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' };
               const valueStyle = (color) => ({ fontSize: '1rem', fontWeight: '700', color, fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 });
 
               return (
@@ -3941,7 +4043,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 1. Current-year savings rate */}
                   <div style={tileStyle(srBg, srBdr)}>
                     <div>
-                      <div style={labelStyle}>💰 Current-year savings rate <InfoTooltip text={`Current-year savings ÷ gross income. Savings = income minus current expenses and any Planned Expenses active this calendar year (${formatCurrency(annualSavings, currency, exchangeRates)}/yr current surplus). This metric does not deduct annual investment contributions; those are treated as deployment of savings, not expenses. Undeployed surplus is current surplus minus entered annual contributions. Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Liability balances are not cashflow payments; add debt service as expense categories if you want those payments reflected here.`} /></div>
+                      <div style={labelStyle}>💰 {scorecardYear} Savings Rate <InfoTooltip text={`Current-year savings ÷ gross income. Savings = income minus current expenses and any Planned Expenses active this calendar year (${formatCurrency(annualSavings, currency, exchangeRates)}/yr current surplus). This metric does not deduct annual investment contributions; those are treated as deployment of savings, not expenses. Undeployed current-year surplus is current surplus minus investment contributions active this calendar year (${formatCurrency(currentYearInvestmentContribution, currency, exchangeRates)}/yr). Target: below 10% = at risk · 10–20% = adequate · 20%+ = wealth-building pace. Liability balances are not cashflow payments; add debt service as expense categories if you want those payments reflected here.`} /></div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                         <span style={valueStyle(srColor)}>{srVal.toFixed(1)}%</span>
                         <span style={{ fontSize: '0.65rem', color: '#4b5563' }}>{formatCurrency(annualSavings, currency, exchangeRates)}/yr</span>
@@ -3952,7 +4054,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 2. NW Multiple */}
                   <div style={tileStyle(nwBg, nwBdr)}>
                     <div>
-                      <div style={labelStyle}>📈 NW Multiple <InfoTooltip text={`Net worth divided by annual salary — the Fidelity age-based benchmark. Targets: 1× by 30 · 3× by 40 · 7× by 55 · 10× by retirement. Your current target at age ${profile.currentAge} is ${nwTarget !== null ? nwTarget.toFixed(1) : '—'}×. Colour shows how close you are: green = at or above target · amber = 75–99% of target · red = below 75%. Excludes passive/other income — salary is the standard Fidelity denominator.`} /></div>
+                      <div style={labelStyle}>📈 {scorecardYear} NW Multiple <InfoTooltip text={`Net worth divided by annual salary — the Fidelity age-based benchmark. Targets: 1× by 30 · 3× by 40 · 7× by 55 · 10× by retirement. Your current target at age ${profile.currentAge} is ${nwTarget !== null ? nwTarget.toFixed(1) : '—'}×. Colour shows how close you are: green = at or above target · amber = 75–99% of target · red = below 75%. Excludes passive/other income — salary is the standard Fidelity denominator.`} /></div>
                       {nwMultiple !== null
                         ? <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                             <span style={valueStyle(nwColor)}>{nwMultiple.toFixed(1)}×</span>
@@ -3966,7 +4068,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 3. Debt Ratio */}
                   <div style={tileStyle(drBg, drBdr)}>
                     <div>
-                      <div style={labelStyle}>📉 Debt Ratio <InfoTooltip text={`Total liabilities ÷ total assets. Measures how leveraged your balance sheet is. Below 30% = healthy · 30–50% = moderate, watch trajectory · above 50% = high leverage, prioritise debt reduction. A high ratio limits financial flexibility and amplifies losses if asset values fall. Mortgage debt is common at earlier life stages — the trend matters as much as the level.`} /></div>
+                      <div style={labelStyle}>📉 {scorecardYear} Debt Ratio <InfoTooltip text={`Total liabilities ÷ total assets. Measures how leveraged your balance sheet is. Below 30% = healthy · 30–50% = moderate, watch trajectory · above 50% = high leverage, prioritise debt reduction. A high ratio limits financial flexibility and amplifies losses if asset values fall. Mortgage debt is common at earlier life stages — the trend matters as much as the level.`} /></div>
                       {drVal !== null
                         ? <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                             <span style={valueStyle(drColor)}>{drVal.toFixed(1)}%</span>
@@ -3980,7 +4082,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 4. Emergency Fund */}
                   <div style={tileStyle(efBg, efBdr)}>
                     <div>
-                      <div style={labelStyle}>🛡️ Emergency Fund <InfoTooltip text={`Cash ÷ monthly expenses = months of runway if income stopped today. Standard guidance: 3 months minimum · 6 months recommended · more if you have variable income, dependants, or work in a cyclical industry. Cash above 6 months may be better deployed — excess idle cash loses real value to inflation.`} /></div>
+                      <div style={labelStyle}>🛡️ {scorecardYear} Emergency Fund <InfoTooltip text={`Cash ÷ monthly expenses = months of runway if income stopped today. Standard guidance: 3 months minimum · 6 months recommended · more if you have variable income, dependants, or work in a cyclical industry. Cash above 6 months may be better deployed — excess idle cash loses real value to inflation.`} /></div>
                       {efMonths !== null
                         ? <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                             <span style={valueStyle(efColor)}>{efMonths.toFixed(1)}<span style={{ fontSize: '0.65rem', fontWeight: 500, marginLeft: '0.15rem' }}>mo</span></span>
@@ -3993,7 +4095,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 5. Investment Mix */}
                   <div style={tileStyle(imBg, imBdr)}>
                     <div>
-                      <div style={labelStyle}>📊 Investment Mix <InfoTooltip text={`Liquid investments (stocks, ETFs, bonds, funds) as % of total assets. Below 20% = low liquid exposure, compounding is limited · 20–40% = moderate · 40%+ = well-positioned for long-term growth. A high real estate or cash concentration limits compounding potential. Only investments count toward your SWR nest egg target — so this ratio directly affects retirement funding.`} /></div>
+                      <div style={labelStyle}>📊 {scorecardYear} Investment Mix <InfoTooltip text={`Liquid investments (stocks, ETFs, bonds, funds) as % of total assets. Below 20% = low liquid exposure, compounding is limited · 20–40% = moderate · 40%+ = well-positioned for long-term growth. A high real estate or cash concentration limits compounding potential. Only investments count toward your SWR nest egg target — so this ratio directly affects retirement funding.`} /></div>
                       {imVal !== null
                         ? <span style={valueStyle(imColor)}>{imVal.toFixed(1)}%</span>
                         : <span style={valueStyle('#6b7280')}>—</span>
@@ -4208,27 +4310,52 @@ const mIdx = cols.findIndex(c =>
               
               {/* Left: Asset Allocation Pie Chart */}
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '1.5rem', position: 'relative', zIndex: 10 }}>
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: '0 0 0.25rem 0' }}>🏦 Current Asset Allocation</h3>
-                  <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: 0 }}>
-                    {formatCurrency((assets.cash || 0) + (assets.investments || 0) + (assets.realEstate || 0) + (assets.other || 0), currency, exchangeRates)} in assets
-                  </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: '0 0 0.25rem 0' }}>🏦 Asset Allocation</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: 0 }}>
+                      {formatCurrency((assetAllocData ? assetAllocData.investments + assetAllocData.realEstate + assetAllocData.cash + assetAllocData.other : (assets.cash || 0) + (assets.investments || 0) + (assets.realEstate || 0) + (assets.other || 0)), currency, exchangeRates)} in assets
+                      {clampedAssetAllocTargetYear !== new Date().getFullYear() && <span style={{ color: '#6b7280', marginLeft: '0.4rem' }}>· Age {profile.currentAge + (clampedAssetAllocTargetYear - new Date().getFullYear())}</span>}
+                    </p>
+                  </div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>year</span>
+                    <TargetYearInput compact
+                      value={clampedAssetAllocTargetYear}
+                      onChange={setAssetAllocTargetYear}
+                      minYear={new Date().getFullYear()}
+                      maxYear={new Date().getFullYear() + (profile.lifeExpectancy - profile.currentAge)}
+                    />
+                    {clampedAssetAllocTargetYear !== new Date().getFullYear() && (
+                      <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {profile.currentAge + (clampedAssetAllocTargetYear - new Date().getFullYear())}</span>
+                    )}
+                    {clampedAssetAllocTargetYear !== new Date().getFullYear() && (
+                      <button onClick={() => setAssetAllocTargetYear(new Date().getFullYear())} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>today</button>
+                    )}
+                  </div>
                 </div>
+                {(() => {
+                  const allocSrc = assetAllocData || { investments: assets.investments || 0, realEstate: assets.realEstate || 0, cash: assets.cash || 0, other: assets.other || 0 };
+                  const pieData = ASSET_TYPES.map(t => ({ name: t.name, value: allocSrc[t.key] || 0, color: t.color }));
+                  const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
+                  const isProjected = clampedAssetAllocTargetYear !== new Date().getFullYear();
+                  return (
+                    <>
                 <div style={{ position: 'relative', width: '100%', height: 340 }}>
                 <div style={{ position: 'absolute', top: '152px', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
                   <div style={{ fontSize: '0.6rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: '3px' }}>Total Assets</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e8e9ed', fontFamily: 'monospace', lineHeight: 1 }}>{formatCurrency((assets.cash||0)+(assets.investments||0)+(assets.realEstate||0)+(assets.other||0), currency, exchangeRates)}</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e8e9ed', fontFamily: 'monospace', lineHeight: 1 }}>{formatCurrency(pieTotal, currency, exchangeRates)}</div>
                 </div>
                 <ResponsiveContainer width="100%" height={340} style={{ overflow: 'visible' }}>
                 <PieChart>
                   <Pie
-                    data={ASSET_TYPES.map(t => ({ name: t.name, value: assets[t.key] || 0, color: t.color }))}
+                    data={pieData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
                     label={(entry) => {
-                      const total = (assets.cash || 0) + (assets.investments || 0) + (assets.realEstate || 0) + (assets.other || 0);
-                      const percent = ((entry.value / total) * 100).toFixed(1);
+                      if (!entry.value || entry.value === 0) return null;
+                      const percent = ((entry.value / pieTotal) * 100).toFixed(1);
                       return `${entry.name}: ${percent}%`;
                     }}
                     outerRadius={110}
@@ -4247,13 +4374,46 @@ const mIdx = cols.findIndex(c =>
                         const data = payload[0];
                         const name = data.name;
                         const value = data.value;
-                        const total = Object.values(assets).filter(v => typeof v === 'number').reduce((sum, val) => sum + val, 0);
-                        const percent = ((value / total) * 100).toFixed(1);
-                        let subItems = [];
-                        if (name === 'Investments') subItems = assets.investmentItems || [];
-                        if (name === 'Real Estate') subItems = assets.realEstateItems || [];
-                        if (name === 'Cash') subItems = assets.cashItems || [];
-                        if (name === 'Other') subItems = assets.otherItems || [];
+                        const percent = pieTotal > 0 ? ((value / pieTotal) * 100).toFixed(1) : '0.0';
+                        // Resolve sub-items and growth rate for this asset type
+                        const cy = new Date().getFullYear();
+                        const yearsAhead = clampedAssetAllocTargetYear - cy;
+                        let rawItems = [];
+                        let growthRate = 0;
+                        if (name === 'Investments') { rawItems = assets.investmentItems || []; growthRate = assumptions.investmentReturn; }
+                        if (name === 'Real Estate') { rawItems = assets.realEstateItems || []; growthRate = assumptions.realEstateAppreciation; }
+                        if (name === 'Cash') { rawItems = assets.cashItems || []; growthRate = 0; }
+                        if (name === 'Other') { rawItems = assets.otherItems || []; growthRate = assumptions.otherAssetGrowth || 0; }
+                        const reconcileToCategoryTotal = (items, categoryTotal) => {
+                          const positiveItems = items.filter(item => item.value > 0);
+                          if (categoryTotal <= 0) return [];
+                          const itemTotal = positiveItems.reduce((sum, item) => sum + item.value, 0);
+                          if (itemTotal <= 0) return [{ name: 'Unallocated', value: categoryTotal }];
+                          const scale = categoryTotal / itemTotal;
+                          return positiveItems.map(item => ({ ...item, value: item.value * scale }));
+                        };
+                        const projectInvestmentItem = (item) => {
+                          const investmentRate = (assumptions.investmentReturn || 0) / 100;
+                          let itemValue = (item.amount || 0) * Math.pow(1 + investmentRate, yearsAhead);
+                          const startYear = item.contribStartYear || cy;
+                          const contribGrowth = (item.contribGrowthRate || 0) / 100;
+                          const lastContributionYear = Math.min(
+                            clampedAssetAllocTargetYear - 1,
+                            cy + (profile.retirementAge - profile.currentAge) - 1
+                          );
+                          for (let contribYear = Math.max(cy, startYear); contribYear <= lastContributionYear; contribYear++) {
+                            const annualContrib = (item.annualContrib || 0) * Math.pow(1 + contribGrowth, contribYear - startYear);
+                            itemValue += annualContrib * Math.pow(1 + investmentRate, clampedAssetAllocTargetYear - contribYear - 1);
+                          }
+                          return { name: item.name, value: itemValue };
+                        };
+                        const projectedItems = name === 'Investments'
+                          ? rawItems.map(projectInvestmentItem)
+                          : rawItems.map(item => ({
+                              name: item.name,
+                              value: isProjected ? (item.amount || 0) * Math.pow(1 + growthRate / 100, yearsAhead) : (item.amount || 0),
+                            }));
+                        const subItems = reconcileToCategoryTotal(projectedItems, value);
                         return (
                           <div style={{ background: 'rgba(10,22,40,0.96)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: '10px', padding: '0.75rem 1rem', minWidth: '210px', backdropFilter: 'blur(8px)' }}>
                             <div style={{ fontWeight: '700', color: '#e8e9ed', marginBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.35rem' }}>
@@ -4272,11 +4432,14 @@ const mIdx = cols.findIndex(c =>
                             </div>
                             {subItems.length > 0 && (
                               <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.4rem' }}>
-                                <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: '0.3rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Breakdown</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                                  <div style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isProjected ? 'Projected Breakdown' : 'Breakdown'}</div>
+                                  {isProjected && <div style={{ fontSize: '0.6rem', color: '#374151', fontStyle: 'italic' }}>{name === 'Investments' ? 'incl. contribs' : `${growthRate}%/yr`}</div>}
+                                </div>
                                 {subItems.map((item, idx) => (
                                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
                                     <span style={{ fontSize: '0.77rem', color: '#9ca3af' }}>• {item.name}</span>
-                                    <span style={{ fontSize: '0.77rem', color: '#e8e9ed', fontWeight: '600', fontFamily: 'monospace', marginLeft: '1rem' }}>{formatCurrencyDecimal(item.amount, currency, exchangeRates)}</span>
+                                    <span style={{ fontSize: '0.77rem', color: isProjected ? '#9ca3af' : '#e8e9ed', fontWeight: '600', fontFamily: 'monospace', marginLeft: '1rem' }}>{formatCurrencyDecimal(item.value, currency, exchangeRates)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -4301,8 +4464,8 @@ const mIdx = cols.findIndex(c =>
               </div>
               {/* Liquid vs illiquid summary bar */}
               {(() => {
-                const liquid = (assets.cash || 0) + (assets.investments || 0);
-                const illiquid = (assets.realEstate || 0) + (assets.other || 0);
+                const liquid = (allocSrc.cash || 0) + (allocSrc.investments || 0);
+                const illiquid = (allocSrc.realEstate || 0) + (allocSrc.other || 0);
                 const total = liquid + illiquid;
                 if (total === 0) return null;
                 const liquidPct = Math.round((liquid / total) * 100);
@@ -4325,6 +4488,9 @@ const mIdx = cols.findIndex(c =>
                   </div>
                 );
               })()}
+                    </>
+                  );
+                })()}
             </div>
             
             {/* Right: Assets Over Time - upgraded */}
@@ -4652,21 +4818,20 @@ const mIdx = cols.findIndex(c =>
                   Cash Flow Over Time
                   <InfoTooltip text="Pre-retirement income includes salary (grows annually), passive income, and other income. At retirement, salary stops — but passive and other income (rental, dividends, etc.) continue for life. Pre-retirement expenses grow category-by-category; at retirement the model switches to your Retirement Budget, inflated each year at your assumed inflation rate." />
                 </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Chart Through:</span>
-                  <TargetYearInput
-                    value={clampedCashFlowTargetYear}
-                    onChange={setCashFlowTargetYear}
-                    minYear={new Date().getFullYear()}
-                    maxYear={new Date().getFullYear() + (profile.lifeExpectancy - profile.currentAge)}
-                  />
-                  <button
-                    onClick={() => setCashFlowTargetYear(new Date().getFullYear() + (profile.retirementAge - profile.currentAge))}
-                    style={{ padding: '0.42rem 0.65rem', background: clampedCashFlowTargetYear === (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${clampedCashFlowTargetYear === (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: '8px', color: clampedCashFlowTargetYear === (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) ? '#a78bfa' : '#9ca3af', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' }}
-                  >
-                    Retirement
-                  </button>
-                  <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>Age {cashFlowTargetAge}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>through</span>
+                    <TargetYearInput compact
+                      value={clampedCashFlowTargetYear}
+                      onChange={setCashFlowTargetYear}
+                      minYear={new Date().getFullYear()}
+                      maxYear={new Date().getFullYear() + (profile.lifeExpectancy - profile.currentAge)}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {cashFlowTargetAge}</span>
+                    {clampedCashFlowTargetYear !== (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) && (
+                      <button onClick={() => setCashFlowTargetYear(new Date().getFullYear() + (profile.retirementAge - profile.currentAge))} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>ret</button>
+                    )}
+                  </div>
                 </div>
               </div>
               <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '1.5rem' }}>
@@ -5654,7 +5819,7 @@ const mIdx = cols.findIndex(c =>
                                       {saveMoreNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Not calculable</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrencyDecimal(extraMonthly, currency, exchangeRates)}/mo</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>add as {extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'monthly × 12'}/yr contribution · invested at {assumptions.investmentReturn}%/yr</div>
-                                      {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo (today) can offset this{annualInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(annualInvestmentContribution / 12, currency, exchangeRates)}/mo already committed` : ''}</div>}
+                                      {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed current-year surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo can offset this{currentYearInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(currentYearInvestmentContribution / 12, currency, exchangeRates)}/mo active contributions` : ''}</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
                                       <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, and continues those contributions through the later retirement date. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
@@ -5898,23 +6063,24 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>Pessimistic</div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exPessimistic)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
                           <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exPessimistic}</div>
-                          <div style={{ fontSize: '0.68rem', color: '#f87171', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatPct(baseRate, 1)} → {formatRatePerYear(pessimisticReturn, 1)}</div>
+                          <div style={{ fontSize: '0.68rem', color: runwayConservativeOffset < 0 ? '#f87171' : '#9ca3af', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{runwayConservativeOffset < 0 ? `${formatPct(baseRate, 1)} → ${formatRatePerYear(pessimisticReturn, 1)}` : formatRatePerYear(pessimisticReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#f87171', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(baseSpend, currency, exchangeRates)}{runwayPessSpend > 0 ? ` → ${formatCurrency(baseSpend * pessSpendMult, currency, exchangeRates)}/yr` : '/yr spend'}</div>
                           {/* Return slider */}
                           <div style={{ marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
                             {(() => {
-                              const pessMin = Math.max(-8, -assumptions.investmentReturn);
-                              const clampedOffset = Math.max(pessMin, runwayConservativeOffset);
+                              const pessMin = -Math.min(8, Math.floor(assumptions.investmentReturn * 2) / 2);
+                              const clampedOffset = Math.max(pessMin, Math.min(0, runwayConservativeOffset));
                               if (clampedOffset !== runwayConservativeOffset) setRunwayConservativeOffset(clampedOffset);
+                              const isAdjusted = runwayConservativeOffset < 0;
                               return (
                                 <>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
                                     <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Return offset</span>
-                                    <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: '#f87171', fontWeight: '700' }}>{runwayConservativeOffset}pp</span>
+                                    <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: isAdjusted ? '#f87171' : '#4b5563', fontWeight: '700' }}>{runwayConservativeOffset}pp</span>
                                   </div>
-                                  <input type="range" min={pessMin} max={0} step={1} value={runwayConservativeOffset}
+                                  <input type="range" min={pessMin} max={0} step={0.5} value={runwayConservativeOffset}
                                     onChange={function(e) { setRunwayConservativeOffset(parseRangeInputValue(e.target, runwayConservativeOffset)); }}
-                                    style={{ width: '100%', accentColor: '#f87171' }} />
+                                    style={{ width: '100%', accentColor: isAdjusted ? '#ef4444' : '#6b7280' }} />
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>{pessMin}pp</span><span>0pp</span></div>
                                 </>
                               );
@@ -5928,7 +6094,7 @@ const mIdx = cols.findIndex(c =>
                             </div>
                             <input type="range" min={0} max={50} step={5} value={runwayPessSpend}
                               onChange={function(e) { setRunwayPessSpend(parseRangeInputValue(e.target, runwayPessSpend)); }}
-                              style={{ width: '100%', accentColor: '#f87171' }} />
+                              style={{ width: '100%', accentColor: runwayPessSpend > 0 ? '#f87171' : '#6b7280' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>+50%</span></div>
                           </div>
                         </div>
@@ -5965,18 +6131,18 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>Optimistic</div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exOptimistic)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
                           <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exOptimistic}</div>
-                          <div style={{ fontSize: '0.68rem', color: '#34d399', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatPct(baseRate, 1)} → {formatRatePerYear(optimisticReturn, 1)}</div>
+                          <div style={{ fontSize: '0.68rem', color: runwayOptimisticOffset > 0 ? '#34d399' : '#9ca3af', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{runwayOptimisticOffset > 0 ? `${formatPct(baseRate, 1)} → ${formatRatePerYear(optimisticReturn, 1)}` : formatRatePerYear(optimisticReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#34d399', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(baseSpend, currency, exchangeRates)}{runwayOptSpend > 0 ? ` → ${formatCurrency(baseSpend * optSpendMult, currency, exchangeRates)}/yr` : '/yr spend'}</div>
                           {/* Return slider */}
                           <div style={{ marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
                               <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Return offset</span>
-                              <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: '#34d399', fontWeight: '700' }}>+{runwayOptimisticOffset}pp</span>
+                              <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayOptimisticOffset > 0 ? '#34d399' : '#4b5563', fontWeight: '700' }}>{runwayOptimisticOffset > 0 ? `+${runwayOptimisticOffset}pp` : '0pp'}</span>
                             </div>
-                            <input type="range" min={1} max={8} step={1} value={runwayOptimisticOffset}
+                            <input type="range" min={0} max={8} step={0.5} value={runwayOptimisticOffset}
                               onChange={function(e) { setRunwayOptimisticOffset(parseRangeInputValue(e.target, runwayOptimisticOffset)); }}
-                              style={{ width: '100%', accentColor: '#34d399' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>+1pp</span><span>+8pp</span></div>
+                              style={{ width: '100%', accentColor: runwayOptimisticOffset > 0 ? '#34d399' : '#6b7280' }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0pp</span><span>+8pp</span></div>
                           </div>
                           {/* Spend slider */}
                           <div style={{ marginTop: '0.5rem' }}>
@@ -5986,7 +6152,7 @@ const mIdx = cols.findIndex(c =>
                             </div>
                             <input type="range" min={0} max={50} step={5} value={runwayOptSpend}
                               onChange={function(e) { setRunwayOptSpend(parseRangeInputValue(e.target, runwayOptSpend)); }}
-                              style={{ width: '100%', accentColor: '#34d399' }} />
+                              style={{ width: '100%', accentColor: runwayOptSpend > 0 ? '#34d399' : '#6b7280' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>−50%</span></div>
                           </div>
                         </div>
@@ -6426,23 +6592,20 @@ const mIdx = cols.findIndex(c =>
                         <h3 style={{ fontSize: '1.3rem', fontWeight: '600', marginBottom: '0.25rem' }}>📈 Pre-retirement Expenses Over Time <InfoTooltip text="Values compounded annually at each category's individual growth rate. Categories phase out from their set end year onwards." /></h3>
                         <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Pre-retirement only · per-category growth rates · click legend to show/hide.</p>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Chart Through:</span>
-                          <TargetYearInput
-                            value={clampedPreRetChartTargetYear}
-                            onChange={setPreRetChartTargetYear}
-                            minYear={currentYear}
-                            maxYear={retirementYear}
-                          />
-                          <button
-                            onClick={() => setPreRetChartTargetYear(retirementYear)}
-                            style={{ padding: '0.42rem 0.65rem', background: clampedPreRetChartTargetYear === retirementYear ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${clampedPreRetChartTargetYear === retirementYear ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: '8px', color: clampedPreRetChartTargetYear === retirementYear ? '#a78bfa' : '#9ca3af', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' }}
-                          >
-                            Retirement
-                          </button>
-                          <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>Age {preRetChartTargetAge}</span>
-                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
+                              <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>through</span>
+                              <TargetYearInput compact
+                                value={clampedPreRetChartTargetYear}
+                                onChange={setPreRetChartTargetYear}
+                                minYear={currentYear}
+                                maxYear={retirementYear}
+                              />
+                              <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {preRetChartTargetAge}</span>
+                              {clampedPreRetChartTargetYear !== retirementYear && (
+                                <button onClick={() => setPreRetChartTargetYear(retirementYear)} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>ret</button>
+                              )}
+                            </div>
                         <div style={{ position: 'relative' }}>
                           <button
                             onClick={() => setChartCatDropdownOpen(o => !o)}
@@ -6772,15 +6935,18 @@ const mIdx = cols.findIndex(c =>
                         <h3 style={{ fontSize: '1.3rem', fontWeight: '600', marginBottom: '0.25rem' }}>🔭 Project to a Future Year</h3>
                         <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>See your projected expenses at any point in time</p>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Target Year:</span>
-                        <TargetYearInput
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>target year</span>
+                        <TargetYearInput compact
                           value={projectionTargetYear}
                           onChange={setProjectionTargetYear}
                           minYear={currentYear + 1}
                           maxYear={retirementYear}
                         />
-                        <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>Age {targetAge}</span>
+                        <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {targetAge}</span>
+                        {projectionTargetYear !== retirementYear && (
+                          <button onClick={() => setProjectionTargetYear(retirementYear)} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>ret</button>
+                        )}
                       </div>
                     </div>
                     {/* Scenario cards */}
@@ -7196,26 +7362,44 @@ const mIdx = cols.findIndex(c =>
                 {/* Read-only total when sub-items exist */}
                 {assets.investmentItems && assets.investmentItems.length > 0 ? (
                   <div style={{ marginBottom: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.42rem', flexWrap: 'wrap', rowGap: '0.3rem', minWidth: 0, flex: '1 1 auto' }}>
                         <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                           Investments
-                          <InfoTooltip text="Amount is today's balance. Contrib is the planned annual addition to that item before retirement; contrib growth increases that annual addition each year. Contributions are added to the base projection and therefore affect Dashboard charts, FI Age, Retirement Health, Monte Carlo starting wealth, and the HTML report. Keep the contribution affordable: the model does not automatically cap it to your calculated surplus." />
+                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution start year. Annual contrib is the planned addition each year starting from the 'from' year; growth compounds from that start year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus — keep them affordable." />
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
-                        {annualInvestmentContribution > 0 && (
-                          <span style={{ fontSize: '0.68rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.12rem 0.4rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
-                            +{formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr contrib
-                          </span>
-                        )}
+                        {annualInvestmentContribution > 0 && (() => {
+                          const cy = new Date().getFullYear();
+                          const contribItems = (assets.investmentItems || []).filter(i => (i.annualContrib || 0) > 0);
+                          const startYears = contribItems.map(i => i.contribStartYear || cy);
+                          const isStaged = contribItems.length > 1 && new Set(startYears).size > 1;
+                          const isSingle = contribItems.length === 1;
+                          const singleItem = isSingle ? contribItems[0] : null;
+                          const singleStartYear = singleItem ? (singleItem.contribStartYear || cy) : cy;
+                          const showFromYear = isSingle && singleStartYear > cy;
+                          if (isStaged) {
+                            return (
+                              <span style={{ fontSize: '0.62rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.1rem 0.32rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.18rem' }}>
+                                staged contribs
+                                <InfoTooltip text={contribItems.map(i => `${i.name}: +${formatCurrencyDecimal(i.annualContrib, currency, exchangeRates)}/yr from ${i.contribStartYear || cy}`).join(' · ')} />
+                              </span>
+                            );
+                          }
+                          return (
+                            <span style={{ fontSize: '0.62rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.1rem 0.32rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
+                              +{formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr{showFromYear ? ` from ${singleStartYear}` : ''}
+                            </span>
+                          );
+                        })()}
                         {investmentContributionExceedsCurrentSavings && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.66rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.12rem 0.36rem', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.18rem', fontSize: '0.62rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.1rem 0.32rem', whiteSpace: 'nowrap' }}>
                             ⚠ over savings
-                            <InfoTooltip text={`Entered annual contributions (${formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr) exceed your current-year savings (${formatCurrencyDecimal(annualSavings, currency, exchangeRates)}/yr) by ${formatCurrencyDecimal(investmentContributionSavingsShortfall, currency, exchangeRates)}/yr. This is allowed; treat it as a stretch target unless you plan to reallocate cashflow.`} />
+                            <InfoTooltip text={overSavingsItems.length === 1 ? `"${overSavingsItems[0].name}" contribution (${formatCurrencyDecimal(overSavingsItems[0].annualContrib, currency, exchangeRates)}/yr starting ${overSavingsItems[0].startYear}) exceeds projected savings in ${overSavingsItems[0].startYear} (${formatCurrencyDecimal(Math.max(0, overSavingsItems[0].projectedSavings), currency, exchangeRates)}/yr) by ${formatCurrencyDecimal(overSavingsItems[0].shortfall, currency, exchangeRates)}/yr. This is allowed; treat it as a stretch target unless you plan to reallocate cashflow.` : `${overSavingsItems.length} contributions exceed projected savings at their respective start years (${overSavingsItems.map(i => i.name).join(', ')}). These are allowed; treat them as stretch targets unless you plan to reallocate cashflow.`} />
                           </span>
                         )}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: '0 0 auto' }}>
                         <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span>
                         <input
                           type="number"
@@ -7246,15 +7430,15 @@ const mIdx = cols.findIndex(c =>
                 {/* Sub-items list */}
                 {expandedCategories.investmentItems && (
                   <div style={{ marginTop: '0.75rem', marginLeft: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 130px 150px 95px 42px', gap: '0.6rem', alignItems: 'center', marginBottom: '0.45rem', padding: '0 0.25rem', fontSize: '0.58rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 110px 210px 95px 42px', gap: '0.6rem', alignItems: 'center', marginBottom: '0.45rem', padding: '0 0.25rem', fontSize: '0.58rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
                       <span>Name</span>
-                      <span>Current value</span>
+                      <span>Balance</span>
                       <span>Annual contrib</span>
                       <span>Growth</span>
                       <span />
                     </div>
                     {(assets.investmentItems || []).map((item) => (
-                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 130px 150px 95px 42px', gap: '0.6rem', marginBottom: '0.75rem', alignItems: 'end', padding: '0.7rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 110px 210px 95px 42px', gap: '0.6rem', marginBottom: '0.75rem', alignItems: 'end', padding: '0.7rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
                           <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600' }}>Name</span>
                           <input
@@ -7280,24 +7464,37 @@ const mIdx = cols.findIndex(c =>
                           />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap' }}>Current value</span>
-                          <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="130px"
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap' }}>Balance</span>
+                          <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="110px"
                             onChange={(aed) => {
                               const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, amount: aed } : i);
                               const total = newItems.reduce((sum, i) => sum + i.amount, 0);
                               setAssets({ ...assets, investmentItems: newItems, investments: total });
                             }} />
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual amount added to this investment item before retirement. It is included in the base projection and affects FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and reports. Enter only contributions you expect to fund; the model does not cap this field to calculated surplus." /></span>
-                          <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="150px"
-                            onChange={(aed) => {
-                              const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, annualContrib: aed } : i);
-                              setAssets({ ...assets, investmentItems: newItems });
-                            }} />
+                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 68px' : 'minmax(0, 1fr)', columnGap: '0.45rem', rowGap: '0.25rem', alignItems: 'end' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the start year — enter what you plan to contribute in that year. Contribution growth then compounds this amount each subsequent year. Balance (today's value) and the from-year for contributions are independent — the balance field always reflects the current balance today." /></span>
+                          {(item.annualContrib || 0) > 0 && <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap' }}>From</span>}
+                          <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="100%" style={{ minWidth: 0 }}
+                              onChange={(aed) => {
+                                const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, annualContrib: aed } : i);
+                                setAssets({ ...assets, investmentItems: newItems });
+                              }} />
+                          {(item.annualContrib || 0) > 0 && (
+                            <ContribStartYearInput
+                              value={item.contribStartYear || currentCalendarYear}
+                              onChange={(yr) => {
+                                const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribStartYear: yr } : i);
+                                setAssets({ ...assets, investmentItems: newItems });
+                              }}
+                              minYear={currentCalendarYear}
+                              maxYear={maxContributionStartYear}
+                              width="68px"
+                            />
+                          )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Growth <InfoTooltip text="Annual increase applied to this item's contribution amount before retirement. Example: 5% means next year's contribution is 5% higher than this year's contribution." /></span>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Growth <InfoTooltip text="Annual rate at which this contribution grows, compounding from the contribution start year forward. Example: 3%/yr means the year-2 contribution is 3% higher than year-1, and so on." /></span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                             <input
                               type="number"
@@ -7317,7 +7514,7 @@ const mIdx = cols.findIndex(c =>
                         </div>
                         <button
                           onClick={() => {
-                            let newItems = assets.investmentItems.filter(i => i.id !== item.id); if (newItems.length === 0) newItems = [{ id: 1, name: 'Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0 }];
+                            let newItems = assets.investmentItems.filter(i => i.id !== item.id); if (newItems.length === 0) newItems = [{ id: 1, name: 'Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null }];
                             const total = newItems.reduce((sum, i) => sum + i.amount, 0);
                             setAssets({ ...assets, investmentItems: newItems, investments: total });
                           }}
@@ -7342,7 +7539,7 @@ const mIdx = cols.findIndex(c =>
                         const newId = assets.investmentItems.length > 0 ? Math.max(...assets.investmentItems.map(i => i.id)) + 1 : 1;
                         setAssets({ 
                           ...assets, 
-                          investmentItems: [...assets.investmentItems, { id: newId, name: 'New Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0 }]
+                          investmentItems: [...assets.investmentItems, { id: newId, name: 'New Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null }]
                         });
                       }}
                       style={{
@@ -8216,6 +8413,7 @@ const mIdx = cols.findIndex(c =>
                   setProjectionTargetYear(new Date().getFullYear() + 5);
                   setPreRetChartTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.retirementAge - DEFAULT_STATE.profile.currentAge));
                   setCashFlowTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge));
+                  setAssetAllocTargetYear(new Date().getFullYear());
                   setSurplusSplitInvest(100);
                   setSurplusSplitDebt(0);
                   setExpenseViewMode('annual');

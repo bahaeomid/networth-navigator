@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-12 by Session 12
+**Last updated:** 2026-05-16 by Session 13
 
 ---
 
@@ -68,6 +68,15 @@
 | NEW-54 | Monte Carlo withdrawal onset out of parity with deterministic/runway | HIGH | K | FIXED | 11 | Deterministic/runway now match MC year-0 withdrawal convention; parity contract documented + harness updated |
 | NEW-55 | Audit harness mixes advisory scripts into pass/fail gating | MEDIUM | K | FIXED | 12 | Reclassified all auditor1 scripts as advisory in `run_all_audits.js`; gating pass banner now reflects assertion-backed tests only |
 | NEW-56 | Docs index current-ground-truth pointers stale vs registry | LOW | K | FIXED | 12 | Updated docs index pointers to the active full audit lineage (`AUDIT_REPORT_2026-05-12-codebase-auditor-full.md`) |
+| NEW-57 | Runway neutral slider state had colored optimism bias and coarse return increments | LOW | L | FIXED | 13 | Neutral runway sliders now use neutral styling; return offsets step in 0.5pp increments |
+| NEW-58 | Investment contribution start-year editor was cramped and allowed post-retirement starts | MEDIUM | L | FIXED | 13 | Start-year input is consistently labeled/sized and capped to the final pre-retirement year |
+| NEW-59 | Collapsed investment contribution badges crowded growth controls | LOW | L | FIXED | 13 | Collapsed investment header now wraps compact badges separately from growth controls |
+| NEW-60 | Projected asset allocation tooltip showed stale/zero investment subitems and estimate wording | MEDIUM | L | FIXED | 13 | Tooltip now projects item-level balances/contributions, reconciles to category totals, and labels projected breakdowns explicitly |
+| NEW-61 | Financial health current-year metric labels wrapped and lacked explicit year context | LOW | L | FIXED | 13 | Scorecard/report labels now include the current calendar year and use compact non-wrapping labels |
+| NEW-62 | Chart target-year controls lacked grouped visual framing | LOW | L | FIXED | 13 | Year controls now sit in a framed backdrop across allocation, cashflow, pre-retirement, and projection charts |
+| NEW-63 | New May 15 state was not fully persisted/imported/exported | MEDIUM | L | FIXED | 13 | Export now writes `runwaySchemaVersion`; autosave/export/import/reset now cover `assetAllocTargetYear` |
+| NEW-64 | Verification harness drifted from runway/contribution semantics | MEDIUM | L | FIXED | 13 | User-capture selectors and full-element coverage projection/runway checks now match the implemented controls and contribution model |
+| NEW-65 | Save More undeployed surplus treated future-starting contributions as current commitments | HIGH | L | FIXED | 13 | Undeployed surplus now subtracts only active current-year investment contributions; UI/report/docs updated |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -918,3 +927,93 @@ Reviewed and re-validated the main connected surfaces after lever fixes:
 
 **Next session priority:**
 1. Validate and close any remaining non-A9 deferred findings if desired (e.g., NEW-21, NEW-25, NEW-27, NEW-43).
+
+---
+
+## SESSION 13 - 2026-05-16 - Codex
+
+**Picking up from:** Session 12 close, commit `1fa1eaa`, Sonnet May 15 implementation report, and user latest-feedback snapshots.
+**Open findings at session start:** NEW-57 through NEW-65, plus prior intentionally deferred findings NEW-21, NEW-25, NEW-27, NEW-43.
+**Session goal:** Audit Sonnet's uncommitted May 15 implementation against the financial model/design intent, implement the latest user feedback and any additive parity fixes, then re-run release verification.
+
+### NEW-57 - Runway neutral slider state had colored optimism bias and coarse return increments (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Return-offset sliders now support 0.5 percentage-point increments. Neutral runway slider state uses neutral styling; color accents are applied only once the user moves a slider away from neutral.
+**Files changed:** `src/App.jsx`, `_dev/e2e/user-scenario-capture.spec.js`, `_dev/tests/verify_full_element_coverage.mjs`
+
+### NEW-58 - Investment contribution start-year editor was cramped and allowed post-retirement starts (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Reworked the investment annual-contribution/start-year controls so the year label and input are visually consistent with the amount field. Start-year inputs are capped to the final pre-retirement year.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/ARCHITECTURE.md`, `_dev/docs/core/FINANCIAL_MODEL.md`, `README.md`
+
+### NEW-59 - Collapsed investment contribution badges crowded growth controls (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Made the collapsed Investments header wrap badges independently from the right-side growth controls and compacted contribution badge copy.
+**Files changed:** `src/App.jsx`
+
+### NEW-60 - Projected asset allocation tooltip showed stale/zero investment subitems and estimate wording (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Projected allocation tooltips now compute item-level projected balances for Investments using current balances, active/future contributions, contribution growth, and category reconciliation. Non-investment category subitems project by their configured category growth rate. Tooltip wording now distinguishes projected breakdowns from current actual breakdowns.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-61 - Financial health current-year metric labels wrapped and lacked explicit year context (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Scorecard and export report labels now include the current calendar year for current-snapshot metrics, including savings rate. Compact label styling prevents the savings-rate label from wrapping.
+**Files changed:** `src/App.jsx`
+
+### NEW-62 - Chart target-year controls lacked grouped visual framing (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added a consistent framed backdrop around year controls for the asset allocation, cashflow, pre-retirement, and project-to-year chart controls.
+**Files changed:** `src/App.jsx`
+
+### NEW-63 - New May 15 state was not fully persisted/imported/exported (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** JSON export now writes `runwaySchemaVersion: 2` so fresh exports retain the neutral runway schema after import. `assetAllocTargetYear` now participates in autosave, export, import, and reset state.
+**Files changed:** `src/App.jsx`
+
+### NEW-64 - Verification harness drifted from runway/contribution semantics (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Updated scenario capture selectors for the new runway range controls. Updated full-element coverage math for retirement-year drawdown parity, staged investment contributions, and neutral runway offset expectations. Regenerated user-capture and full-element coverage artifacts.
+**Files changed:** `_dev/e2e/user-scenario-capture.spec.js`, `_dev/tests/verify_full_element_coverage.mjs`, `_dev/artifacts/user_scenario_capture.json`, `_dev/artifacts/user_scenario_extracted.json`, `_dev/artifacts/full_element_coverage_report.json`
+
+### NEW-65 - Save More undeployed surplus treated future-starting contributions as current commitments (HIGH -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Current-year undeployed surplus now subtracts only active current-year investment contributions, not future-starting planned contributions. Updated current-year savings tooltip, HTML report methodology, and financial-model docs to preserve the distinction between configured future commitments and current-year active deployment.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### Verification Chain (Session 13)
+
+- `npm run lint` -> PASS
+- `npm run build` -> PASS
+- `npm run test:audits` -> PASS
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` -> PASS
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS
+  - `npm run test:smoke` -> PASS (12 Playwright tests)
+
+## SESSION 13 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 9 - NEW-57, NEW-58, NEW-59, NEW-60, NEW-61, NEW-62, NEW-63, NEW-64, NEW-65
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** May 15 follow-up backlog closed; release verification passed.
+
+**Key observations this session:**
+- Future-dated contribution inputs must not be treated as current-year cash commitments in savings-rate or Save More surplus math.
+- Projected tooltips need to share the same contribution/growth semantics as the projection engine, or they become misleading even when top-level totals are correct.
+- Any user-visible state added to chart controls must be wired through autosave, export, import, and reset in the same change.
+
+**Next session priority:**
+1. Address prior intentional deferrals if product requirements change (NEW-21, NEW-25, NEW-27, NEW-43).
