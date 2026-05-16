@@ -151,7 +151,7 @@ const TOOLTIPS = {
   retirementAge: "The age you plan to stop working. Income stops and retirement expenses begin at this age.",
   lifeExpectancy: "Expected age of death for planning purposes. Standard is 90-95 years.",
   cash: "Liquid cash in bank accounts, emergency funds. Low/no growth expected.",
-  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution field to model planned ongoing additions; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the first warning year.",
+  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution field to model planned ongoing additions; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the affected year(s).",
   realEstate: "Property value (your home + investment properties). Appreciates based on real estate rate.",
   otherAssets: "Other valuable assets: business equity, collectibles, precious metals, vehicles, etc. Treated as illiquid — this category appreciates at the Other growth rate but does not contribute to SWR drawdown capacity. Only Investments and Cash are considered liquid for retirement funding purposes.",
   mortgage: "Outstanding mortgage balance on all properties. This affects net worth only; it does not create a cashflow expense. To reflect the payment in savings, enter the full annual principal + interest payment as a Pre-Retirement expense category with 0% growth and a phase-out year matching the loan payoff year. Keep the liability here for net worth accuracy. Avoid double-counting if that payment is already included in another expense category.",
@@ -587,14 +587,39 @@ const TargetYearInput = ({ value, onChange, minYear, maxYear, compact }) => {
   );
 };
 
-const ChartYearSelector = ({ mode, value, onChange, minYear, maxYear, currentYear, retirementYear, lifeExpectancyYear, currentAge }) => {
+const formatYearRanges = (years) => {
+  const sorted = [...new Set(years)].sort((a, b) => a - b);
+  const ranges = [];
+  let start = null;
+  let prev = null;
+  sorted.forEach((year) => {
+    if (start === null) {
+      start = year;
+      prev = year;
+      return;
+    }
+    if (year === prev + 1) {
+      prev = year;
+      return;
+    }
+    ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+    start = year;
+    prev = year;
+  });
+  if (start !== null) ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return ranges.join(', ');
+};
+
+const ChartYearSelector = ({ mode, value, onChange, minYear, maxYear, currentYear, retirementYear, lifeExpectancyYear, currentAge, showModeLabel = true, quickYearKeys }) => {
   const age = currentAge + (value - currentYear);
   const seen = new Set();
+  const allowedQuickYears = new Set(quickYearKeys || ['today', 'retirement', 'life']);
   const quickYears = [
-    { label: 'Today', year: currentYear, title: `Today (${currentYear})` },
-    { label: 'Ret', year: retirementYear, title: `Retirement (${retirementYear})` },
-    { label: 'Life', year: lifeExpectancyYear, title: `Life expectancy (${lifeExpectancyYear})` },
+    { key: 'today', label: 'Today', year: currentYear, title: `Today (${currentYear})` },
+    { key: 'retirement', label: 'Ret', year: retirementYear, title: `Retirement (${retirementYear})` },
+    { key: 'life', label: 'Life', year: lifeExpectancyYear, title: `Life expectancy (${lifeExpectancyYear})` },
   ].filter((item) => {
+    if (!allowedQuickYears.has(item.key)) return false;
     if (item.year < minYear || item.year > maxYear || seen.has(item.year)) return false;
     seen.add(item.year);
     return true;
@@ -602,10 +627,10 @@ const ChartYearSelector = ({ mode, value, onChange, minYear, maxYear, currentYea
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.28rem 0.42rem', background: 'linear-gradient(135deg, rgba(15,23,42,0.68), rgba(30,41,59,0.5))', border: '1px solid rgba(148,163,184,0.22)', borderRadius: '12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-      <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{mode}</span>
+      {showModeLabel && <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{mode}</span>}
       <TargetYearInput compact value={value} onChange={onChange} minYear={minYear} maxYear={maxYear} />
       <span style={{ fontSize: '0.68rem', color: '#64748b', whiteSpace: 'nowrap' }}>Age {age}</span>
-      <span style={{ width: '1px', height: '18px', background: 'rgba(148,163,184,0.18)' }} />
+      {quickYears.length > 0 && <span style={{ width: '1px', height: '18px', background: 'rgba(148,163,184,0.18)' }} />}
       {quickYears.map((item) => {
         const active = value === item.year;
         return (
@@ -2283,7 +2308,7 @@ const NetWorthNavigator = () => {
       <p>The projections are sensitive to the following assumptions, which are user-defined and applied consistently across all scenarios unless otherwise stated:</p>
       <ul>
         <li><strong>Investment return (${assumptions.investmentReturn}% p.a.).</strong> Applied to the liquid investment portfolio (pre- and post-retirement). This is a nominal, pre-fee return. Adviser fees, fund management charges, and transaction costs are not deducted.</li>
-        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If a start year is set, that item begins in that calendar year; contribution growth compounds from the start year forward. The model does not cap contributions to calculated surplus; the app flags the first pre-retirement year where planned contributions exceed projected savings so users can review affordability.</li>
+        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If a start year is set, that item begins in that calendar year; contribution growth compounds from the start year forward. The model does not cap contributions to calculated surplus; the app flags any pre-retirement years where planned contributions exceed projected savings so users can review affordability.</li>
         <li><strong>Real estate appreciation (${assumptions.realEstateAppreciation}% p.a.).</strong> Applied uniformly to the entire real estate portfolio. Regional, property-type, and leverage effects are not modelled.</li>
         <li><strong>Salary growth (${assumptions.salaryGrowth}% p.a.).</strong> Applied to earned income until the stated retirement age, after which salary is assumed to cease.</li>
         <li><strong>Passive income growth (${assumptions.passiveGrowth}% p.a.) and other income growth (${assumptions.otherIncomeGrowth}% p.a.).</strong> Continued post-retirement unless an end year is specified on the income sub-item.</li>
@@ -3360,7 +3385,7 @@ const mIdx = cols.findIndex(c =>
     return wealthProjection.filter((d) => d.year <= clampedAssetsOverTimeTargetYear);
   }, [wealthProjection, clampedAssetsOverTimeTargetYear]);
 
-  // Informational affordability check: first pre-retirement year where planned
+  // Informational affordability check: pre-retirement years where planned
   // investment contributions exceed the projected savings surplus.
   const overSavingsItems = useMemo(() => {
     const contribItems = (assets.investmentItems || []).filter((item) => (item.annualContrib || 0) > 0);
@@ -3370,6 +3395,7 @@ const mIdx = cols.findIndex(c =>
     const retirementYear = cy + (profile.retirementAge - profile.currentAge);
     const rowsByYear = new Map(wealthProjection.map((row) => [row.year, row]));
 
+    const breachRows = [];
     for (let year = cy; year < retirementYear; year++) {
       const annualContrib = contribItems.reduce((sum, item) => {
         const startYear = item.contribStartYear || cy;
@@ -3382,7 +3408,7 @@ const mIdx = cols.findIndex(c =>
       const row = rowsByYear.get(year);
       const projectedSavings = row ? row.savings : (year === cy ? annualSavings : 0);
       if (annualContrib > projectedSavings) {
-        return [{
+        breachRows.push({
           id: 'planned-contributions',
           name: 'Planned contributions',
           annualContrib,
@@ -3391,11 +3417,11 @@ const mIdx = cols.findIndex(c =>
           age: row ? row.age : profile.currentAge + (year - cy),
           projectedSavings,
           shortfall: annualContrib - projectedSavings,
-        }];
+        });
       }
     }
 
-    return [];
+    return breachRows;
   }, [assets.investmentItems, wealthProjection, annualSavings, profile.currentAge, profile.retirementAge]);
 
   const investmentContributionExceedsCurrentSavings = useMemo(() => {
@@ -4259,28 +4285,29 @@ const mIdx = cols.findIndex(c =>
                   Net Worth Over Time
                   <InfoTooltip text={`${TOOLTIPS.netWorth}${assumptions.enableDrawdown ? ' · Drawdown mode is active: post-retirement, your investment balance is drawn down each year by your inflation-adjusted retirement expenses. Real estate and other assets continue to grow passively and are not drawn from.' : ''}`} />
                 </h3>
-                {assumptions.enableDrawdown && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.75rem', borderRadius: '20px', background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.4)', fontSize: '0.75rem', fontWeight: '600', color: '#a78bfa' }}>
-                    📉 Drawdown Active
-                  </div>
-                )}
-                <ChartYearSelector
-                  mode="through"
-                  value={clampedNetWorthTargetYear}
-                  onChange={setNetWorthTargetYear}
-                  minYear={currentCalendarYear}
-                  maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
-                  currentYear={currentCalendarYear}
-                  retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
-                  lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
-                  currentAge={profile.currentAge}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {assumptions.enableDrawdown && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.75rem', borderRadius: '20px', background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.4)', fontSize: '0.75rem', fontWeight: '600', color: '#a78bfa' }}>
+                      📉 Drawdown Active
+                    </div>
+                  )}
+                  <ChartYearSelector
+                    mode="through"
+                    value={clampedNetWorthTargetYear}
+                    onChange={setNetWorthTargetYear}
+                    minYear={currentCalendarYear}
+                    maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                    currentYear={currentCalendarYear}
+                    retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                    lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                    currentAge={profile.currentAge}
+                    showModeLabel={false}
+                    quickYearKeys={['retirement', 'life']}
+                  />
+                </div>
               </div>
               <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '0.5rem' }}>
                 Your wealth trajectory from age {profile.currentAge} to {profile.currentAge + (clampedNetWorthTargetYear - currentCalendarYear)}
-              </p>
-              <p style={{ fontSize: '0.78rem', color: '#4b5563', marginBottom: '1.25rem' }}>
-                ⚠ Only investment-item annual contributions are included in the base projection. Any remaining surplus stays undeployed unless modeled in Surplus Deployment below.
               </p>
               <ResponsiveContainer width="100%" height={450} style={{ overflow: 'visible' }}>
                 <AreaChart data={netWorthChartData} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
@@ -4448,6 +4475,7 @@ const mIdx = cols.findIndex(c =>
                     retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
                     lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
                     currentAge={profile.currentAge}
+                    showModeLabel={false}
                   />
                 </div>
                 {(() => {
@@ -4635,6 +4663,9 @@ const mIdx = cols.findIndex(c =>
                     parentKey: cat.key,
                     parentLabel: cat.label,
                     startAmount: sub.amount,
+                    annualContrib: sub.annualContrib || 0,
+                    contribStartYear: sub.contribStartYear || null,
+                    contribGrowthRate: sub.contribGrowthRate || 0,
                     rate: cat.rate,
                     color: cat.subColors[si % cat.subColors.length],
                   });
@@ -4642,23 +4673,38 @@ const mIdx = cols.findIndex(c =>
               });
 
               // Build chart data by merging wealthProjection with sub-item projections
-              // For investment sub-items: when drawdown is enabled, scale proportionally
-              // to the total investments balance from wealthProjection (which already has drawdown applied)
-              // so sub-items track the actual depleted balance rather than pure compound growth.
-              const investmentsStartAmount = assets.investments || 1; // avoid divide-by-zero
+              const projectInvestmentSubItem = (sub, targetYear) => {
+                const investmentRate = (assumptions.investmentReturn || 0) / 100;
+                const yearsAhead = targetYear - currentYear;
+                let itemValue = (sub.startAmount || 0) * Math.pow(1 + investmentRate, yearsAhead);
+                const startYear = sub.contribStartYear || currentYear;
+                const contribGrowth = (sub.contribGrowthRate || 0) / 100;
+                const retirementYear = currentYear + (profile.retirementAge - profile.currentAge);
+                const lastContributionYear = Math.min(targetYear - 1, retirementYear - 1);
+                for (let contribYear = Math.max(currentYear, startYear); contribYear <= lastContributionYear; contribYear++) {
+                  const annualContrib = (sub.annualContrib || 0) * Math.pow(1 + contribGrowth, contribYear - startYear);
+                  itemValue += annualContrib * Math.pow(1 + investmentRate, targetYear - contribYear - 1);
+                }
+                return Math.max(0, itemValue);
+              };
               const assetChartData = assetsOverTimeBaseData.map((d) => {
                 const row = { ...d };
                 const yearsAhead = d.year - currentYear;
-                allSubItems.forEach(sub => {
-                  if (sub.parentKey === 'investments' && assumptions.enableDrawdown) {
-                    // Scale the sub-item proportionally to how total investments have moved
-                    // (captures both growth AND drawdown withdrawals from wealthProjection)
-                    // Weight: proportional share of starting investments * actual total
-                    const subShare = sub.startAmount / investmentsStartAmount;
-                    row[sub.key] = Math.round(Math.max(0, subShare * d.investments));
-                  } else {
-                    row[sub.key] = Math.round(sub.startAmount * Math.pow(1 + sub.rate / 100, yearsAhead));
-                  }
+                ASSET_LINES.forEach(cat => {
+                  const catSubs = allSubItems.filter(sub => sub.parentKey === cat.key);
+                  if (catSubs.length === 0) return;
+                  const rawValues = catSubs.map(sub => ({
+                    sub,
+                    value: sub.parentKey === 'investments'
+                      ? projectInvestmentSubItem(sub, d.year)
+                      : Math.max(0, (sub.startAmount || 0) * Math.pow(1 + (sub.rate || 0) / 100, yearsAhead)),
+                  }));
+                  const rawTotal = rawValues.reduce((sum, item) => sum + item.value, 0);
+                  const categoryTotal = d[cat.key] || 0;
+                  const scale = rawTotal > 0 ? categoryTotal / rawTotal : 0;
+                  rawValues.forEach(({ sub, value }) => {
+                    row[sub.key] = Math.round(Math.max(0, value * scale));
+                  });
                 });
                 return row;
               });
@@ -4681,17 +4727,20 @@ const mIdx = cols.findIndex(c =>
                     <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: 0 }}>
                       Assets Over Time
                     </h3>
-                    <ChartYearSelector
-                      mode="through"
-                      value={clampedAssetsOverTimeTargetYear}
-                      onChange={setAssetsOverTimeTargetYear}
-                      minYear={currentCalendarYear}
-                      maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
-                      currentYear={currentCalendarYear}
-                      retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
-                      lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
-                      currentAge={profile.currentAge}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <ChartYearSelector
+                        mode="through"
+                        value={clampedAssetsOverTimeTargetYear}
+                        onChange={setAssetsOverTimeTargetYear}
+                        minYear={currentCalendarYear}
+                        maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                        currentYear={currentCalendarYear}
+                        retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                        lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                        currentAge={profile.currentAge}
+                        showModeLabel={false}
+                        quickYearKeys={['retirement', 'life']}
+                      />
                     <div style={{ position: 'relative' }}>
                       <button
                         onClick={() => setAssetDropdownOpen(prev => !prev)}
@@ -4760,6 +4809,7 @@ const mIdx = cols.findIndex(c =>
                         </div>
                         </>
                       )}
+                    </div>
                     </div>
                   </div>
                   <p style={{ fontSize: '0.85rem', color: '#9ca3af', marginBottom: '0.75rem' }}>
@@ -4957,6 +5007,8 @@ const mIdx = cols.findIndex(c =>
                     retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
                     lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
                     currentAge={profile.currentAge}
+                    showModeLabel={false}
+                    quickYearKeys={['retirement', 'life']}
                   />
                 </div>
               </div>
@@ -6182,20 +6234,6 @@ const mIdx = cols.findIndex(c =>
                     <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>How long your investment portfolio survives through age {runwayTargetAge}</p>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-                    <ChartYearSelector
-                      mode="through"
-                      value={clampedRunwayTargetYear}
-                      onChange={setRunwayTargetYear}
-                      minYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
-                      maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
-                      currentYear={currentCalendarYear}
-                      retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
-                      lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
-                      currentAge={profile.currentAge}
-                    />
-                  </div>
-
                   {/* Stat cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
 
@@ -6305,6 +6343,22 @@ const mIdx = cols.findIndex(c =>
                         </div>
                       );
                     })()}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+                    <ChartYearSelector
+                      mode="through"
+                      value={clampedRunwayTargetYear}
+                      onChange={setRunwayTargetYear}
+                      minYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                      maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                      currentYear={currentCalendarYear}
+                      retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                      lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                      currentAge={profile.currentAge}
+                      showModeLabel={false}
+                      quickYearKeys={['life']}
+                    />
                   </div>
 
                   {/* Chart */}
@@ -6751,6 +6805,8 @@ const mIdx = cols.findIndex(c =>
                           retirementYear={retirementYear}
                           lifeExpectancyYear={currentYear + (profile.lifeExpectancy - profile.currentAge)}
                           currentAge={profile.currentAge}
+                          showModeLabel={false}
+                          quickYearKeys={['retirement']}
                         />
                         <div style={{ position: 'relative' }}>
                           <button
@@ -7091,6 +7147,7 @@ const mIdx = cols.findIndex(c =>
                         retirementYear={retirementYear}
                         lifeExpectancyYear={currentYear + (profile.lifeExpectancy - profile.currentAge)}
                         currentAge={profile.currentAge}
+                        showModeLabel={false}
                       />
                     </div>
                     {/* Scenario cards */}
@@ -7510,7 +7567,7 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.34rem', flexWrap: 'nowrap', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
                         <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flex: '0 0 auto' }}>
                           Investments
-                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution start year. Annual contrib is the planned addition each year starting from the 'from' year; growth compounds from that start year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the first year to review in Cash Flow Over Time." />
+                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution start year. Annual contrib is the planned addition each year starting from the 'from' year; growth compounds from that start year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the affected year(s) to review in Cash Flow Over Time." />
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace', flex: '0 0 auto' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
                         {annualInvestmentContribution > 0 && (() => {
@@ -7536,12 +7593,23 @@ const mIdx = cols.findIndex(c =>
                             </span>
                           );
                         })()}
-                        {investmentContributionExceedsCurrentSavings && overSavingsItems[0] && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.16rem', fontSize: '0.58rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.08rem 0.26rem', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
-                            ⚠ over {overSavingsItems[0].breachYear}
-                            <InfoTooltip text={`Planned investment contributions first exceed projected pre-retirement surplus in ${overSavingsItems[0].breachYear} (Age ${overSavingsItems[0].age}): ${formatCurrencyDecimal(overSavingsItems[0].annualContrib, currency, exchangeRates)}/yr contributions vs ${formatCurrencyDecimal(overSavingsItems[0].projectedSavings, currency, exchangeRates)}/yr projected surplus, a ${formatCurrencyDecimal(overSavingsItems[0].shortfall, currency, exchangeRates)}/yr gap. This includes salary growth, expense inflation, planned expenses/OTEs, contribution start years, and contribution growth. Contributions are still allowed and are not capped; use the Cash Flow Over Time chart to review year-by-year surplus before setting a fixed contribution.`} />
-                          </span>
-                        )}
+                        {investmentContributionExceedsCurrentSavings && overSavingsItems.length > 0 && (() => {
+                          const yearSummary = formatYearRanges(overSavingsItems.map((item) => item.breachYear));
+                          const badgeText = overSavingsItems.length === 1
+                            ? `over ${overSavingsItems[0].breachYear}`
+                            : `over ${overSavingsItems.length} yrs`;
+                          const firstBreach = overSavingsItems[0];
+                          const largestBreach = overSavingsItems.reduce((max, item) => item.shortfall > max.shortfall ? item : max, firstBreach);
+                          const compactExamples = firstBreach === largestBreach
+                            ? `First breach: ${firstBreach.breachYear}, gap ${formatCurrencyDecimal(firstBreach.shortfall, currency, exchangeRates)}/yr.`
+                            : `First breach: ${firstBreach.breachYear}, gap ${formatCurrencyDecimal(firstBreach.shortfall, currency, exchangeRates)}/yr.\nLargest gap: ${largestBreach.breachYear}, ${formatCurrencyDecimal(largestBreach.shortfall, currency, exchangeRates)}/yr.`;
+                          return (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.16rem', fontSize: '0.58rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.08rem 0.26rem', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
+                              ⚠ {badgeText}
+                              <InfoTooltip text={`Planned investment contributions exceed projected pre-retirement surplus in ${overSavingsItems.length} year${overSavingsItems.length !== 1 ? 's' : ''}: ${yearSummary}.\n\n${compactExamples}\n\nContributions are still allowed and are not capped. Use Cash Flow Over Time to zoom into each year's income, expenses, planned expenses, and savings breakdown.`} />
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: '0 0 auto' }}>
                         <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span>

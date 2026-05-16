@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 by Session 16
+**Last updated:** 2026-05-16 by Session 18
 
 ---
 
@@ -84,8 +84,14 @@
 | NEW-70 | Chart year selectors lacked quick milestone-year switching | LOW | L | FIXED | 15 | Added compact shared selector with editable year, age, and Today/Ret/Life quick chips where relevant |
 | NEW-71 | Chart year selectors were not applied to Net Worth, Assets Over Time, or Retirement Runway | LOW | M | FIXED | 16 | Added shared year controls to the remaining chart surfaces and persisted the new target-year state |
 | NEW-72 | Custom runway range styling regressed thumb alignment and live fill behavior | LOW | M | FIXED | 16 | Removed `.nwn-range`; restored native range sizing while preserving pessimistic right-anchored semantics via an RTL magnitude slider |
-| NEW-73 | Investment over-savings warning only checked the contribution start year | MEDIUM | M | FIXED | 16 | Warning now scans all pre-retirement years and reports the first year where planned contributions exceed projected savings surplus |
+| NEW-73 | Investment over-savings warning only checked the contribution start year | MEDIUM | M | FIXED | 16 | Warning now scans all pre-retirement years; all-year reporting is tracked in NEW-75 |
 | NEW-74 | Dynamic contribution warning lacked regression coverage | LOW | M | FIXED | 16 | Added a Playwright regression for a future OTE-driven affordability breach and updated capture/coverage handling for RTL pessimistic slider semantics |
+| NEW-75 | Investment over-savings warning still summarized only the first breached year | MEDIUM | N | FIXED | 17 | Warning now returns all pre-retirement breach years and badges multi-year breaches |
+| NEW-76 | Chart horizon selectors carried redundant mode labels and milestone chips on chart surfaces | LOW | N | FIXED | 17 | Added per-chart selector display options; removed requested Through/Today/Ret/At labels/chips and moved Runway selector below scenario cards |
+| NEW-77 | Net Worth chart retained obsolete undeployed-surplus warning copy | LOW | O | FIXED | 18 | Removed stale chart note now that explicit annual contributions flow through the base projection |
+| NEW-78 | Assets Over Time investment drilldown overlays omitted annual contributions | HIGH | O | FIXED | 18 | Investment sub-item overlays now project starting balance plus staged contribution growth and reconcile to category totals |
+| NEW-79 | Multi-year over-savings tooltip was too verbose for compact header space | LOW | O | FIXED | 18 | Tooltip now summarizes count/range with first/largest gaps and points users to Cash Flow Over Time for details |
+| NEW-80 | Project-to-Future-Year selector still showed the redundant AT label | LOW | O | FIXED | 18 | Project selector now uses the same compact chart-year display option |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -1202,3 +1208,98 @@ Applied to Asset Allocation, Cash Flow, Pre-retirement Expenses, and Project to 
 
 **Next session priority:**
 1. Address prior intentional deferrals only if product requirements change (NEW-21, NEW-25, NEW-27, NEW-43).
+
+---
+
+## SESSION 17 - 2026-05-16 - Codex
+
+**Picking up from:** User follow-up on over-savings warning completeness and chart selector cleanup screenshots.
+**Open findings at session start:** NEW-75 through NEW-76.
+**Session goal:** Report all pre-retirement contribution-affordability breaches and remove redundant chart selector labels/chips without changing projection behavior.
+
+### NEW-75 - Investment over-savings warning still summarized only the first breached year (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** `overSavingsItems` now returns every pre-retirement year where aggregate planned investment contributions exceed projected savings surplus. The Investments header keeps a compact badge (`over YYYY` or `over N yrs`), and the tooltip lists the affected year range plus each year's contributions, projected surplus, and gap. Tooltip/docs copy now directs users to Cash Flow Over Time for the full year-by-year breakdown.
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-76 - Chart horizon selectors carried redundant mode labels and milestone chips on chart surfaces (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Extended `ChartYearSelector` with per-call display options so chart surfaces can hide the mode label and selected quick chips without changing persisted target-year state. Removed requested `THROUGH`/`Today`/`Ret`/`AT` label noise across the affected chart controls. Net Worth and Assets Over Time now group the selector with adjacent header controls, and Retirement Runway now places its chart horizon selector below the scenario cards and above the chart.
+**Files changed:** `src/App.jsx`, `_dev/artifacts/user_scenario_capture.json`, `_dev/artifacts/user_scenario_extracted.json`, `_dev/artifacts/full_element_coverage_report.json`
+
+### Verification Chain (Session 17)
+
+- `npm run lint` -> PASS
+- `npm run build` -> PASS
+- `npx playwright test _dev/e2e/regression-and-scenarios.spec.js -g "investment warning flags" --reporter=list` -> PASS
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` -> PASS
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS
+  - `npm run test:smoke` -> PASS (13 Playwright tests)
+- Final artifact refresh: `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 17 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 2 - NEW-75, NEW-76
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Follow-up warning completeness and compact chart-control UI cleanup closed; release verification passed.
+
+---
+
+## SESSION 18 - 2026-05-16 - Codex
+
+**Picking up from:** User follow-up on stale Net Worth chart copy, Assets Over Time drilldown contribution parity, compact over-savings tooltip behavior, and remaining Project-to-Future-Year selector label.
+**Open findings at session start:** NEW-77 through NEW-80.
+**Session goal:** Remove stale chart messaging, align Assets Over Time sub-item overlays with annual contribution semantics, keep over-savings guidance compact, and re-verify downstream contribution surfaces.
+
+### NEW-77 - Net Worth chart retained obsolete undeployed-surplus warning copy (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Removed the warning paragraph above Net Worth Over Time because explicit investment-item annual contributions already flow through the base projection and downstream retirement calculations.
+**Files changed:** `src/App.jsx`
+
+### NEW-78 - Assets Over Time investment drilldown overlays omitted annual contributions (HIGH -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Assets Over Time investment sub-item overlays now project starting balance plus annual contributions from each item's configured start year through the last pre-retirement contribution year, applying contribution growth and investment compounding. The projected sub-item values are reconciled to the category total so drawdown/category totals remain consistent with `wealthProjection`.
+**Verification:** Added a Playwright regression where an investment item has zero starting balance and a positive annual contribution; the selected drilldown line now renders a non-zero value.
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`
+
+### NEW-79 - Multi-year over-savings tooltip was too verbose for compact header space (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Replaced the itemized year-by-year tooltip body with a compact count/range summary, first breach, largest gap, and Cash Flow Over Time guidance for detailed inspection.
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-80 - Project-to-Future-Year selector still showed the redundant AT label (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Applied the existing compact `ChartYearSelector` display option to Project to a Future Year, removing the remaining `AT` label without changing target-year behavior.
+**Files changed:** `src/App.jsx`
+
+### Verification Chain (Session 18)
+
+- `npm run lint` -> PASS
+- `npm run build` -> PASS (existing Vite chunk-size warning only)
+- `npx playwright test _dev/e2e/regression-and-scenarios.spec.js -g "investment warning flags|assets over time investment drilldown" --reporter=list` -> PASS
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` -> PASS
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS (existing Vite chunk-size warning only)
+  - `npm run test:smoke` -> PASS (14 Playwright tests)
+- Final artifact refresh: `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 18 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 4 - NEW-77, NEW-78, NEW-79, NEW-80
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Contribution overlay parity and remaining compact chart-label cleanup closed; release verification passed.

@@ -352,11 +352,11 @@ test('regression: CSV Uncategorized category captures unmatched OTE mapping', as
   expect(orangeDots).toBeGreaterThan(0);
 });
 
-test('regression: investment warning flags first future contribution affordability breach', async ({ page }) => {
+test('regression: investment warning flags all future contribution affordability breaches', async ({ page }) => {
   attachDialogHandler(page);
   await page.goto('/');
 
-  const breachYear = CURRENT_YEAR + 2;
+  const breachYears = [CURRENT_YEAR + 2, CURRENT_YEAR + 3];
   const scenario = buildScenarioData({
     name: 'future-contribution-warning',
     currentAge: 35,
@@ -373,15 +373,60 @@ test('regression: investment warning flags first future contribution affordabili
     assumptions: { salaryGrowth: 0, passiveGrowth: 0, otherIncomeGrowth: 0, investmentReturn: 5, investmentStdDev: 12, realEstateAppreciation: 0, realEstateStdDev: 0, otherAssetGrowth: 0, otherAssetStdDev: 0 },
     investmentItems: [{ id: 1, name: 'Portfolio', amount: 100000, annualContrib: 80000, contribGrowthRate: 0, contribStartYear: CURRENT_YEAR }],
     oneTimeExpenses: [
-      { id: 1, year: breachYear, description: 'School fee spike', amount: 60000, category: 'housing', endYear: null },
+      { id: 1, year: breachYears[0], description: 'School fee spike', amount: 60000, category: 'housing', endYear: null },
+      { id: 2, year: breachYears[1], description: 'Family support', amount: 70000, category: 'housing', endYear: null },
     ],
     nestEggSwr: 4,
   });
   await importJsonPayload(page, scenario);
 
   await tabByName(page, 'Finances').click();
-  const investmentsHeader = page.locator('div').filter({ hasText: 'Investments' }).filter({ hasText: new RegExp(`over\\s*${breachYear}`) }).first();
+  const investmentsHeader = page.locator('div').filter({ hasText: 'Investments' }).filter({ hasText: /over\s*2\s*yrs/ }).first();
   await expect(investmentsHeader).toBeVisible();
+  const warningBadge = investmentsHeader.locator('span').filter({ hasText: /over\s*2\s*yrs/ }).first();
+  await warningBadge.locator('span').last().hover();
+  await expect(page.getByText(new RegExp(`${breachYears[0]}-${breachYears[1]}`))).toBeVisible();
+});
+
+test('regression: assets over time investment drilldown includes annual contributions', async ({ page }) => {
+  attachDialogHandler(page);
+  await page.goto('/');
+
+  const scenario = buildScenarioData({
+    name: 'asset-drilldown-contributions',
+    currentAge: 37,
+    retirementAge: 45,
+    lifeExpectancy: 61,
+    currency: 'AED',
+    assets: { cash: 50000, investments: 0, realEstate: 0, other: 0 },
+    liabilities: { mortgage: 0, loans: 0, other: 0 },
+    income: { salary: 300000, passive: 0, other: 0 },
+    preExpenses: { housing: 60000, bills: 20000, groceries: 20000, healthBasic: 0, travel: 0, entertainment: 0 },
+    retExpenses: { housing: 30000, bills: 15000, groceries: 15000, healthBasic: 10000, travel: 0, entertainment: 0 },
+    preRates: { housing: 0, bills: 0, groceries: 0, healthBasic: 0, travel: 0, entertainment: 0 },
+    retRates: { housing: 0, bills: 0, groceries: 0, healthBasic: 0, travel: 0, entertainment: 0 },
+    assumptions: { salaryGrowth: 0, passiveGrowth: 0, otherIncomeGrowth: 0, investmentReturn: 5, investmentStdDev: 12, realEstateAppreciation: 0, realEstateStdDev: 0, otherAssetGrowth: 0, otherAssetStdDev: 0 },
+    investmentItems: [{ id: 1, name: 'Contribution Fund', amount: 0, annualContrib: 100000, contribGrowthRate: 0, contribStartYear: CURRENT_YEAR }],
+    oneTimeExpenses: [],
+    nestEggSwr: 4,
+  });
+  await importJsonPayload(page, scenario);
+
+  await tabByName(page, 'Dashboard').click();
+  const assetsPanel = page.getByRole('heading', { name: 'Assets Over Time' })
+    .locator('xpath=ancestor::div[.//p[contains(., "How your wealth grows across asset classes")]][1]');
+  await expect(assetsPanel).toBeVisible();
+  await assetsPanel.getByRole('button', { name: /Drill down/ }).click();
+  await assetsPanel.getByText('Contribution Fund').click();
+
+  const chart = assetsPanel.locator('.recharts-wrapper').first();
+  const box = await chart.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box.x + 10, box.y + 10);
+  await page.mouse.move(box.x + box.width * 0.55, box.y + box.height * 0.45);
+  const tooltip = page.locator('.recharts-tooltip-wrapper').filter({ hasText: 'Contribution Fund' }).first();
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText(/Contribution Fund[\s\S]*AED\s(?!0(?:\D|$))[0-9]/);
 });
 
 test('regression: retire-later recommendation is reproducible and runway percentages are normalized', async ({ page }) => {
