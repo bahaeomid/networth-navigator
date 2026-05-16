@@ -5697,6 +5697,7 @@ const mIdx = cols.findIndex(c =>
                   addRows(liabilities.otherLiabilityItems, liabilities.other || 0, 'Liability', 5, 'other');
                   return rows;
                 })();
+                const totalConfiguredPreRetDebt = liabilityPaydownItems.reduce((sum, row) => sum + (row.item.amount || 0), 0);
                 const createDebtPaydownState = () => liabilityPaydownItems.map((row) => ({ ...row, extraPaid: 0 }));
                 const getRemainingDebtForYearFromState = (debtState, year) => debtState.reduce((sum, row) => {
                   const scheduled = getLiabilityBalanceForYear(row.item, year, currentCalendarYear, row.defaultTermYears);
@@ -5847,15 +5848,15 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ padding: '1rem', background: !hasLiabilityInPreRetHorizon ? 'rgba(255,255,255,0.02)' : 'rgba(248,113,113,0.07)', borderRadius: '10px', border: `1px solid ${!hasLiabilityInPreRetHorizon ? 'rgba(255,255,255,0.06)' : 'rgba(248,113,113,0.3)'}` }}>
                             <div style={{ fontSize: '0.85rem', color: '#f87171', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                               🏦 Clear debt first
-                              <InfoTooltip text={`Each pre-retirement year's Savings is directed to liabilities active in that same year (respecting each liability row's From and payoff years). Scheduled amortization still runs in the background; the Savings here is extra paydown on top. Once active liabilities are cleared, any remaining debt allocation is redirected to investments at ${assumptions.investmentReturn}%/yr. Debt paydown stops at your Planned Retirement Age. Liability balances affect net worth only; debt-service cashflow must be entered in your expense categories so those payments flow into savings, retirement drawdown, and nest-egg sizing.`} />
+                              <InfoTooltip text={`Each pre-retirement year's Savings is directed to liability rows that are active in that same calendar year, respecting every row's From and payoff years. If no liability is active in a year, the surplus is invested at ${assumptions.investmentReturn}%/yr instead. That applies both before a future-start liability begins and after an active liability has been paid off. Future liabilities are not ignored; they wait until their From year, then receive debt allocation while active. Scheduled amortization still runs in the background; the Savings here is extra paydown on top. Debt paydown stops at your Planned Retirement Age. Liability balances affect net worth only; debt-service cashflow must be entered in expense categories so those payments flow into savings, retirement drawdown, and nest-egg sizing.`} />
                             </div>
                             {!hasLiabilityInPreRetHorizon
                               ? <div style={{ fontSize: '0.85rem', color: '#9ca3af', fontStyle: 'italic' }}>No pre-retirement liabilities in the selected horizon — same as investing all surplus.</div>
                               : <>
                                   <div style={{ fontSize: '0.85rem', color: '#e8e9ed', marginBottom: '0.85rem', lineHeight: 1.5 }}>
                                     {totalDebtToday > 0
-                                      ? `Pay down ${formatCurrencyDecimal(totalDebtToday, currency, exchangeRates)} debt first, then invest freed surplus.`
-                                      : `No liability balance today; surplus is invested until future liabilities activate, then future liabilities up to ${formatCurrencyDecimal(maxPreRetLiabilityBalance, currency, exchangeRates)} are paid down as they activate.`}
+                                      ? `Track ${formatCurrencyDecimal(totalConfiguredPreRetDebt, currency, exchangeRates)} configured debt (${formatCurrencyDecimal(totalDebtToday, currency, exchangeRates)} active today). Pay active balances first, invest surplus when no debt is active.`
+                                      : `No liability balance today; surplus is invested until future liabilities activate. Then configured debt of ${formatCurrencyDecimal(totalConfiguredPreRetDebt || maxPreRetLiabilityBalance, currency, exchangeRates)} is paid down as each row becomes active.`}
                                   </div>
                                   <div style={{ height: '1px', background: 'rgba(248,113,113,0.2)', marginBottom: '0.75rem' }} />
                                   <div style={{ marginBottom: '0.65rem' }}>

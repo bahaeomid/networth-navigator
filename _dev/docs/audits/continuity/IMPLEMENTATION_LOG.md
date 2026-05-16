@@ -1566,3 +1566,22 @@ UI copy and tooltip text were updated to clarify:
 **Findings blocked:** 0
 **Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Investment contribution year fields now match the shared Finance behavior, surplus debt deployment tracks multiple/future-start liabilities correctly, and gap-lever tooltip copy is clearer.
+
+---
+
+## SESSION 24 - 2026-05-17 - Codex
+
+**Picking up from:** User feedback that the Surplus Deployment "Clear debt first" tile still displayed only the current active liability amount, making future-start liabilities look ignored.
+**Session goal:** Clarify the tile display and tooltip without changing the already-correct per-liability simulation.
+
+### NEW-95 - Clear Debt First tile headline only showed active-today debt (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Updated the tile headline to show total configured debt plus the active-today balance when a liability is already active. Expanded the tooltip to state that surplus is invested in years with no active liability, including years before a future-start liability begins and years after active debt is paid off.
+
+**Files changed:** `src/App.jsx`
+
+### Verification Chain (Session 24)
+
+- `npm run lint` -> PASS
+- `git diff --check` -> PASS
