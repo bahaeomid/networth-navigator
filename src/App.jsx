@@ -276,7 +276,6 @@ const InfoTooltip = ({ text }) => {
 
 const phasedHeaderBadgeTones = {
   income: { color: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.22)' },
-  liability: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.22)' },
 };
 
 const shouldShowPhasedHeaderBadge = (configured, active) => (
@@ -8418,7 +8417,7 @@ const mIdx = cols.findIndex(c =>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Mortgage</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(liabilities.mortgage, exchangeRates[currency])}</span>
                       {shouldShowPhasedHeaderBadge(liabilities.mortgage, currentLiabilityBalances.mortgage) && (
-                        <PhasedHeaderBadge tone="liability" text={`${formatDisplayNumber(currentLiabilityBalances.mortgage, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
+                        <PhasedHeaderBadge text={`${formatDisplayNumber(currentLiabilityBalances.mortgage, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
                       )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
@@ -8461,7 +8460,7 @@ const mIdx = cols.findIndex(c =>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Loans</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(liabilities.loans, exchangeRates[currency])}</span>
                       {shouldShowPhasedHeaderBadge(liabilities.loans, currentLiabilityBalances.loans) && (
-                        <PhasedHeaderBadge tone="liability" text={`${formatDisplayNumber(currentLiabilityBalances.loans, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
+                        <PhasedHeaderBadge text={`${formatDisplayNumber(currentLiabilityBalances.loans, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
                       )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
@@ -8503,7 +8502,7 @@ const mIdx = cols.findIndex(c =>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Other Liabilities</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(liabilities.other, exchangeRates[currency])}</span>
                       {shouldShowPhasedHeaderBadge(liabilities.other, currentLiabilityBalances.other) && (
-                        <PhasedHeaderBadge tone="liability" text={`${formatDisplayNumber(currentLiabilityBalances.other, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
+                        <PhasedHeaderBadge text={`${formatDisplayNumber(currentLiabilityBalances.other, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
                       )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
