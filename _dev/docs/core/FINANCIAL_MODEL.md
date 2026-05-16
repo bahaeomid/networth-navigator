@@ -83,7 +83,7 @@ One-time expenses:
 ```
 investmentContribution(y) =
   Σ item.annualContrib × (1 + item.contribGrowthRate)^(calendarYear - item.contribStartYear)
-  only when calendarYear >= item.contribStartYear
+  only when item.contribStartYear <= calendarYear <= item.contribEndYear
   [pre-retirement only; defaults to 0]
 
 investments(y+1) = max(0, investments(y) × (1 + investmentReturn) + investmentContribution(y) − drawdown(y))
@@ -92,7 +92,7 @@ otherAssets(y+1)  = otherAssets(y) × (1 + otherAssetGrowth)
 cash(y)          = constant (earns 0%, not compounded)
 ```
 
-Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year. The entered contribution amount is nominal in the start year; contribution growth compounds from that start year forward, not from today. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, Assets Over Time drilldown overlays, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning when planned investment contributions exceed projected savings surplus in any pre-retirement year, summarizes the affected range and examples, and directs users to the Cash Flow Over Time chart for full year-by-year context.
+Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year and can optionally end before retirement. The entered contribution amount is nominal in the start year; contribution growth compounds from that start year forward, not from today. The end year is inclusive. If no end year is set, the contribution continues through the final pre-retirement contribution year. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, Assets Over Time drilldown overlays, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning when planned investment contributions exceed projected savings surplus in any pre-retirement year, summarizes the affected range and examples, and directs users to the Cash Flow Over Time chart for full year-by-year context.
 
 ### Liability Amortization (Linear)
 
@@ -240,7 +240,7 @@ This lever is additional to the annual contributions entered on investment sub-i
 undeployedSurplus = currentYearSavings - currentYearActiveInvestmentContributions
 ```
 
-Future-starting investment contributions do not reduce current-year undeployed surplus until their start year. Gap-closing lever solvers also respect each item's configured contribution start year and growth rate. If planned contributions exceed projected savings surplus in any pre-retirement year, the base model still honors the entered contribution plan and shows an informational affordability warning; users should reduce the contribution input, delay the start year, or review Cash Flow Over Time if the plan is not affordable.
+Future-starting investment contributions do not reduce current-year undeployed surplus until their start year. Contributions with an end year stop reducing undeployed surplus after that inclusive end year. Gap-closing lever solvers also respect each item's configured contribution start year, end year, and growth rate. If planned contributions exceed projected savings surplus in any pre-retirement year, the base model still honors the entered contribution plan and shows an informational affordability warning; users should reduce the contribution input, shorten/delay the contribution window, or review Cash Flow Over Time if the plan is not affordable.
 
 Surplus Deployment is separate: its tiles deploy each year's full dynamic surplus or a selected split of that surplus as standalone alternatives. They do not add full surplus on top of fixed investment-item contributions already in the base plan.
 
@@ -254,7 +254,7 @@ For each extra year (1–30):
     return years
 ```
 
-Shows how many additional working years close the gap when only retirement age changes. Existing investment-item annual contributions continue through the later retirement date.
+Shows how many additional working years close the gap when only retirement age changes. Existing investment-item annual contributions continue through the later retirement date unless their configured end year stops them sooner.
 
 ### Lever 3: Higher Return
 
@@ -279,7 +279,7 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 | Decision | Rationale | Impact |
 |----------|-----------|--------|
 | **Cash excluded from Monte Carlo** | Cash is allocated annually as an emergency fund, not a growth asset | MC uses liquid investments only |
-| **Only explicit investment contributions enter the base projection** | Planned annual contributions belong on investment sub-items and may start in future pre-retirement years; unallocated surplus remains a scenario input | Base projection includes entered contributions from their configured start year; Surplus Deployment remains useful for testing additional year-by-year surplus strategies |
+| **Only explicit investment contributions enter the base projection** | Planned annual contributions belong on investment sub-items and may use a future pre-retirement start year and optional inclusive end year; unallocated surplus remains a scenario input | Base projection includes entered contributions only within their configured contribution windows; Surplus Deployment remains useful for testing additional year-by-year surplus strategies |
 | **Cash earns 0%** | Pragmatic — emergency fund, not income-generating | Cash balance is constant across projection |
 | **Linear amortization** | Simplification accepted by owner | Slightly overestimates debt in early years vs actual amortization schedule |
 | **Liability balances do not imply payments** | Balance sheet and cashflow are deliberately separate | Keep liabilities for net worth; enter full debt-service payments as expenses to affect savings |

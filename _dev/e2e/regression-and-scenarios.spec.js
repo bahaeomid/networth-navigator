@@ -388,6 +388,40 @@ test('regression: investment warning flags all future contribution affordability
   await expect(page.getByText(new RegExp(`${breachYears[0]}-${breachYears[1]}`))).toBeVisible();
 });
 
+test('regression: investment contribution to-year stops later affordability breaches', async ({ page }) => {
+  attachDialogHandler(page);
+  await page.goto('/');
+
+  const breachYears = [CURRENT_YEAR + 2, CURRENT_YEAR + 3];
+  const scenario = buildScenarioData({
+    name: 'ended-contribution-warning',
+    currentAge: 35,
+    retirementAge: 40,
+    lifeExpectancy: 85,
+    currency: 'AED',
+    assets: { cash: 50000, investments: 100000, realEstate: 0, other: 0 },
+    liabilities: { mortgage: 0, loans: 0, other: 0 },
+    income: { salary: 200000, passive: 0, other: 0 },
+    preExpenses: { housing: 60000, bills: 20000, groceries: 20000, healthBasic: 0, travel: 0, entertainment: 0 },
+    retExpenses: { housing: 30000, bills: 15000, groceries: 15000, healthBasic: 10000, travel: 0, entertainment: 0 },
+    preRates: { housing: 0, bills: 0, groceries: 0, healthBasic: 0, travel: 0, entertainment: 0 },
+    retRates: { housing: 0, bills: 0, groceries: 0, healthBasic: 0, travel: 0, entertainment: 0 },
+    assumptions: { salaryGrowth: 0, passiveGrowth: 0, otherIncomeGrowth: 0, investmentReturn: 5, investmentStdDev: 12, realEstateAppreciation: 0, realEstateStdDev: 0, otherAssetGrowth: 0, otherAssetStdDev: 0 },
+    investmentItems: [{ id: 1, name: 'Portfolio', amount: 100000, annualContrib: 80000, contribGrowthRate: 0, contribStartYear: CURRENT_YEAR, contribEndYear: breachYears[0] }],
+    oneTimeExpenses: [
+      { id: 1, year: breachYears[0], description: 'School fee spike', amount: 60000, category: 'housing', endYear: null },
+      { id: 2, year: breachYears[1], description: 'Family support after contribution ends', amount: 70000, category: 'housing', endYear: null },
+    ],
+    nestEggSwr: 4,
+  });
+  await importJsonPayload(page, scenario);
+
+  await tabByName(page, 'Finances').click();
+  const investmentsHeader = page.locator('div').filter({ hasText: 'Investments' }).filter({ hasText: new RegExp(`over\\s*${breachYears[0]}`) }).first();
+  await expect(investmentsHeader).toBeVisible();
+  await expect(investmentsHeader).not.toContainText(/over\s*2\s*yrs/);
+});
+
 test('regression: assets over time investment drilldown includes annual contributions', async ({ page }) => {
   attachDialogHandler(page);
   await page.goto('/');

@@ -12,7 +12,7 @@ const assets = {
   investments: 300000,
   investmentItems: [
     { annualContrib: 24000, contribGrowthRate: 3 },
-    { annualContrib: 12000, contribGrowthRate: 0, contribStartYear: new Date().getFullYear() + 5 },
+    { annualContrib: 12000, contribGrowthRate: 0, contribStartYear: new Date().getFullYear() + 5, contribEndYear: new Date().getFullYear() + 12 },
   ],
 };
 const retirementBudget = {
@@ -40,13 +40,15 @@ function projectedInvestmentsForLever(candidateRetirementAge, returnPct, extraAn
   const years = Math.max(0, candidateRetirementAge - profile.currentAge);
   const rate = Math.max(0, returnPct || 0) / 100;
   let balance = assets.investments || 0;
+  const candidateRetirementYear = currentYear + years;
   for (let i = 0; i < years; i++) {
     const contributionYear = currentYear + i;
     const plannedContrib = (assets.investmentItems || []).reduce((sum, item) => {
       const base = item.annualContrib || 0;
       if (base <= 0) return sum;
       const startYear = item.contribStartYear || currentYear;
-      if (contributionYear < startYear) return sum;
+      const endYear = Math.max(startYear, Math.min(candidateRetirementYear - 1, item.contribEndYear || candidateRetirementYear - 1));
+      if (contributionYear < startYear || contributionYear > endYear) return sum;
       const growthRate = (item.contribGrowthRate || 0) / 100;
       return sum + base * Math.pow(1 + growthRate, contributionYear - startYear);
     }, 0);

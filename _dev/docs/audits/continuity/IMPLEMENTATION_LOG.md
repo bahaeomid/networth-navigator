@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 by Session 18
+**Last updated:** 2026-05-16 by Session 19
 
 ---
 
@@ -92,6 +92,7 @@
 | NEW-78 | Assets Over Time investment drilldown overlays omitted annual contributions | HIGH | O | FIXED | 18 | Investment sub-item overlays now project starting balance plus staged contribution growth and reconcile to category totals |
 | NEW-79 | Multi-year over-savings tooltip was too verbose for compact header space | LOW | O | FIXED | 18 | Tooltip now summarizes count/range with first/largest gaps and points users to Cash Flow Over Time for details |
 | NEW-80 | Project-to-Future-Year selector still showed the redundant AT label | LOW | O | FIXED | 18 | Project selector now uses the same compact chart-year display option |
+| NEW-81 | Investment annual contributions could not stop before retirement | MEDIUM | P | FIXED | 19 | Added inclusive contribution To year with compact stacked From/To UI and updated all contribution projection paths |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -1303,3 +1304,42 @@ Applied to Asset Allocation, Cash Flow, Pre-retirement Expenses, and Project to 
 **Findings blocked:** 0
 **Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Contribution overlay parity and remaining compact chart-label cleanup closed; release verification passed.
+
+---
+
+## SESSION 19 - 2026-05-16 - Codex
+
+**Picking up from:** User request to add a low-risk investment annual contribution end date while preserving the cramped investment-item row layout.
+**Open findings at session start:** NEW-81.
+**Session goal:** Add an inclusive contribution To year, keep the UI compact and consistent, and update every contribution-dependent projection, report, doc, and verifier path.
+
+### NEW-81 - Investment annual contributions could not stop before retirement (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added optional `contribEndYear` on investment items. Blank/default To means the final pre-retirement contribution year; explicit To years are inclusive. A shared contribution-window helper now drives current-year active contributions, base `wealthProjection`, over-savings warnings, Asset Allocation projected subitems, Assets Over Time drilldown overlays, and Retirement Health gap-lever projections. The investment row keeps the existing top-level grid and stacks compact From/To year controls inside the existing annual-contribution cell.
+**Manual sanity check:** Hypothetical overlapping windows produced expected annual contribution totals: 2026=100K, 2027=100K, 2028=150K, 2029=55K, 2030=60.5K, 2031=0.
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`, `_dev/tests/audit_phase4_formula_verification.js`, `_dev/tests/auditor2_gap_levers.js`, `_dev/tests/verify_full_element_coverage.mjs`, `_dev/docs/core/FINANCIAL_MODEL.md`, `_dev/docs/core/ARCHITECTURE.md`, `README.md`
+
+### Verification Chain (Session 19)
+
+- Baseline commit before feature work: `49f47b5 fix: align over-savings tooltip wording`
+- `npm run lint` -> PASS
+- `npm run build` -> PASS (existing Vite chunk-size warning only)
+- `node _dev/tests/audit_phase4_formula_verification.js` -> PASS
+- `node _dev/tests/auditor2_gap_levers.js` -> PASS
+- `npx playwright test _dev/e2e/regression-and-scenarios.spec.js -g "investment warning flags|to-year stops|assets over time investment drilldown" --reporter=list` -> PASS (3 tests)
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` -> PASS
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS (existing Vite chunk-size warning only)
+  - `npm run test:smoke` -> PASS (15 Playwright tests)
+- Final artifact refresh: `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 19 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 1 - NEW-81
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Investment contribution phasing now supports start and inclusive end years across UI, calculations, docs, reports, and verification.

@@ -250,7 +250,8 @@ const buildWealthProjection = () => {
       ? (assets.investmentItems || []).reduce((sum, item) => {
           const base = toNum(item.annualContrib);
           const startYear = item.contribStartYear || currentYear;
-          if (year < startYear) return sum;
+          const endYear = Math.max(startYear, Math.min(retirementCalYear - 1, item.contribEndYear || retirementCalYear - 1));
+          if (year < startYear || year > endYear) return sum;
           const growthRate = toNum(item.contribGrowthRate) / 100;
           return sum + base * Math.pow(1 + growthRate, year - startYear);
         }, 0)

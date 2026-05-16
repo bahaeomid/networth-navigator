@@ -44,14 +44,20 @@ assertClose((120000 - 80000 - 10000) / 120000 * 100, 25, 'F5b: Current-Year Savi
   const items = [
     { annualContrib: 12000, contribGrowthRate: 0 },
     { annualContrib: 6000, contribGrowthRate: 5 },
+    { annualContrib: 5000, contribGrowthRate: 0, contribStartYear: 2026, contribEndYear: 2027 },
   ];
-  const yearIndex = 2;
+  const currentYear = 2025;
+  const retirementYear = 2040;
+  const targetYear = 2027;
   const contribution = items.reduce((sum, item) => {
     const base = item.annualContrib || 0;
+    const startYear = item.contribStartYear || currentYear;
+    const endYear = item.contribEndYear || retirementYear - 1;
+    if (targetYear < startYear || targetYear > endYear || targetYear >= retirementYear) return sum;
     const growthRate = (item.contribGrowthRate || 0) / 100;
-    return sum + base * Math.pow(1 + growthRate, yearIndex);
+    return sum + base * Math.pow(1 + growthRate, targetYear - startYear);
   }, 0);
-  assertClose(contribution, 18615, 'F5c: Annual investment contribution with growth');
+  assertClose(contribution, 23615, 'F5c: Annual investment contribution with growth and inclusive end year');
 }
 
 // --- Formula 6: NW Multiple (NetWorth / AnnualSalary) ---

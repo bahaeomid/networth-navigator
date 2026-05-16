@@ -151,7 +151,7 @@ const TOOLTIPS = {
   retirementAge: "The age you plan to stop working. Income stops and retirement expenses begin at this age.",
   lifeExpectancy: "Expected age of death for planning purposes. Standard is 90-95 years.",
   cash: "Liquid cash in bank accounts, emergency funds. Low/no growth expected.",
-  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution field to model planned ongoing additions; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the affected year(s).",
+  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution fields to model planned ongoing additions over a From/To year window; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the affected year(s).",
   realEstate: "Property value (your home + investment properties). Appreciates based on real estate rate.",
   otherAssets: "Other valuable assets: business equity, collectibles, precious metals, vehicles, etc. Treated as illiquid — this category appreciates at the Other growth rate but does not contribute to SWR drawdown capacity. Only Investments and Cash are considered liquid for retirement funding purposes.",
   mortgage: "Outstanding mortgage balance on all properties. This affects net worth only; it does not create a cashflow expense. To reflect the payment in savings, enter the full annual principal + interest payment as a Pre-Retirement expense category with 0% growth and a phase-out year matching the loan payoff year. Keep the liability here for net worth accuracy. Avoid double-counting if that payment is already included in another expense category.",
@@ -610,6 +610,25 @@ const formatYearRanges = (years) => {
   return ranges.join(', ');
 };
 
+const getContributionStartYear = (item, currentYear) => item.contribStartYear || currentYear;
+
+const getContributionEndYear = (item, currentYear, retirementYear) => {
+  const finalPreRetYear = Math.max(currentYear, retirementYear - 1);
+  const startYear = getContributionStartYear(item, currentYear);
+  const rawEndYear = item.contribEndYear || finalPreRetYear;
+  return Math.max(startYear, Math.min(finalPreRetYear, rawEndYear));
+};
+
+const getInvestmentContributionForYear = (item, year, currentYear, retirementYear) => {
+  const base = item.annualContrib || 0;
+  if (base <= 0 || year >= retirementYear) return 0;
+  const startYear = getContributionStartYear(item, currentYear);
+  const endYear = getContributionEndYear(item, currentYear, retirementYear);
+  if (year < startYear || year > endYear) return 0;
+  const growthRate = (item.contribGrowthRate || 0) / 100;
+  return base * Math.pow(1 + growthRate, year - startYear);
+};
+
 const ChartYearSelector = ({ mode, value, onChange, minYear, maxYear, currentYear, retirementYear, lifeExpectancyYear, currentAge, showModeLabel = true, quickYearKeys }) => {
   const age = currentAge + (value - currentYear);
   const seen = new Set();
@@ -649,8 +668,8 @@ const ChartYearSelector = ({ mode, value, onChange, minYear, maxYear, currentYea
   );
 };
 
-// Compact year input for investment item contrib start year — same edit pattern as TargetYearInput
-const ContribStartYearInput = ({ value, onChange, minYear, maxYear, width, style }) => {
+// Compact year input for investment item contribution windows — same edit pattern as TargetYearInput
+const ContribStartYearInput = ({ value, onChange, minYear, maxYear, width, style, title }) => {
   const [display, setDisplay] = React.useState(value.toString());
   const [isFocused, setIsFocused] = React.useState(false);
   React.useEffect(() => { if (!isFocused) setDisplay(value.toString()); }, [value, isFocused]);
@@ -672,7 +691,7 @@ const ContribStartYearInput = ({ value, onChange, minYear, maxYear, width, style
         if (e.key === 'ArrowUp') onChange(Math.min(maxYear, value + 1));
         if (e.key === 'ArrowDown') onChange(Math.max(minYear, value - 1));
       }}
-      title="Year contributions begin (arrow keys to adjust)"
+      title={title || "Year contributions begin (arrow keys to adjust)"}
       style={{
         width: width || '68px', padding: '0.4rem 0.35rem',
         background: 'rgba(255,255,255,0.05)',
@@ -1003,8 +1022,8 @@ const NetWorthNavigator = () => {
         { id: 2, name: 'Checking Account', amount: 20000 }
       ],
       investmentItems: [
-        { id: 1, name: 'Savings Account', amount: 100000, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null },
-        { id: 2, name: 'Investment Portfolio', amount: 200000, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null }
+        { id: 1, name: 'Savings Account', amount: 100000, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null, contribEndYear: null },
+        { id: 2, name: 'Investment Portfolio', amount: 200000, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null, contribEndYear: null }
       ],
       realEstateItems: [
         { id: 1, name: 'Primary Residence', amount: 600000 },
@@ -2308,7 +2327,7 @@ const NetWorthNavigator = () => {
       <p>The projections are sensitive to the following assumptions, which are user-defined and applied consistently across all scenarios unless otherwise stated:</p>
       <ul>
         <li><strong>Investment return (${assumptions.investmentReturn}% p.a.).</strong> Applied to the liquid investment portfolio (pre- and post-retirement). This is a nominal, pre-fee return. Adviser fees, fund management charges, and transaction costs are not deducted.</li>
-        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If a start year is set, that item begins in that calendar year; contribution growth compounds from the start year forward. The model does not cap contributions to calculated surplus; the app flags any pre-retirement years where planned contributions exceed projected savings so users can review affordability.</li>
+        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If From/To years are set, that item contributes only within that inclusive pre-retirement window; contribution growth compounds from the From year forward. The model does not cap contributions to calculated surplus; the app flags any pre-retirement years where planned contributions exceed projected savings so users can review affordability.</li>
         <li><strong>Real estate appreciation (${assumptions.realEstateAppreciation}% p.a.).</strong> Applied uniformly to the entire real estate portfolio. Regional, property-type, and leverage effects are not modelled.</li>
         <li><strong>Salary growth (${assumptions.salaryGrowth}% p.a.).</strong> Applied to earned income until the stated retirement age, after which salary is assumed to cease.</li>
         <li><strong>Passive income growth (${assumptions.passiveGrowth}% p.a.) and other income growth (${assumptions.otherIncomeGrowth}% p.a.).</strong> Continued post-retirement unless an end year is specified on the income sub-item.</li>
@@ -2396,7 +2415,7 @@ const NetWorthNavigator = () => {
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
         <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. This is not the dynamic full-surplus scenario; those year-by-year strategies are shown separately in Surplus Deployment. Only undeployed current-year surplus (${fmt(undeployedSurplus)}/yr in ${currentYear}, after investment contributions active this year) can offset the additional requirement.</li>
-        <li><strong>Retire Later.</strong> The number of additional working years needed if Planned Retirement Age changes and all other inputs remain unchanged. Existing investment-item annual contributions continue through the later retirement date. Displays "Gap too large" if not achievable within 30 extra years or before life expectancy.</li>
+        <li><strong>Retire Later.</strong> The number of additional working years needed if Planned Retirement Age changes and all other inputs remain unchanged. Existing investment-item annual contributions continue through the later retirement date unless their To year ends sooner. Displays "Gap too large" if not achievable within 30 extra years or before life expectancy.</li>
         <li><strong>Higher Return.</strong> The Investment return assumption required to reach the required nest egg by retirement with current investment balances and entered annual contributions unchanged. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
       <p>All three levers are illustrative. A combination strategy will always close the gap more efficiently than any single lever in isolation.</p>
@@ -3030,13 +3049,9 @@ const mIdx = cols.findIndex(c =>
 
   const currentYearInvestmentContribution = useMemo(() => {
     if (profile.currentAge >= profile.retirementAge) return 0;
+    const retirementYear = currentCalendarYear + (profile.retirementAge - profile.currentAge);
     return (assets.investmentItems || []).reduce((sum, item) => {
-      const base = item.annualContrib || 0;
-      if (base <= 0) return sum;
-      const startYear = item.contribStartYear || currentCalendarYear;
-      if (currentCalendarYear < startYear) return sum;
-      const growthRate = (item.contribGrowthRate || 0) / 100;
-      return sum + base * Math.pow(1 + growthRate, currentCalendarYear - startYear);
+      return sum + getInvestmentContributionForYear(item, currentCalendarYear, currentCalendarYear, retirementYear);
     }, 0);
   }, [assets.investmentItems, profile.currentAge, profile.retirementAge, currentCalendarYear]);
 
@@ -3319,12 +3334,8 @@ const mIdx = cols.findIndex(c =>
       }
       const yearInvestmentContribution = age < profile.retirementAge
         ? (assets.investmentItems || []).reduce((sum, item) => {
-            const base = item.annualContrib || 0;
-            const growthRate = (item.contribGrowthRate || 0) / 100;
-            const startYear = item.contribStartYear || currentYear;
-            if (year < startYear) return sum;
-            const yearsSinceStart = year - startYear;
-            return sum + base * Math.pow(1 + growthRate, yearsSinceStart);
+            const retirementYear = currentYear + (profile.retirementAge - profile.currentAge);
+            return sum + getInvestmentContributionForYear(item, year, currentYear, retirementYear);
           }, 0)
         : 0;
       // Planned investment-item contributions are deployed into the base projection.
@@ -3398,10 +3409,7 @@ const mIdx = cols.findIndex(c =>
     const breachRows = [];
     for (let year = cy; year < retirementYear; year++) {
       const annualContrib = contribItems.reduce((sum, item) => {
-        const startYear = item.contribStartYear || cy;
-        if (year < startYear) return sum;
-        const growthRate = (item.contribGrowthRate || 0) / 100;
-        return sum + (item.annualContrib || 0) * Math.pow(1 + growthRate, year - startYear);
+        return sum + getInvestmentContributionForYear(item, year, cy, retirementYear);
       }, 0);
       if (annualContrib <= 0) continue;
 
@@ -4541,9 +4549,10 @@ const mIdx = cols.findIndex(c =>
                           let itemValue = (item.amount || 0) * Math.pow(1 + investmentRate, yearsAhead);
                           const startYear = item.contribStartYear || cy;
                           const contribGrowth = (item.contribGrowthRate || 0) / 100;
+                          const retirementYear = cy + (profile.retirementAge - profile.currentAge);
                           const lastContributionYear = Math.min(
                             clampedAssetAllocTargetYear - 1,
-                            cy + (profile.retirementAge - profile.currentAge) - 1
+                            getContributionEndYear(item, cy, retirementYear)
                           );
                           for (let contribYear = Math.max(cy, startYear); contribYear <= lastContributionYear; contribYear++) {
                             const annualContrib = (item.annualContrib || 0) * Math.pow(1 + contribGrowth, contribYear - startYear);
@@ -4665,6 +4674,7 @@ const mIdx = cols.findIndex(c =>
                     startAmount: sub.amount,
                     annualContrib: sub.annualContrib || 0,
                     contribStartYear: sub.contribStartYear || null,
+                    contribEndYear: sub.contribEndYear || null,
                     contribGrowthRate: sub.contribGrowthRate || 0,
                     rate: cat.rate,
                     color: cat.subColors[si % cat.subColors.length],
@@ -4680,7 +4690,7 @@ const mIdx = cols.findIndex(c =>
                 const startYear = sub.contribStartYear || currentYear;
                 const contribGrowth = (sub.contribGrowthRate || 0) / 100;
                 const retirementYear = currentYear + (profile.retirementAge - profile.currentAge);
-                const lastContributionYear = Math.min(targetYear - 1, retirementYear - 1);
+                const lastContributionYear = Math.min(targetYear - 1, getContributionEndYear(sub, currentYear, retirementYear));
                 for (let contribYear = Math.max(currentYear, startYear); contribYear <= lastContributionYear; contribYear++) {
                   const annualContrib = (sub.annualContrib || 0) * Math.pow(1 + contribGrowth, contribYear - startYear);
                   itemValue += annualContrib * Math.pow(1 + investmentRate, targetYear - contribYear - 1);
@@ -5745,13 +5755,9 @@ const mIdx = cols.findIndex(c =>
                 let balance = assets.investments || 0;
                 for (let i = 0; i < years; i++) {
                   const contributionYear = currentYearForLevers + i;
+                  const candidateRetirementYear = currentYearForLevers + (candidateRetirementAge - profile.currentAge);
                   const plannedContrib = (assets.investmentItems || []).reduce((sum, item) => {
-                    const base = item.annualContrib || 0;
-                    if (base <= 0) return sum;
-                    const startYear = item.contribStartYear || currentYearForLevers;
-                    if (contributionYear < startYear) return sum;
-                    const growthRate = (item.contribGrowthRate || 0) / 100;
-                    return sum + base * Math.pow(1 + growthRate, contributionYear - startYear);
+                    return sum + getInvestmentContributionForYear(item, contributionYear, currentYearForLevers, candidateRetirementYear);
                   }, 0);
                   balance = Math.max(0, balance * (1 + rate) + plannedContrib + (extraAnnualContribution || 0));
                 }
@@ -5997,17 +6003,17 @@ const mIdx = cols.findIndex(c =>
                                 <div>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                                     <div style={{ padding: '0.85rem', background: saveMoreNA ? 'rgba(255,255,255,0.02)' : 'rgba(96,165,250,0.07)', borderRadius: '8px', border: `1px solid ${saveMoreNA ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario. This is solved as an annualized contribution: adding ${extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'the shown monthly amount × 12'}/yr as a new investment item with 0% contribution growth should close the retirement gap, all else unchanged. Annual contributions already entered on investment items are included in the base projection from their configured start years. This is not the dynamic full-surplus scenario; use Surplus Deployment for that. Only undeployed current-year surplus can offset it: current surplus minus investment contributions active this year.`} /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario. This is solved as an annualized contribution: adding ${extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'the shown monthly amount × 12'}/yr as a new investment item with 0% contribution growth should close the retirement gap, all else unchanged. Annual contributions already entered on investment items are included in the base projection within their configured From/To windows. This is not the dynamic full-surplus scenario; use Surplus Deployment for that. Only undeployed current-year surplus can offset it: current surplus minus investment contributions active this year.`} /></div>
                                       {saveMoreNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Not calculable</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrencyDecimal(extraMonthly, currency, exchangeRates)}/mo</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>add as {extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'monthly × 12'}/yr contribution · invested at {assumptions.investmentReturn}%/yr</div>
                                       {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed current-year surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo can offset this{currentYearInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(currentYearInvestmentContribution / 12, currency, exchangeRates)}/mo active contributions` : ''}</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, and continues those contributions through the later retirement date. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, applying each item's configured From/To contribution window. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
                                       {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>{retireLaterBeyondLife ? 'Would require retiring at or after life expectancy' : 'Gap too large to close by working longer'}</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
-                                      <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · contributions continue`}</div>
+                                      <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · contribution windows honored`}</div>
                                     </div>
                                     {(() => {
                                       const returnDelta = solvedReturn !== null ? Math.round((solvedReturn - assumptions.investmentReturn) * 10) / 10 : null;
@@ -7567,29 +7573,34 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.34rem', flexWrap: 'nowrap', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
                         <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flex: '0 0 auto' }}>
                           Investments
-                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution start year. Annual contrib is the planned addition each year starting from the 'from' year; growth compounds from that start year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the affected year(s) to review in Cash Flow Over Time." />
+                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution window. Annual contrib is the planned addition each year from the From year through the inclusive To year; blank/default To means the final pre-retirement contribution year. Growth compounds from the From year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the affected year(s) to review in Cash Flow Over Time." />
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace', flex: '0 0 auto' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
                         {annualInvestmentContribution > 0 && (() => {
                           const cy = new Date().getFullYear();
+                          const retirementYear = cy + (profile.retirementAge - profile.currentAge);
                           const contribItems = (assets.investmentItems || []).filter(i => (i.annualContrib || 0) > 0);
                           const startYears = contribItems.map(i => i.contribStartYear || cy);
-                          const isStaged = contribItems.length > 1 && new Set(startYears).size > 1;
+                          const endYears = contribItems.map(i => getContributionEndYear(i, cy, retirementYear));
+                          const isStaged = contribItems.length > 1 && (new Set(startYears).size > 1 || new Set(endYears).size > 1);
                           const isSingle = contribItems.length === 1;
                           const singleItem = isSingle ? contribItems[0] : null;
                           const singleStartYear = singleItem ? (singleItem.contribStartYear || cy) : cy;
+                          const singleEndYear = singleItem ? getContributionEndYear(singleItem, cy, retirementYear) : null;
                           const showFromYear = isSingle && singleStartYear > cy;
+                          const showToYear = isSingle && Boolean(singleItem?.contribEndYear);
+                          const intervalText = (item) => `${item.name}: +${formatCurrencyDecimal(item.annualContrib, currency, exchangeRates)}/yr from ${getContributionStartYear(item, cy)} to ${getContributionEndYear(item, cy, retirementYear)}`;
                           if (isStaged) {
                             return (
                               <span style={{ fontSize: '0.58rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.08rem 0.26rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.16rem', flex: '0 0 auto' }}>
                                 staged
-                                <InfoTooltip text={contribItems.map(i => `${i.name}: +${formatCurrencyDecimal(i.annualContrib, currency, exchangeRates)}/yr from ${i.contribStartYear || cy}`).join(' · ')} />
+                                <InfoTooltip text={contribItems.map(intervalText).join(' · ')} />
                               </span>
                             );
                           }
                           return (
                             <span style={{ fontSize: '0.58rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.08rem 0.26rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
-                              +{formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr{showFromYear ? ` from ${singleStartYear}` : ''}
+                              +{formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr{showFromYear ? ` from ${singleStartYear}` : ''}{showToYear ? ` to ${singleEndYear}` : ''}
                             </span>
                           );
                         })()}
@@ -7684,26 +7695,52 @@ const mIdx = cols.findIndex(c =>
                               setAssets({ ...assets, investmentItems: newItems, investments: total });
                             }} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 68px' : 'minmax(0, 1fr)', columnGap: '0.45rem', rowGap: '0.25rem', alignItems: 'end' }}>
-                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the start year — enter what you plan to contribute in that year. Contribution growth then compounds this amount each subsequent year. Balance (today's value) and the from-year for contributions are independent — the balance field always reflects the current balance today." /></span>
-                          {(item.annualContrib || 0) > 0 && <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap' }}>From</span>}
+                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 58px' : 'minmax(0, 1fr)', columnGap: '0.45rem', rowGap: '0.25rem', alignItems: 'end' }}>
+                          <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the From year — enter what you plan to contribute in that year. Contributions run from From through To, inclusive, and default through the final pre-retirement contribution year. Contribution growth compounds from the From year forward. Balance (today's value) and the contribution window are independent — the balance field always reflects the current balance today." /></span>
+                          {(item.annualContrib || 0) > 0 && <div style={{ gridColumn: 2, gridRow: '1 / span 2', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '0.22rem', alignSelf: 'stretch' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
+                              <span style={{ fontSize: '0.52rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', lineHeight: 1 }}>From</span>
+                              <ContribStartYearInput
+                                value={item.contribStartYear || currentCalendarYear}
+                                onChange={(yr) => {
+                                  const newItems = assets.investmentItems.map(i => {
+                                    if (i.id !== item.id) return i;
+                                    const currentEndYear = i.contribEndYear || maxContributionStartYear;
+                                    const nextEndYear = Math.max(yr, currentEndYear);
+                                    return { ...i, contribStartYear: yr, contribEndYear: nextEndYear >= maxContributionStartYear ? null : nextEndYear };
+                                  });
+                                  setAssets({ ...assets, investmentItems: newItems });
+                                }}
+                                minYear={currentCalendarYear}
+                                maxYear={maxContributionStartYear}
+                                width="58px"
+                                title="First calendar year this annual contribution is made"
+                                style={{ padding: '0.18rem 0.2rem', fontSize: '0.68rem' }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.12rem' }}>
+                              <span style={{ fontSize: '0.52rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', lineHeight: 1 }}>To</span>
+                              <ContribStartYearInput
+                                value={item.contribEndYear || maxContributionStartYear}
+                                onChange={(yr) => {
+                                  const startYear = item.contribStartYear || currentCalendarYear;
+                                  const clampedYear = Math.max(startYear, Math.min(maxContributionStartYear, yr));
+                                  const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribEndYear: clampedYear >= maxContributionStartYear ? null : clampedYear } : i);
+                                  setAssets({ ...assets, investmentItems: newItems });
+                                }}
+                                minYear={item.contribStartYear || currentCalendarYear}
+                                maxYear={maxContributionStartYear}
+                                width="58px"
+                                title="Final calendar year this annual contribution is made"
+                                style={{ padding: '0.18rem 0.2rem', fontSize: '0.68rem' }}
+                              />
+                            </div>
+                          </div>}
                           <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="100%" style={{ minWidth: 0 }}
                               onChange={(aed) => {
                                 const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, annualContrib: aed } : i);
                                 setAssets({ ...assets, investmentItems: newItems });
                               }} />
-                          {(item.annualContrib || 0) > 0 && (
-                            <ContribStartYearInput
-                              value={item.contribStartYear || currentCalendarYear}
-                              onChange={(yr) => {
-                                const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribStartYear: yr } : i);
-                                setAssets({ ...assets, investmentItems: newItems });
-                              }}
-                              minYear={currentCalendarYear}
-                              maxYear={maxContributionStartYear}
-                              width="68px"
-                            />
-                          )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Growth <InfoTooltip text="Annual rate at which this contribution grows, compounding from the contribution start year forward. Example: 3%/yr means the year-2 contribution is 3% higher than year-1, and so on." /></span>
@@ -7726,7 +7763,7 @@ const mIdx = cols.findIndex(c =>
                         </div>
                         <button
                           onClick={() => {
-                            let newItems = assets.investmentItems.filter(i => i.id !== item.id); if (newItems.length === 0) newItems = [{ id: 1, name: 'Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null }];
+                            let newItems = assets.investmentItems.filter(i => i.id !== item.id); if (newItems.length === 0) newItems = [{ id: 1, name: 'Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null, contribEndYear: null }];
                             const total = newItems.reduce((sum, i) => sum + i.amount, 0);
                             setAssets({ ...assets, investmentItems: newItems, investments: total });
                           }}
@@ -7751,7 +7788,7 @@ const mIdx = cols.findIndex(c =>
                         const newId = assets.investmentItems.length > 0 ? Math.max(...assets.investmentItems.map(i => i.id)) + 1 : 1;
                         setAssets({ 
                           ...assets, 
-                          investmentItems: [...assets.investmentItems, { id: newId, name: 'New Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null }]
+                          investmentItems: [...assets.investmentItems, { id: newId, name: 'New Investment', amount: 0, annualContrib: 0, contribGrowthRate: 0, contribStartYear: null, contribEndYear: null }]
                         });
                       }}
                       style={{
