@@ -127,6 +127,8 @@ If no sub-items: total amortized linearly over default term (25yr mortgage, 5yr 
 
 Liability balances are balance-sheet items only. They affect net worth and debt-free age, but they do **not** create cashflow expenses or reduce savings automatically. Until first-class debt-service fields are added, users should model scheduled payments for any liability type (mortgage, car loan, personal loan, credit card plan, other debt) as expense categories with a phase-out year matching the payoff year, while keeping the liability entry for net worth accuracy. For amortising loans, use the full principal + interest cash payment because both portions reduce investable cashflow. Avoid double-counting if the same payment is already included inside another expense category.
 
+Debt Free Age is the first projected age after the final year in the horizon where any configured liability balance is positive. This prevents a temporary zero-liability gap before a future-start liability from being reported as permanently debt-free.
+
 ### Drawdown (Post-Retirement)
 
 ```

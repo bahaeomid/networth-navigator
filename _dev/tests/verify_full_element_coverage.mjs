@@ -543,9 +543,12 @@ const incomeReplacement = annualIncomeNow > 0 ? (retirementExpensesToday / annua
 const reqSWRToday = toNum(assets.investments) > 0 ? (getRetNominalForYear(retirementCalYear) / toNum(assets.investments)) * 100 : null;
 
 const debtFreeAgeExpected = (() => {
-  if (totalLiabilitiesNow <= 0) return null;
-  const hit = wealthProjection.find((d) => d.totalLiabilities === 0);
-  return hit ? hit.age : null;
+  const lastDebtIndex = wealthProjection.reduce((lastIdx, d, idx) => {
+    return toNum(d.totalLiabilities) > 0 ? idx : lastIdx;
+  }, -1);
+  if (lastDebtIndex < 0) return null;
+  const clearRow = wealthProjection[lastDebtIndex + 1];
+  return clearRow ? clearRow.age : null;
 })();
 
 const firstMillionUsdYearExpected = (() => {

@@ -1461,7 +1461,53 @@ UI copy and tooltip text were updated to clarify:
 
 ## SESSION 21 CLOSE - 2026-05-16
 
-**Findings resolved this session:** 3 - NEW-85, NEW-86, NEW-87  
-**Findings blocked:** 0  
-**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).  
+**Findings resolved this session:** 3 - NEW-85, NEW-86, NEW-87
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Life-event range overlays, phased liability debt-deployment behavior, and downstream verification parity are now aligned and release-validated.
+
+---
+
+## SESSION 22 - 2026-05-17 - Codex
+
+**Picking up from:** Post-commit audit of `1a280d8` against baseline `cd43ad3` plus follow-up UI screenshots for investment rows, life-event year fields, life-event overlay dots, and chart toggle animation.
+**Session goal:** Fix audit findings and UI regressions without changing the underlying financial-model design.
+
+### NEW-88 - Debt Free Age ignored future-start liabilities (HIGH -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Changed Debt Free Age from "first zero liability row" to "first row after the final positive liability balance in the projection horizon." This prevents temporary zero-liability gaps before future-start liabilities from showing as permanently debt-free.
+
+**Files changed:** `src/App.jsx`, `_dev/tests/verify_full_element_coverage.mjs`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-89 - Dashboard NW Multiple bypassed phased salary (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Updated the in-app Financial Health NW Multiple to use current-year phased salary sub-items, matching the income phasing helpers and HTML report behavior.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-90 - Life-event range overlays still emitted point markers and animated on toggle (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Multi-year life events now render as blue bands only. Single-year life events still render point markers. Net Worth and Assets Over Time line/area animations were disabled so legend toggles hide/show life-event overlays immediately, matching the prior OTE behavior.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-91 - Phasing year-field styling and investment-row alignment drifted from OTE patterns (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Shared the OTE-like orange year-field styling through year inputs, made Life Event Start/End fields match OTE sizing, tightened investment row grid columns, kept the Growth tooltip adjacent to the Growth title, and reduced spacing before the delete action.
+
+**Files changed:** `src/App.jsx`
+
+### Verification Chain (Session 22)
+
+- `npm run lint` -> PASS
+- `git diff --check` -> PASS
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS
+  - `npm run test:smoke` -> PASS (`16/16`)
+- `node _dev/tests/verify_full_element_coverage.mjs` -> PASS via release chain (`44/44`)

@@ -39,14 +39,14 @@ console.log("When expenses > income: savings rate = 0% (not negative)");
 console.log("Tooltip says 'expenses exceed income by X/yr' but rate shows 0%");
 
 console.log("\n=== 4.2 Net Worth Multiple (Fidelity benchmark) ===");
-console.log("Formula: currentNetWorth / income.salary");
+console.log("Formula: currentNetWorth / active current-year salary");
 console.log(`Test: currentNetWorth=${testData.currentNetWorth}, income.salary=${testData.incomeSalary}`);
 const nwMultiple = testData.currentNetWorth / testData.incomeSalary;
 console.log(`Result: ${nwMultiple.toFixed(2)}× salary`);
 
-console.log("CRITICAL ISSUE: Denominator uses income.salary (top-level)");
-console.log(`But annualIncome uses sub-item sum: ${testData.incomeSalaryItems.reduce((s,i)=>s+i.amount,0)}`);
-console.log("If sub-items exist and rollup is stale, metrics diverge");
+console.log("App expectation: use active phased salary sub-items when present, falling back to top-level salary only when no sub-items exist.");
+console.log(`Sub-item salary in this fixture: ${testData.incomeSalaryItems.reduce((s,i)=>s+i.amount,0)}`);
+console.log("If a future change falls back to stale top-level salary, metrics diverge.");
 
 console.log("\n=== Age interpolation test ===");
 console.log("Age < 30: target = 1 × (age / 30)");
@@ -100,7 +100,7 @@ console.log("Recommendation: Both should be in same terms (today's or retirement
 
 console.log("\n=== Summary of Scorecard Issues ===");
 console.log("1. Savings Rate: Negative values masked by Math.max(0, ...)");
-console.log("2. NW Multiple: Inconsistent denominator (top-level vs sub-item sum)");
+console.log("2. NW Multiple: Active phased salary should be used instead of stale top-level salary");
 console.log("3. Debt Ratio: Correct ✓");
 console.log("4. Emergency Fund: Correct ✓ but depends on expenses.current sync");
 console.log("5. Investment Mix: Formula correct ✓ but label potentially misleading");

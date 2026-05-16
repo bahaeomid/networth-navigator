@@ -39,24 +39,24 @@ function testNWMultiple() {
   const salarySubItems = [200000, 150000]; // Sum = 350000
   const salarySubTotal = salarySubItems.reduce((a, b) => a + b, 0);
   
-  // Current implementation (INCONSISTENT)
+  // Legacy top-level-only implementation (inconsistent when sub-items are active)
   const nwMultipleCurrent = currentNetWorth / salaryTopLevel;
   
-  // Correct implementation (CONSISTENT)
+  // Current expected implementation (consistent with phased salary sub-items)
   const nwMultipleCorrect = currentNetWorth / salarySubTotal;
   
   console.log(`  Net Worth: ${currentNetWorth}`);
   console.log(`  Salary (top-level): ${salaryTopLevel}`);
   console.log(`  Salary (sub-items): ${salarySubTotal}`);
-  console.log(`  Current NW Multiple: ${(nwMultipleCurrent * 100).toFixed(0)}%`);
-  console.log(`  Correct NW Multiple: ${(nwMultipleCorrect * 100).toFixed(0)}%`);
+  console.log(`  Legacy NW Multiple: ${(nwMultipleCurrent * 100).toFixed(0)}%`);
+  console.log(`  Expected phased-salary NW Multiple: ${(nwMultipleCorrect * 100).toFixed(0)}%`);
   
   assert(
     nwMultipleCurrent !== nwMultipleCorrect,
-    'Denominators differ when sub-items exist'
+    'Legacy denominator differs when sub-items exist'
   );
   
-  console.log('  ✓ Issue confirmed - inconsistent denominator\n');
+  console.log('  ✓ Guard documented - app should use active phased salary\n');
 }
 
 // Test 4.3: Income Replacement Ratio

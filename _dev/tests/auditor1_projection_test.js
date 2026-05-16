@@ -112,7 +112,7 @@ console.log(`Loans Balance Year 1: ${loanAmort(inputs.liabilities.loans, 6, 1)}`
 
 console.log("\n=== Summary of Critical Issues Found ===");
 console.log("1. Sub-item sync: currentNetWorth uses top-level rollups, annualIncome sums sub-items");
-console.log("2. NW Multiple denominator inconsistency: uses income.salary (top-level) while annualIncome uses sub-item sum");
+console.log("2. NW Multiple guard: active phased salary should be used instead of stale top-level salary");
 console.log("3. Negative savings masked by Math.max(0, ...) in savings calculation");
 console.log("4. Drawdown timing convention updated: drawdown now starts at age >= retirementAge; keep deterministic/runway/MC onset aligned");
 console.log("5. Linear amortization doesn't model real mortgage interest payments (documented limitation)");

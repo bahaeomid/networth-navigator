@@ -764,6 +764,27 @@ const ChartYearSelector = ({ mode, value, onChange, minYear, maxYear, currentYea
 };
 
 // Compact year input for investment item contribution windows — same edit pattern as TargetYearInput
+const yearFieldBaseStyle = {
+  padding: '0.6rem 0.5rem',
+  background: 'rgba(245,158,11,0.08)',
+  border: '1px solid rgba(245,158,11,0.35)',
+  borderRadius: '8px',
+  color: '#f59e0b',
+  fontSize: '0.9rem',
+  fontFamily: 'JetBrains Mono, monospace',
+  fontWeight: '600',
+  textAlign: 'center',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+const yearFieldEmptyStyle = {
+  background: 'rgba(255,255,255,0.03)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  color: '#4b5563',
+  fontWeight: '400',
+};
+
 const ContribStartYearInput = ({ value, onChange, minYear, maxYear, width, style, title }) => {
   const [display, setDisplay] = React.useState(value.toString());
   const [isFocused, setIsFocused] = React.useState(false);
@@ -788,12 +809,10 @@ const ContribStartYearInput = ({ value, onChange, minYear, maxYear, width, style
       }}
       title={title || "Year contributions begin (arrow keys to adjust)"}
       style={{
-        width: width || '68px', padding: '0.4rem 0.35rem',
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '6px', color: '#e8e9ed',
-        fontSize: '0.82rem', fontFamily: 'JetBrains Mono, monospace',
-        textAlign: 'center', outline: 'none',
+        ...yearFieldBaseStyle,
+        width: width || '68px',
+        padding: '0.35rem 0.3rem',
+        fontSize: '0.72rem',
         ...(style || {})
       }}
     />
@@ -852,12 +871,9 @@ const PhaseYearInput = ({ value, onChange, minYear, maxYear, title, placeholder 
       placeholder={placeholder}
       title={title}
       style={{
-        width, padding: '0.4rem 0.3rem',
-        background: 'rgba(234,179,8,0.08)',
-        border: '1px solid rgba(234,179,8,0.3)',
-        borderRadius: '6px', color: '#eab308',
-        fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace',
-        textAlign: 'center'
+        ...yearFieldBaseStyle,
+        ...(display.trim() === '' ? yearFieldEmptyStyle : {}),
+        width,
       }}
     />
   );
@@ -2634,7 +2650,7 @@ const NetWorthNavigator = () => {
       <p>The five Key Metrics tiles on the Overview tab display the following derived values:</p>
       <ul>
         <li><strong>Net Worth.</strong> Total assets (investments + real estate + cash + other) minus total liabilities (mortgage + loans + other), at today's balances. Not projected — this is a point-in-time snapshot.</li>
-        <li><strong>Debt Free Age.</strong> The first projected year in which total liabilities reach zero, based on the liability amortisation schedule described in Note 2. Displayed as an age and calendar year. If all liabilities already carry an end year via sub-items, this reflects the latest payoff date.</li>
+        <li><strong>Debt Free Age.</strong> The first projected year after the final positive liability balance in the configured schedule, based on the liability amortisation approach described in Note 2. Displayed as an age and calendar year. This accounts for future-start liabilities rather than treating a temporary zero-debt gap as permanently debt-free.</li>
         <li><strong>First $1M USD.</strong> The projected age and calendar year at which net worth first crosses USD 1,000,000, converted from AED at the export-date exchange rate. See Note 12 for the full set of wealth milestones and the rationale for USD denomination.</li>
         <li><strong>Planned Retirement.</strong> The retirement age and calendar year as entered in the Profile tab. This is a user input, not a derived value. The FI Age (earliest age at which the portfolio could support retirement) is shown separately in the Retirement Health tile and may differ.</li>
         <li><strong>Retirement Health.</strong> A composite summary showing FI Age, SWR needed today (the withdrawal rate implied by current investments relative to the required retirement spend), Monte Carlo survival odds, and the projected portfolio exhaustion age (if drawdown is enabled and the portfolio runs out before life expectancy).</li>
@@ -3876,10 +3892,13 @@ const mIdx = cols.findIndex(c =>
   }, [wealthProjection, nestEggSwr, retirementBudget, retExpenseGrowthRates, retExpensePhaseOutYears, expenseCategories, profile.retirementAge, profile.currentAge]);
 
   const debtFreeAge = useMemo(function() {
-    if (currentLiabilityBalances.total <= 0) return null; // already debt-free
-    const hit = wealthProjection.find(function(d) { return d.totalLiabilities === 0; });
-    return hit ? hit.age : null;
-  }, [wealthProjection, currentLiabilityBalances.total]);
+    const lastDebtIndex = wealthProjection.reduce(function(lastIdx, d, idx) {
+      return (d.totalLiabilities || 0) > 0 ? idx : lastIdx;
+    }, -1);
+    if (lastDebtIndex < 0) return null; // no current or future liability balance in the horizon
+    const firstClearAfterFinalDebt = wealthProjection[lastDebtIndex + 1];
+    return firstClearAfterFinalDebt ? firstClearAfterFinalDebt.age : null;
+  }, [wealthProjection]);
 
   const getMilestoneEvents = () => {
     const currentYear = new Date().getFullYear();
@@ -3911,6 +3930,7 @@ const mIdx = cols.findIndex(c =>
     
     // Derive age from start year dynamically to stay in sync with profile.currentAge
     normalizedLifeEvents.forEach(event => {
+      if (!isLifeEventSingleYear(event, currentYear)) return;
       const eventStartYear = getLifeEventStartYear(event, currentYear);
       const derivedAge = profile.currentAge + (eventStartYear - currentYear);
       if (derivedAge >= profile.currentAge && derivedAge <= profile.lifeExpectancy) {
@@ -3963,7 +3983,7 @@ const mIdx = cols.findIndex(c =>
     
     const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === age) : null;
     const lifeEvent = !hiddenEventMarkers.life
-      ? normalizedLifeEvents.find((e) => isYearWithinInclusiveRange(year, getLifeEventStartYear(e, currentYear), getLifeEventEndYear(e, currentYear)))
+      ? normalizedLifeEvents.find((e) => isLifeEventSingleYear(e, currentYear) && isYearWithinInclusiveRange(year, getLifeEventStartYear(e, currentYear), getLifeEventEndYear(e, currentYear)))
       : null;
     // Only single-year OTEs get dots; recurring OTEs (with endYear > year) are shown via band
     const singleYearOTE = !hiddenEventMarkers.expense ? normalizedOneTimeExpenses.find(e =>
@@ -4406,7 +4426,10 @@ const mIdx = cols.findIndex(c =>
               // 2. NW Multiple (Fidelity benchmark vs salary)
               // Fidelity age brackets: 30→1×, 40→3×, 55→7×, retirementAge→10×
               // Interpolate linearly between brackets for target at current age.
-              const sal = income.salary || 0;
+              const salaryFallbackEndYear = Math.max(scorecardYear, currentRetirementCalendarYear - 1);
+              const sal = income.salaryItems && income.salaryItems.length > 0
+                ? income.salaryItems.reduce((sum, item) => sum + getIncomeAmountForYear(item, scorecardYear, scorecardYear, assumptions.salaryGrowth, salaryFallbackEndYear), 0)
+                : (income.salary || 0);
               let nwMultiple = null;
               let nwTarget   = null;
               let nwColor    = '#6b7280';
@@ -4791,6 +4814,7 @@ const mIdx = cols.findIndex(c =>
                     fill="url(#netWorthGradient)"
                     dot={<CustomDot />}
                     activeDot={{ r: 6 }}
+                    isAnimationActive={false}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -5319,23 +5343,23 @@ const mIdx = cols.findIndex(c =>
                           const wealthMilestone = !hiddenEventMarkers.milestone ? wealthMilestones.find(m => m.age === payload.age) : null;
                           if (wealthMilestone) return <circle key={payload.age} cx={cx} cy={cy} r={6} fill="#34d399" stroke="white" strokeWidth={2} />;
                           const yr = currentYear + (payload.age - profile.currentAge);
-                          if (!hiddenEventMarkers.life && normalizedLifeEvents.find((e) => isYearWithinInclusiveRange(yr, getLifeEventStartYear(e, currentYear), getLifeEventEndYear(e, currentYear)))) return <circle key={payload.age} cx={cx} cy={cy} r={5} fill="#60a5fa" stroke="white" strokeWidth={2} />;
+                          if (!hiddenEventMarkers.life && normalizedLifeEvents.find((e) => isLifeEventSingleYear(e, currentYear) && isYearWithinInclusiveRange(yr, getLifeEventStartYear(e, currentYear), getLifeEventEndYear(e, currentYear)))) return <circle key={payload.age} cx={cx} cy={cy} r={5} fill="#60a5fa" stroke="white" strokeWidth={2} />;
                           return null;
                         }}
-                        activeDot={{ r: 5 }} hide={hiddenAssetLines['totalAssets']}
+                        activeDot={{ r: 5 }} hide={hiddenAssetLines['totalAssets']} isAnimationActive={false}
                       />
                       {/* Category lines - dashed, no dots */}
                       {ASSET_LINES.map(item => (
                         <Line key={item.key} type="monotone" dataKey={item.key} name={item.label}
                           stroke={item.color} strokeWidth={1.5} strokeDasharray="5 3"
-                          dot={false} activeDot={{ r: 4 }} hide={hiddenAssetLines[item.key]}
+                          dot={false} activeDot={{ r: 4 }} hide={hiddenAssetLines[item.key]} isAnimationActive={false}
                         />
                       ))}
                       {/* Sub-item lines - thinner, more dashed, shown only when toggled on */}
                       {allSubItems.map(sub => (
                         <Line key={sub.key} type="monotone" dataKey={sub.key} name={sub.label}
                           stroke={sub.color} strokeWidth={1} strokeDasharray="3 4"
-                          dot={false} activeDot={{ r: 3 }} hide={hiddenAssetLines[sub.key] !== false}
+                          dot={false} activeDot={{ r: 3 }} hide={hiddenAssetLines[sub.key] !== false} isAnimationActive={false}
                         />
                       ))}
                     </LineChart>
@@ -6370,7 +6394,7 @@ const mIdx = cols.findIndex(c =>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: gapOpen ? '0.85rem' : 0 }}>
                                 <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                   🔧 Ways to close the {formatCurrencyDecimal(absGap, currency, exchangeRates)} gap
-                                  <InfoTooltip text="Three independent levers — each shows what it would take to close the gap if that one factor changed while everything else stayed the same. Only liquid Investments are included in these calculations — illiquid assets like real estate are excluded. Converting illiquid wealth to Investments would improve your position further. Combining levers would close the gap faster." />
+                                  <InfoTooltip text="Three independent levers: each shows what it would take to close the gap if that one factor changed while everything else stayed the same. They use current Investments, entered investment-item contributions, investment return, SWR, and retirement-budget phase-outs. Pre-retirement income, expenses, and planned expenses affect cashflow/surplus views, but they do not change the portfolio here unless you model the available savings as investment contributions or use Surplus Deployment." />
                                 </div>
                                 <button onClick={() => setExpandedCategories(p => ({...p, gapClosing: !gapOpen}))} style={{ fontSize: '0.72rem', color: '#9ca3af', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '5px', padding: '0.2rem 0.55rem', cursor: 'pointer', flexShrink: 0 }}>
                                   {gapOpen ? '▲ Hide Details' : '▼ Show Details'}
@@ -6387,7 +6411,7 @@ const mIdx = cols.findIndex(c =>
                                       {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed current-year surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo can offset this{currentYearInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(currentYearInvestmentContribution / 12, currency, exchangeRates)}/mo active contributions` : ''}</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, applying each item's configured From year/To year contribution window. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, applying each item's configured From year/To year contribution window. Salary/passive/other income phasing affects cashflow views but does not automatically create extra portfolio savings. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
                                       {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>{retireLaterBeyondLife ? 'Would require retiring at or after life expectancy' : 'Gap too large to close by working longer'}</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · contribution windows honored`}</div>
@@ -7045,6 +7069,7 @@ const mIdx = cols.findIndex(c =>
                 });
                 const lifeEventHit = normalizedLifeEvents.find((e) => isYearWithinInclusiveRange(y, getLifeEventStartYear(e, currentYear), getLifeEventEndYear(e, currentYear)));
                 row.lifeEventLabel = lifeEventHit ? lifeEventHit.description : null;
+                row.lifeEventIsSingleYear = lifeEventHit ? isLifeEventSingleYear(lifeEventHit, currentYear) : false;
                 row.total = Math.round(totalVal + row.oneTimeExpense);
                 row.totalBase = Math.round(totalVal); // total without one-time
                 row.essential = Math.round(essentialTotal);
@@ -7394,7 +7419,7 @@ const mIdx = cols.findIndex(c =>
                           dot={(props) => {
                             const { cx, cy, payload } = props;
                             const hasMilestone = !hiddenEventMarkers.milestone && wealthMilestones.find(m => m.age === payload.age);
-                            const hasLifeEvent = !hiddenEventMarkers.life && !!payload.lifeEventLabel;
+                            const hasLifeEvent = !hiddenEventMarkers.life && !!payload.lifeEventLabel && payload.lifeEventIsSingleYear;
                             const hasSingleOTE = !hiddenEventMarkers.expense && (payload.singleYearOTEsList || []).length > 0;
                             if (hasMilestone && hasLifeEvent) {
                               return <g key={payload.year}><circle cx={cx} cy={cy} r={7} fill="none" stroke="#34d399" strokeWidth={2.5} strokeOpacity={0.85} /><circle cx={cx} cy={cy} r={4} fill="#60a5fa" stroke="white" strokeWidth={1.5} /></g>;
@@ -8050,15 +8075,15 @@ const mIdx = cols.findIndex(c =>
                 {/* Sub-items list */}
                 {expandedCategories.investmentItems && (
                   <div style={{ marginTop: '0.75rem', marginLeft: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 110px 210px 95px 42px', gap: '0.6rem', alignItems: 'center', marginBottom: '0.45rem', padding: '0 0.25rem', fontSize: '0.58rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 120px 260px 88px 42px', gap: '0.5rem', alignItems: 'center', marginBottom: '0.45rem', padding: '0 0.25rem', fontSize: '0.58rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
                       <span>Name</span>
                       <span>Balance</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the From year. Contributions run from the From year through the inclusive To year and default through the final pre-retirement contribution year." /></span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Growth %/yr <InfoTooltip text="Annual rate at which this contribution grows inside the From year to To year window. Example: 3%/yr means the contribution in the second active contribution year is 3% higher than the From year amount." /></span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}>Growth %/yr <InfoTooltip text="Annual rate at which this contribution grows inside the From year to To year window. Example: 3%/yr means the contribution in the second active contribution year is 3% higher than the From year amount." /></span>
                       <span />
                     </div>
                     {(assets.investmentItems || []).map((item) => (
-                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 110px 210px 95px 42px', gap: '0.6rem', marginBottom: '0.75rem', alignItems: 'center', padding: '0.7rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 120px 260px 88px 42px', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', padding: '0.7rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
                         <div style={{ minWidth: 0 }}>
                           <input
                             type="text"
@@ -8083,16 +8108,16 @@ const mIdx = cols.findIndex(c =>
                           />
                         </div>
                         <div>
-                          <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="110px"
+                          <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="120px"
                             onChange={(aed) => {
                               const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, amount: aed } : i);
                               const total = newItems.reduce((sum, i) => sum + i.amount, 0);
                               setAssets({ ...assets, investmentItems: newItems, investments: total });
                             }} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 66px' : 'minmax(0, 1fr)', columnGap: '0.4rem', rowGap: '0.25rem', alignItems: 'center' }}>
-                          {(item.annualContrib || 0) > 0 && <div style={{ gridColumn: 2, gridRow: '1 / span 2', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '0.18rem', alignSelf: 'end' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', minHeight: '1.42rem', maxHeight: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 70px' : 'minmax(0, 1fr)', columnGap: '0.45rem', rowGap: '0.25rem', alignItems: 'center' }}>
+                          {(item.annualContrib || 0) > 0 && <div style={{ gridColumn: 2, gridRow: '1 / span 2', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '0.22rem', alignSelf: 'center' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', boxSizing: 'border-box' }}>
                               <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>From</span>
                               <ContribStartYearInput
                                 value={item.contribStartYear || currentCalendarYear}
@@ -8107,12 +8132,12 @@ const mIdx = cols.findIndex(c =>
                                 }}
                                 minYear={currentCalendarYear}
                                 maxYear={maxContributionStartYear}
-                                width="58px"
+                                width="48px"
                                 title="From year: first calendar year this annual contribution is made"
-                                style={{ padding: 0, height: '1.05rem', minHeight: '1.05rem', maxHeight: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', lineHeight: 1, width: '100%', boxSizing: 'border-box' }}
+                                style={{ padding: '0.25rem 0.15rem', height: '1.45rem', fontSize: '0.65rem', lineHeight: 1, width: '100%' }}
                               />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', minHeight: '1.42rem', maxHeight: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', boxSizing: 'border-box' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', boxSizing: 'border-box' }}>
                               <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>To</span>
                               <ContribStartYearInput
                                 value={item.contribEndYear || maxContributionStartYear}
@@ -8124,9 +8149,9 @@ const mIdx = cols.findIndex(c =>
                                 }}
                                 minYear={item.contribStartYear || currentCalendarYear}
                                 maxYear={maxContributionStartYear}
-                                width="58px"
+                                width="48px"
                                 title="To year: final calendar year this annual contribution is made"
-                                style={{ padding: 0, height: '1.05rem', minHeight: '1.05rem', maxHeight: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', lineHeight: 1, width: '100%', boxSizing: 'border-box' }}
+                                style={{ padding: '0.25rem 0.15rem', height: '1.45rem', fontSize: '0.65rem', lineHeight: 1, width: '100%' }}
                               />
                             </div>
                           </div>}
@@ -8136,7 +8161,7 @@ const mIdx = cols.findIndex(c =>
                                 setAssets({ ...assets, investmentItems: newItems });
                               }} />
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
                             <input
                               type="number"
                               value={item.contribGrowthRate || 0}
@@ -8148,7 +8173,7 @@ const mIdx = cols.findIndex(c =>
                                 }
                               }}
                               title="Annual growth rate applied to this contribution amount"
-                              style={{ width: '52px', padding: '0.45rem 0.35rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '6px', color: '#34d399', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
+                              style={{ width: '100%', padding: '0.45rem 0.35rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '6px', color: '#34d399', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', boxSizing: 'border-box' }}
                             />
                         </div>
                         <button
@@ -8917,7 +8942,7 @@ const mIdx = cols.findIndex(c =>
 
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
                   {lifeEvents.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '120px 120px 100px 2fr auto', gap: '1rem', padding: '0 1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '80px 80px 100px 2fr auto', gap: '1rem', padding: '0 1rem' }}>
                     <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: '500' }}>Start</span>
                     <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: '500' }}>End</span>
                     <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: '500' }}>Age (auto)</span>
@@ -8931,7 +8956,7 @@ const mIdx = cols.findIndex(c =>
                     return (
                     <div key={event.id} style={{ 
                       display: 'grid', 
-                      gridTemplateColumns: '120px 120px 100px 2fr auto', 
+                      gridTemplateColumns: '80px 80px 100px 2fr auto',
                       gap: '1rem', 
                       alignItems: 'center',
                       padding: '0.75rem 1rem',
@@ -8953,7 +8978,7 @@ const mIdx = cols.findIndex(c =>
                         maxYear={currentCalendarYear + 120}
                         title="Start year (inclusive) for this life event"
                         placeholder="start"
-                        width="120px"
+                        width="80px"
                       />
                       <PhaseYearInput
                         value={endYear}
@@ -8966,7 +8991,7 @@ const mIdx = cols.findIndex(c =>
                         maxYear={currentCalendarYear + 120}
                         title="End year (inclusive). Leave blank for a single-year event."
                         placeholder="end"
-                        width="120px"
+                        width="80px"
                       />
                       <div style={{
                         width: '100%',
