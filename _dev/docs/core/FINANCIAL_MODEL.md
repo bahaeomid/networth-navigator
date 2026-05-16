@@ -69,13 +69,13 @@ Pre-retirement (15 categories, each with own inflation rate):
   totalPreRetExp(y) = Σ categoryExp(y)
 
 Post-retirement (15 retirement budget categories):
+  categoryRetExp(y) = baseRet × (1 + retRate)^(yearsToRetirement + yearsIntoRetirement)
+  totalRetExp(y) = Σ categoryRetExp(y)
+
+One-time expenses:
   Two-segment inflation:
     Segment 1: base × (1 + preRate)^yearsToRetirement        [pre-ret inflation]
     Segment 2: segment1 × (1 + retRate)^yearsIntoRetirement   [post-ret inflation]
-  totalRetExp(y) = Σ category two-segment values
-
-One-time expenses:
-  Same two-segment inflation applied per item
 ```
 
 ### Asset Growth

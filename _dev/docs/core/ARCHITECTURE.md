@@ -6,7 +6,7 @@
 
 ## Overview
 
-Single-file React 18 SPA (`src/App.jsx`, ~7,800 lines). No routing, no backend, no database. All computation runs client-side. Built with Vite, charts via Recharts.
+Single-file React 18 SPA (`src/App.jsx`, 9,000+ lines). No routing, no backend, no database. All computation runs client-side. Built with Vite, charts via Recharts.
 
 **Stack:** React 18 · Vite · Recharts · open.er-api.com (FX rates)
 
@@ -27,7 +27,7 @@ Single-file React 18 SPA (`src/App.jsx`, ~7,800 lines). No routing, no backend, 
 
 ```
 <AppErrorBoundary>           ← Class component, catches unhandled exceptions
-  <NetWorthNavigator>         ← Main function component (~7,500 lines)
+  <NetWorthNavigator>         ← Main function component (large single-file app body)
     Tab: Profile              ← Age, retirement, life expectancy, dependents
     Tab: Finances             ← Assets, liabilities, income (with sub-items)
     Tab: Pre-Retirement       ← 15 pre-retirement categories + growth settings

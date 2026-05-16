@@ -1617,3 +1617,47 @@ UI copy and tooltip text were updated to clarify:
 **Findings blocked:** 0
 **Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Phased income and liability headers now show compact active-today context only when it differs from the configured total, preserving stable configured totals while improving Finance-tab clarity.
+
+---
+
+## SESSION 26 - 2026-05-17 - Codex
+
+**Picking up from:** User request for final full audit using the vendored `_dev/skills/codebase-auditor` skill plus manual verification of calculations, charts, metrics, tooltips, and scenario coverage.
+**Session goal:** Re-audit the current financial model end to end, add scenario coverage where existing tests were insufficient, update audit records, and release-verify.
+
+### NEW-97 - Combined phased-finance scenario coverage was not deterministic enough (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added `_dev/tests/audit_scenario_matrix.js` and wired it into `_dev/tests/run_all_audits.js` as a gating harness. The harness covers phased salary replacement, passive income through retirement, future-start and overlapping liabilities, recurring planned expenses, investment contribution opening-snapshot timing, deficit-surplus behavior, debt-free age, and clear-debt-first surplus behavior before and during future liabilities.
+
+**Files changed:** `_dev/tests/audit_scenario_matrix.js`, `_dev/tests/run_all_audits.js`
+
+### NEW-98 - Core docs drifted from current implementation details (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Updated architecture line-count language and corrected the financial model description for retirement budget category inflation. Regular retirement budget categories inflate from today using retirement growth rates; planned expenses use the two-segment pre/post-retirement path.
+
+**Files changed:** `_dev/docs/core/ARCHITECTURE.md`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### Audit report
+
+**Report added:** `_dev/docs/audits/AUDIT_REPORT_2026-05-17-full-financial-model-audit.md`
+**Registry updated:** `_dev/docs/audits/AUDIT_REGISTRY.md` now marks A10 as current.
+
+### Verification Chain (Session 26)
+
+- Baseline `npm run test:release` before audit changes -> PASS
+- `node _dev/tests/audit_scenario_matrix.js` -> PASS
+- `npm run test:release` after audit hardening -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS (`10` gating harnesses)
+  - `npm run build` -> PASS (existing Vite chunk-size warning only)
+  - `npm run test:smoke` -> PASS (`16/16`)
+  - `node _dev/tests/verify_full_element_coverage.mjs` -> PASS via release chain (`44/44`)
+
+## SESSION 26 CLOSE - 2026-05-17
+
+**Findings resolved this session:** 2 - NEW-97, NEW-98
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Final codebase-auditor pass found no production calculation defects. Scenario coverage and core docs are now hardened and release-validated.

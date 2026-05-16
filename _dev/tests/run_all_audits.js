@@ -12,6 +12,7 @@ const tests = [
   { file: 'audit_phase4_formula_verification.js' },
   { file: 'audit_phase5_parity.js' },
   { file: 'audit_phase6_edge_cases.js' },
+  { file: 'audit_scenario_matrix.js' },
   { file: 'audit_phase6_idempotency.js' },
   { file: 'auditor1_gap_levers.js', mode: 'advisory' },
   { file: 'auditor1_monte_carlo.js', mode: 'advisory' },
