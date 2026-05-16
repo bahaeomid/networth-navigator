@@ -1585,3 +1585,35 @@ UI copy and tooltip text were updated to clarify:
 
 - `npm run lint` -> PASS
 - `git diff --check` -> PASS
+
+---
+
+## SESSION 25 - 2026-05-17 - Codex
+
+**Picking up from:** User approval to implement compact Finance-tab configured/active indicators for phased categories.
+**Session goal:** Keep category totals stable while making current-year active amounts visible without crowding the header UI.
+
+### NEW-96 - Phased income/liability headers showed configured totals only (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added compact active-today badges to phased Annual Income and Liability category headers when the current active amount differs from the configured row total. The main value remains the configured total to preserve data-entry, import/export, and report semantics; calculations continue to use active current-year income/liability values. Header rows now wrap safely so badges do not overlap growth controls or expand/collapse buttons.
+
+**Files changed:** `src/App.jsx`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### Verification Chain (Session 25)
+
+- `npm run lint` -> PASS
+- `git diff --check` -> PASS
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS (existing Vite chunk-size warning only)
+  - `npm run test:smoke` -> PASS (`16/16`)
+- `node _dev/tests/verify_full_element_coverage.mjs` -> PASS via release chain (`44/44`)
+
+## SESSION 25 CLOSE - 2026-05-17
+
+**Findings resolved this session:** 1 - NEW-96
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Phased income and liability headers now show compact active-today context only when it differs from the configured total, preserving stable configured totals while improving Finance-tab clarity.

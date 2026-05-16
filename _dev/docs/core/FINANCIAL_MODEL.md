@@ -110,6 +110,8 @@ income(y) = baseAmount × (1 + growthRate)^(y - start)
 - Passive and Other income fallback end year is the life-expectancy calendar year, so they can continue through retirement unless a To year is set.
 - Entered base amounts are nominal in the From year.
 
+Finance-tab income headers keep the main total as the configured nominal row total for data-entry stability. When phasing/growth makes the current-year active amount different, the UI shows a compact "active" badge beside the configured total; calculations use the active current-year amount.
+
 ### Liability Amortization (Linear)
 
 ```
@@ -128,6 +130,8 @@ If no sub-items: total amortized linearly over default term (25yr mortgage, 5yr 
 Liability balances are balance-sheet items only. They affect net worth and debt-free age, but they do **not** create cashflow expenses or reduce savings automatically. Until first-class debt-service fields are added, users should model scheduled payments for any liability type (mortgage, car loan, personal loan, credit card plan, other debt) as expense categories with a phase-out year matching the payoff year, while keeping the liability entry for net worth accuracy. For amortising loans, use the full principal + interest cash payment because both portions reduce investable cashflow. Avoid double-counting if the same payment is already included inside another expense category.
 
 Debt Free Age is the first projected age after the final year in the horizon where any configured liability balance is positive. This prevents a temporary zero-liability gap before a future-start liability from being reported as permanently debt-free.
+
+Finance-tab liability headers keep the main total as the configured starting-balance total across rows. When the current-year active balance differs because of From/payoff years or amortization, the UI shows a compact "active" badge beside the configured total; net worth and debt-ratio calculations use the active current-year balance.
 
 ### Drawdown (Post-Retirement)
 

@@ -274,6 +274,25 @@ const InfoTooltip = ({ text }) => {
   );
 };
 
+const phasedHeaderBadgeTones = {
+  income: { color: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.22)' },
+  liability: { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.22)' },
+};
+
+const shouldShowPhasedHeaderBadge = (configured, active) => (
+  Math.round(configured || 0) !== Math.round(active || 0)
+);
+
+const PhasedHeaderBadge = ({ text, tooltip, tone = 'income' }) => {
+  const colors = phasedHeaderBadgeTones[tone] || phasedHeaderBadgeTones.income;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.12rem', fontSize: '0.58rem', fontWeight: '700', color: colors.color, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: '5px', padding: '0.08rem 0.26rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
+      {text}
+      <InfoTooltip text={tooltip} />
+    </span>
+  );
+};
+
 const CalcInput = ({ icon, label, value, field, tooltip, color, onChange, growthRate, onGrowthChange, currency: ciCurrency, rate: ciRate, tag, onTagToggle, phaseOutYear, onPhaseOutChange, onRename, onStartEdit, isEditing, onRemove, canRemove, monthly }) => {
   const _ciCurrency = ciCurrency || 'AED';
   const _ciRate = ciRate || 1;
@@ -3282,7 +3301,7 @@ const mIdx = cols.findIndex(c =>
     return totalAssets - currentLiabilityBalances.total;
   }, [assets, currentLiabilityBalances.total]);
   
-  const annualIncome = useMemo(() => {
+  const currentIncomeBreakdown = useMemo(() => {
     const salaryFallbackEndYear = Math.max(currentCalendarYear, currentRetirementCalendarYear - 1);
     const passiveFallbackEndYear = currentLifeExpectancyCalendarYear;
     const otherFallbackEndYear = currentLifeExpectancyCalendarYear;
@@ -3299,8 +3318,9 @@ const mIdx = cols.findIndex(c =>
     const oth = otherItems
       ? otherItems.reduce((sum, item) => sum + getIncomeAmountForYear(item, currentCalendarYear, currentCalendarYear, assumptions.otherIncomeGrowth || 0, otherFallbackEndYear), 0)
       : (income.other || 0);
-    return sal + pas + oth;
+    return { salary: sal, passive: pas, other: oth, total: sal + pas + oth };
   }, [income, assumptions, currentCalendarYear, currentRetirementCalendarYear, currentLifeExpectancyCalendarYear]);
+  const annualIncome = currentIncomeBreakdown.total;
   
   const annualSavings = useMemo(() => {
     const currentCalYear = new Date().getFullYear();
@@ -8393,12 +8413,15 @@ const mIdx = cols.findIndex(c =>
               <div style={{ marginBottom: '1.5rem' }}>
                 {/* Read-only total when sub-items exist */}
                 {liabilities.mortgageItems && liabilities.mortgageItems.length > 0 ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Mortgage</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(liabilities.mortgage, exchangeRates[currency])}</span>
+                      {shouldShowPhasedHeaderBadge(liabilities.mortgage, currentLiabilityBalances.mortgage) && (
+                        <PhasedHeaderBadge tone="liability" text={`${formatDisplayNumber(currentLiabilityBalances.mortgage, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       <button onClick={() => setExpandedCategories({...expandedCategories, mortgageItems: !expandedCategories.mortgageItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.mortgageItems ? '▲ Hide' : '▼ ' + ((liabilities.mortgageItems?.length || 0) === 1 ? '1 item' : (liabilities.mortgageItems?.length || 0) + ' items')}</button>
                     </div>
                   </div>
@@ -8433,12 +8456,15 @@ const mIdx = cols.findIndex(c =>
               <div style={{ marginBottom: '1.5rem' }}>
                 {/* Read-only total when sub-items exist */}
                 {liabilities.loanItems && liabilities.loanItems.length > 0 ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Loans</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(liabilities.loans, exchangeRates[currency])}</span>
+                      {shouldShowPhasedHeaderBadge(liabilities.loans, currentLiabilityBalances.loans) && (
+                        <PhasedHeaderBadge tone="liability" text={`${formatDisplayNumber(currentLiabilityBalances.loans, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       <button onClick={() => setExpandedCategories({...expandedCategories, loanItems: !expandedCategories.loanItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.loanItems ? '▲ Hide' : '▼ ' + ((liabilities.loanItems?.length || 0) === 1 ? '1 item' : (liabilities.loanItems?.length || 0) + ' items')}</button>
                     </div>
                   </div>
@@ -8472,12 +8498,15 @@ const mIdx = cols.findIndex(c =>
               {/* Other Liabilities - Expandable */}
               <div style={{ marginBottom: '1.5rem' }}>
                 {liabilities.otherLiabilityItems && liabilities.otherLiabilityItems.length > 0 ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Other Liabilities</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(liabilities.other, exchangeRates[currency])}</span>
+                      {shouldShowPhasedHeaderBadge(liabilities.other, currentLiabilityBalances.other) && (
+                        <PhasedHeaderBadge tone="liability" text={`${formatDisplayNumber(currentLiabilityBalances.other, exchangeRates[currency])} active`} tooltip="Active today after applying liability From/payoff years and linear amortization. The main value remains the configured starting balance total across all rows." />
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       <button onClick={() => setExpandedCategories({...expandedCategories, otherLiabilityItems: !expandedCategories.otherLiabilityItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.otherLiabilityItems ? '▲ Hide' : '▼ ' + ((liabilities.otherLiabilityItems?.length || 0) === 1 ? '1 item' : (liabilities.otherLiabilityItems?.length || 0) + ' items')}</button>
                     </div>
                   </div>
@@ -8525,12 +8554,15 @@ const mIdx = cols.findIndex(c =>
               <div style={{ marginBottom: '1.5rem' }}>
                 {/* Read-only total when sub-items exist */}
                 {income.salaryItems && income.salaryItems.length > 0 ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Salary</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(income.salary, exchangeRates[currency])}</span>
+                      {shouldShowPhasedHeaderBadge(income.salary, currentIncomeBreakdown.salary) && (
+                        <PhasedHeaderBadge tone="income" text={`${formatDisplayNumber(currentIncomeBreakdown.salary, exchangeRates[currency])} active`} tooltip="Active today after applying this income row's From/To years and growth from its From year. The main value remains the configured nominal total across all rows." />
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span><input type="number" value={assumptions.salaryGrowth} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0 && v <= 30) setAssumptions({...assumptions, salaryGrowth: v}); }} style={{ width: '52px', padding: '0.1rem 0.2rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#9ca3af', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} /><span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
                       <span style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.1)', display: 'inline-block', margin: '0 0.1rem' }} />
                       <button onClick={() => setExpandedCategories({...expandedCategories, salaryItems: !expandedCategories.salaryItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.salaryItems ? 'Hide' : ((income.salaryItems?.length || 0) === 1 ? '1 item' : (income.salaryItems?.length || 0) + ' items')}</button>
@@ -8573,12 +8605,15 @@ const mIdx = cols.findIndex(c =>
               <div style={{ marginBottom: '1.5rem' }}>
                 {/* Read-only total when sub-items exist */}
                 {income.passiveItems && income.passiveItems.length > 0 ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Passive Income</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(income.passive, exchangeRates[currency])}</span>
+                      {shouldShowPhasedHeaderBadge(income.passive, currentIncomeBreakdown.passive) && (
+                        <PhasedHeaderBadge tone="income" text={`${formatDisplayNumber(currentIncomeBreakdown.passive, exchangeRates[currency])} active`} tooltip="Active today after applying this income row's From/To years and growth from its From year. The main value remains the configured nominal total across all rows." />
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span><input type="number" value={assumptions.passiveGrowth ?? 2} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0 && v <= 30) setAssumptions({...assumptions, passiveGrowth: v}); }} style={{ width: '52px', padding: '0.1rem 0.2rem', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#e8e9ed', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} /><span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
                       <span style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.1)', display: 'inline-block', margin: '0 0.1rem' }} />
                       <button onClick={() => setExpandedCategories({...expandedCategories, passiveItems: !expandedCategories.passiveItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.passiveItems ? 'Hide' : ((income.passiveItems?.length || 0) === 1 ? '1 item' : (income.passiveItems?.length || 0) + ' items')}</button>
@@ -8621,12 +8656,15 @@ const mIdx = cols.findIndex(c =>
               <div style={{ marginBottom: '1.5rem' }}>
                 {/* Read-only total when sub-items exist */}
                 {income.otherIncomeItems && income.otherIncomeItems.length > 0 ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed' }}>Other Income</span>
                       <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(income.other, exchangeRates[currency])}</span>
+                      {shouldShowPhasedHeaderBadge(income.other, currentIncomeBreakdown.other) && (
+                        <PhasedHeaderBadge tone="income" text={`${formatDisplayNumber(currentIncomeBreakdown.other, exchangeRates[currency])} active`} tooltip="Active today after applying this income row's From/To years and growth from its From year. The main value remains the configured nominal total across all rows." />
+                      )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>growth</span><input type="number" value={assumptions.otherIncomeGrowth ?? 2} onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0 && v <= 30) setAssumptions({...assumptions, otherIncomeGrowth: v}); }} style={{ width: '52px', padding: '0.1rem 0.2rem', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', color: '#e8e9ed', fontSize: '0.7rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }} /><span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>%/yr</span>
                       <span style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.1)', display: 'inline-block', margin: '0 0.1rem' }} />
                       <button onClick={() => setExpandedCategories({...expandedCategories, otherIncomeItems: !expandedCategories.otherIncomeItems})} style={{ fontSize: '0.68rem', color: '#9ca3af', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.15rem 0.45rem', cursor: 'pointer', minWidth: '70px', textAlign: 'center' }}>{expandedCategories.otherIncomeItems ? 'Hide' : ((income.otherIncomeItems?.length || 0) === 1 ? '1 item' : (income.otherIncomeItems?.length || 0) + ' items')}</button>
