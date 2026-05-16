@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 by Session 13
+**Last updated:** 2026-05-16 by Session 14
 
 ---
 
@@ -77,6 +77,7 @@
 | NEW-63 | New May 15 state was not fully persisted/imported/exported | MEDIUM | L | FIXED | 13 | Export now writes `runwaySchemaVersion`; autosave/export/import/reset now cover `assetAllocTargetYear` |
 | NEW-64 | Verification harness drifted from runway/contribution semantics | MEDIUM | L | FIXED | 13 | User-capture selectors and full-element coverage projection/runway checks now match the implemented controls and contribution model |
 | NEW-65 | Save More undeployed surplus treated future-starting contributions as current commitments | HIGH | L | FIXED | 13 | Undeployed surplus now subtracts only active current-year investment contributions; UI/report/docs updated |
+| NEW-66 | Gap-closing lever solver ignored investment contribution start years | HIGH | L | FIXED | 14 | Save More, Retire Later, and Higher Return solvers now respect `contribStartYear`; copy clarifies Save More vs Surplus Deployment semantics |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -1017,3 +1018,44 @@ Reviewed and re-validated the main connected surfaces after lever fixes:
 
 **Next session priority:**
 1. Address prior intentional deferrals if product requirements change (NEW-21, NEW-25, NEW-27, NEW-43).
+
+---
+
+## SESSION 14 - 2026-05-16 - Codex
+
+**Picking up from:** User clarification on whether Save More should be dynamic full-surplus deployment.
+**Open findings at session start:** NEW-66.
+**Session goal:** Clarify the intended distinction between the flat Save More gap-closing lever and standalone Surplus Deployment scenarios, then verify the solver logic follows staged contribution semantics.
+
+### NEW-66 - Gap-closing lever solver ignored investment contribution start years (HIGH -> FIXED)
+
+**Status:** FIXED
+**Problem:** The base projection respected `contribStartYear` for investment-item contributions, but the Retirement Health gap-closing solver treated every entered contribution as active from the current year. This could understate the Save More amount, Retire Later years, or Higher Return required when a planned contribution starts in the future.
+
+**Fix applied:**
+- Updated the gap-closing lever solver to include each investment contribution only from its configured start year.
+- Contribution growth now compounds from the configured start year in the lever solver, matching the base projection.
+- Updated the gap-lever test fixture to include a future-starting contribution and assert parity under staged contribution semantics.
+- Clarified app/report/docs copy:
+  - Save More is a flat additional contribution lever, not the dynamic full-surplus scenario.
+  - Surplus Deployment is the dynamic year-by-year full-surplus/split scenario and is not layered on top of fixed entered contributions.
+
+**Files changed:** `src/App.jsx`, `_dev/tests/auditor2_gap_levers.js`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### Verification Chain (Session 14)
+
+- `npm run lint` -> PASS
+- `npm run test:audits` -> PASS
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS
+  - `npm run test:smoke` -> PASS (12 Playwright tests)
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 14 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 1 - NEW-66
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Post-`1fa1eaa` staged-contribution lever parity gap closed; release verification passed.

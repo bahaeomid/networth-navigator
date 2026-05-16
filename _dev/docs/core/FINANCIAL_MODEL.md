@@ -232,7 +232,7 @@ Solve extra annual contribution (binary search):
 extraMonthly = ceil(extraAnnual / 12)
 ```
 
-Shows how much additional monthly investment closes the gap when added as a new investment contribution stream (0% contribution growth) on top of existing investment-item contributions.
+Shows how much additional monthly investment closes the gap when added as a new investment contribution stream (0% contribution growth) on top of existing investment-item contributions. This is a flat gap-closing lever, not the dynamic full-surplus scenario shown in Surplus Deployment.
 
 This lever is additional to the annual contributions entered on investment sub-items, because those contributions are already included in `projectedWealth`. Only undeployed surplus can offset the displayed monthly amount:
 
@@ -240,7 +240,9 @@ This lever is additional to the annual contributions entered on investment sub-i
 undeployedSurplus = currentYearSavings - currentYearActiveInvestmentContributions
 ```
 
-Future-starting investment contributions do not reduce current-year undeployed surplus until their start year. If an item's annual contribution exceeds projected savings in its own start year, the base model still honors the entered contribution plan; users should reduce the contribution input if it is not affordable.
+Future-starting investment contributions do not reduce current-year undeployed surplus until their start year. Gap-closing lever solvers also respect each item's configured contribution start year and growth rate. If an item's annual contribution exceeds projected savings in its own start year, the base model still honors the entered contribution plan; users should reduce the contribution input if it is not affordable.
+
+Surplus Deployment is separate: its tiles deploy each year's full dynamic surplus or a selected split of that surplus as standalone alternatives. They do not add full surplus on top of fixed investment-item contributions already in the base plan.
 
 ### Lever 2: Retire Later
 

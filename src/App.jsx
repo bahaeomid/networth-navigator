@@ -2311,7 +2311,7 @@ const NetWorthNavigator = () => {
       <p>The <strong>overall verdict</strong> is a 6-state classification combining Q1 (on track vs gap) and Q2 (≥80% strong, 60–79% caution, &lt;60% weak): Strong · Moderate risk · High risk · Gap with strong odds · Gap detected · High risk with gap and low odds.</p>
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
-        <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. Only undeployed current-year surplus (${fmt(undeployedSurplus)}/yr in ${currentYear}, after active investment contributions) can offset the additional requirement.</li>
+        <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. This is not the dynamic full-surplus scenario; those year-by-year strategies are shown separately in Surplus Deployment. Only undeployed current-year surplus (${fmt(undeployedSurplus)}/yr in ${currentYear}, after investment contributions active this year) can offset the additional requirement.</li>
         <li><strong>Retire Later.</strong> The number of additional working years needed if Planned Retirement Age changes and all other inputs remain unchanged. Existing investment-item annual contributions continue through the later retirement date. Displays "Gap too large" if not achievable within 30 extra years or before life expectancy.</li>
         <li><strong>Higher Return.</strong> The Investment return assumption required to reach the required nest egg by retirement with current investment balances and entered annual contributions unchanged. Displays "unrealistic" if the required return exceeds 30%/yr.</li>
       </ul>
@@ -2339,7 +2339,7 @@ const NetWorthNavigator = () => {
   <div class="note-block">
     <div class="note-heading"><span class="note-num">11.</span> Surplus Deployment Scenarios</div>
     <div class="note-body">
-      <p>The Surplus Deployment section models three standalone strategies for allocating annual pre-retirement savings surplus. All three scenarios use the actual year-by-year surplus from the base projection (which reflects salary growth, expense inflation, and one-time costs) rather than a fixed annual figure. The base projection includes only annual contributions entered on investment items; Tile 1 shows an upper-bound alternative where the full dynamic surplus is invested. The delta versus base FI Age is the benefit of deploying more than the entered contributions. Scenarios are illustrative only — they do not update the base projection or any other metric in the report.</p>
+      <p>The Surplus Deployment section models three standalone strategies for allocating annual pre-retirement savings surplus. All three scenarios use the actual year-by-year surplus from the base projection (which reflects salary growth, expense inflation, and one-time costs) rather than a fixed annual figure. The base projection includes only annual contributions entered on investment items; Tile 1 shows an alternative where the full dynamic surplus is invested instead. It is not added on top of entered fixed contributions. The delta versus base FI Age is the benefit or drag versus the contribution plan already entered. Scenarios are illustrative only — they do not update the base projection or any other metric in the report.</p>
     </div>
   </div>
   <hr class="note-rule"/>
@@ -5225,7 +5225,7 @@ const mIdx = cols.findIndex(c =>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: surplusOpen ? '0.85rem' : 0 }}>
                       <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         💸 Surplus Deployment
-                        <InfoTooltip text={`Your annual pre-retirement surplus (total income minus expenses) sits undeployed by default except for any annual contributions you explicitly entered on investment items. These three standalone strategies show what happens to your FI Age and retirement wealth if you actively deploy surplus in different ways. Important: all strategies operate pre-retirement only — surplus deployment stops at your Planned Retirement Age. Post-retirement, passive and other non-salary income is automatically netted against investment drawdown, so there is no double-counting between pre- and post-retirement phases.`} />
+                        <InfoTooltip text={`Your annual pre-retirement surplus (total income minus expenses) sits undeployed by default except for any annual contributions you explicitly entered on investment items. These three standalone strategies replace that default behavior for comparison: they deploy each year's actual surplus dynamically, and they do not add the entered fixed contributions on top. Important: all strategies operate pre-retirement only — surplus deployment stops at your Planned Retirement Age. Post-retirement, passive and other non-salary income is automatically netted against investment drawdown, so there is no double-counting between pre- and post-retirement phases.`} />
                       </div>
                       {!hasFutureSurplus
                         ? <span style={{ fontSize: '0.72rem', color: '#4b5563', fontStyle: 'italic' }}>No surplus — expenses meet or exceed income throughout projection</span>
@@ -5234,14 +5234,14 @@ const mIdx = cols.findIndex(c =>
                           </button>
                       }
                     </div>
-                    {surplusOpen && hasFutureSurplus && <div style={{ fontSize: '0.72rem', color: '#6b7280', marginBottom: '0.85rem', lineHeight: 1.5 }}>Use your pre-retirement surplus to see if you can retire faster — or pay off debt sooner. Each tile is a standalone scenario, not an addition to the base projection. The base projection uses annual contributions entered on investment items; these tiles show what happens if you deploy the full dynamic surplus or split it differently. The delta versus base FI Age is the benefit of deploying more than the entered contributions.</div>}
+                    {surplusOpen && hasFutureSurplus && <div style={{ fontSize: '0.72rem', color: '#6b7280', marginBottom: '0.85rem', lineHeight: 1.5 }}>Use your pre-retirement surplus to see if you can retire faster — or pay off debt sooner. Each tile is a standalone scenario, not an addition to the base projection. The base projection uses annual contributions entered on investment items; these tiles instead deploy the full dynamic surplus or split it differently. The delta versus base FI Age is the impact versus your entered contribution plan, not extra money layered on top.</div>}
                     {surplusOpen && hasFutureSurplus && (
                       <div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
 
                           {/* Tile 1 — Invest all */}
                           <div style={{ padding: '1rem', background: 'rgba(52,211,153,0.07)', borderRadius: '10px', border: '1px solid rgba(52,211,153,0.3)' }}>
-                            <div style={{ fontSize: '0.85rem', color: '#34d399', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>💹 Invest all surplus <InfoTooltip text={`Each year's leftover Savings — after all expenses — is added to your Investments pot immediately and grows at your assumed return of ${assumptions.investmentReturn}%/yr until retirement. This is a full-surplus deployment scenario, not an amount to add to the base projection. It typically acts as an upper bound versus entered fixed contributions, though large planned expenses can make dynamic surplus lower than entered contributions in specific years. The FI Age shown is how early you could retire if you consistently invest every extra bit of saving.`} /></div>
+                            <div style={{ fontSize: '0.85rem', color: '#34d399', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>💹 Invest all surplus <InfoTooltip text={`Each year's leftover Savings — after all expenses — is added to your Investments pot immediately and grows at your assumed return of ${assumptions.investmentReturn}%/yr until retirement. This is a full-surplus deployment scenario, not an amount to add to the base projection and not full surplus plus entered fixed contributions. It typically acts as an upper bound versus entered fixed contributions, though large planned expenses can make dynamic surplus lower than entered contributions in specific years. The FI Age shown is how early you could retire if you consistently invest every extra bit of saving.`} /></div>
                             <div style={{ fontSize: '0.85rem', color: '#e8e9ed', marginBottom: '0.85rem', lineHeight: 1.5 }}>Each year's surplus invested at {assumptions.investmentReturn}%/yr & compounded until retirement.</div>
                             <div style={{ height: '1px', background: 'rgba(52,211,153,0.2)', marginBottom: '0.75rem' }} />
                             <div style={{ marginBottom: '0.65rem' }}>
@@ -5566,10 +5566,14 @@ const mIdx = cols.findIndex(c =>
                 const rate = Math.max(0, returnPct || 0) / 100;
                 let balance = assets.investments || 0;
                 for (let i = 0; i < years; i++) {
+                  const contributionYear = currentYearForLevers + i;
                   const plannedContrib = (assets.investmentItems || []).reduce((sum, item) => {
                     const base = item.annualContrib || 0;
+                    if (base <= 0) return sum;
+                    const startYear = item.contribStartYear || currentYearForLevers;
+                    if (contributionYear < startYear) return sum;
                     const growthRate = (item.contribGrowthRate || 0) / 100;
-                    return sum + base * Math.pow(1 + growthRate, i);
+                    return sum + base * Math.pow(1 + growthRate, contributionYear - startYear);
                   }, 0);
                   balance = Math.max(0, balance * (1 + rate) + plannedContrib + (extraAnnualContribution || 0));
                 }
@@ -5815,7 +5819,7 @@ const mIdx = cols.findIndex(c =>
                                 <div>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
                                     <div style={{ padding: '0.85rem', background: saveMoreNA ? 'rgba(255,255,255,0.02)' : 'rgba(96,165,250,0.07)', borderRadius: '8px', border: `1px solid ${saveMoreNA ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario. This is solved as an annualized contribution: adding ${extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'the shown monthly amount × 12'}/yr as a new investment item with 0% contribution growth should close the retirement gap, all else unchanged. Annual contributions already entered on investment items are included in the base projection. Only undeployed surplus can offset it: current surplus minus entered annual investment contributions.`} /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Save more <InfoTooltip text={`Extra amount to invest on top of your current base scenario. This is solved as an annualized contribution: adding ${extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'the shown monthly amount × 12'}/yr as a new investment item with 0% contribution growth should close the retirement gap, all else unchanged. Annual contributions already entered on investment items are included in the base projection from their configured start years. This is not the dynamic full-surplus scenario; use Surplus Deployment for that. Only undeployed current-year surplus can offset it: current surplus minus investment contributions active this year.`} /></div>
                                       {saveMoreNA ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>Not calculable</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrencyDecimal(extraMonthly, currency, exchangeRates)}/mo</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>add as {extraMonthly ? formatCurrencyDecimal(extraMonthly * 12, currency, exchangeRates) : 'monthly × 12'}/yr contribution · invested at {assumptions.investmentReturn}%/yr</div>

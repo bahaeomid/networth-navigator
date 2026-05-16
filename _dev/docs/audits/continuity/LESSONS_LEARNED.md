@@ -3,7 +3,7 @@
 **Project:** NetWorth Navigator v2.0.0
 **Domain:** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 (Session 13)
+**Last updated:** 2026-05-16 (Session 14)
 
 ---
 
@@ -258,3 +258,23 @@ Findings in batch: NEW-57, NEW-58, NEW-59, NEW-60, NEW-61, NEW-62, NEW-63, NEW-6
 - JSON export now writes `runwaySchemaVersion: 2`, preventing freshly exported scenarios from importing through the legacy runway migration path.
 - `_dev/tests/verify_full_element_coverage.mjs` now models retirement-year drawdown and staged investment contributions consistently with `src/App.jsx`.
 - `_dev/e2e/user-scenario-capture.spec.js` should select runway controls by their current step/min/max semantics, not by legacy optimistic/pessimistic bounds.
+
+---
+
+## Batch Synthesis - Session 14 - 2026-05-16
+Findings in batch: NEW-66
+
+### Patterns observed
+
+1. When a staged-input feature is added, every solver that reimplements projection math must be updated, not only the main projection engine.
+2. Similar user-facing concepts need explicit labels: a flat gap-closing contribution and a dynamic full-surplus deployment scenario are not interchangeable.
+
+### Principles extracted
+
+- **Search for duplicate financial engines after model changes:** If `wealthProjection` changes, inspect lever solvers, report calculations, test fixtures, and tooltip formulas for equivalent assumptions.
+- **Name scenario semantics in the UI:** Tooltips should say whether a scenario is additive to the base plan, replaces a base behavior for comparison, or changes a single variable in isolation.
+
+### Codebase-specific observations
+
+- The Retirement Health gap-closing solver now gates investment-item contributions by `contribStartYear`, matching the base projection.
+- The Surplus Deployment tiles use full year-by-year surplus as standalone alternatives; they are not full surplus plus entered fixed contributions.
