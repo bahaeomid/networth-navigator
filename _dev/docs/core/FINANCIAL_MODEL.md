@@ -92,7 +92,7 @@ otherAssets(y+1)  = otherAssets(y) × (1 + otherAssetGrowth)
 cash(y)          = constant (earns 0%, not compounded)
 ```
 
-Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year. The entered contribution amount is nominal in the start year; contribution growth compounds from that start year forward, not from today. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, and HTML report charts. The model does not cap these contributions to calculated savings capacity; users should enter affordable planned contributions.
+Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year. The entered contribution amount is nominal in the start year; contribution growth compounds from that start year forward, not from today. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning for the first future pre-retirement year where planned investment contributions exceed projected savings surplus, so users can review affordability against the Cash Flow Over Time chart.
 
 ### Liability Amortization (Linear)
 
@@ -240,7 +240,7 @@ This lever is additional to the annual contributions entered on investment sub-i
 undeployedSurplus = currentYearSavings - currentYearActiveInvestmentContributions
 ```
 
-Future-starting investment contributions do not reduce current-year undeployed surplus until their start year. Gap-closing lever solvers also respect each item's configured contribution start year and growth rate. If an item's annual contribution exceeds projected savings in its own start year, the base model still honors the entered contribution plan; users should reduce the contribution input if it is not affordable.
+Future-starting investment contributions do not reduce current-year undeployed surplus until their start year. Gap-closing lever solvers also respect each item's configured contribution start year and growth rate. If planned contributions exceed projected savings surplus in any pre-retirement year, the base model still honors the entered contribution plan and shows an informational affordability warning; users should reduce the contribution input, delay the start year, or review Cash Flow Over Time if the plan is not affordable.
 
 Surplus Deployment is separate: its tiles deploy each year's full dynamic surplus or a selected split of that surplus as standalone alternatives. They do not add full surplus on top of fixed investment-item contributions already in the base plan.
 

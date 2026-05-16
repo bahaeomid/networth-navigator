@@ -301,3 +301,29 @@ Findings in batch: NEW-67, NEW-68, NEW-69, NEW-70
 
 - `ChartYearSelector` now centralizes compact year/age/milestone controls for chart surfaces.
 - Retirement Runway sliders now use `.nwn-range` with explicit track backgrounds rather than relying on browser `accent-color` behavior.
+
+---
+
+## Batch Synthesis - Session 16 - 2026-05-16
+Findings in batch: NEW-71, NEW-72, NEW-73, NEW-74
+
+### Patterns observed
+
+1. UI fixes that bypass native browser control behavior can create visual regressions even when calculation semantics are correct.
+2. Chart-horizon controls are not decorative; they introduce user-visible state that must participate in autosave, export, import, reset, and verification artifacts.
+3. Affordability warnings need to scan the same year-by-year projection horizon as the cashflow chart because future planned expenses and OTEs can change surplus capacity after a contribution starts.
+4. Capture/coverage harnesses should preserve semantic values when DOM controls use transformed representations for UX reasons.
+
+### Principles extracted
+
+- **Prefer semantic native controls before custom paint:** Use native range inputs when possible; if a visual direction differs from the financial value, transform the UI value while keeping application state semantic.
+- **Persist every chart horizon control:** Chart filters affect what users see and should round-trip through autosave, JSON export/import, reset, and generated capture artifacts.
+- **Warn on first projected breach, not first configured date:** When a fixed plan interacts with year-by-year cashflow, scan the whole relevant horizon and report the first actionable breach year.
+- **Test transformed control semantics:** If a DOM value is intentionally different from the model value, encode the translation in Playwright capture and coverage checks.
+
+### Codebase-specific observations
+
+- Retirement Runway now uses a positive RTL magnitude range for the pessimistic return control while keeping `runwayConservativeOffset` negative in app state.
+- Net Worth, Assets Over Time, and Retirement Runway now share `ChartYearSelector` behavior with persisted target-year state.
+- The Investments warning now compares aggregate planned investment contributions against `wealthProjection` yearly savings for all pre-retirement years.
+- `_dev/e2e/regression-and-scenarios.spec.js` includes a targeted future-OTE affordability breach test for the contribution warning badge.

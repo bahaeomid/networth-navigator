@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 by Session 15
+**Last updated:** 2026-05-16 by Session 16
 
 ---
 
@@ -80,8 +80,12 @@
 | NEW-66 | Gap-closing lever solver ignored investment contribution start years | HIGH | L | FIXED | 14 | Save More, Retire Later, and Higher Return solvers now respect `contribStartYear`; copy clarifies Save More vs Surplus Deployment semantics |
 | NEW-67 | Retirement Health copy could still blur conservative SWR target vs Monte Carlo survival odds | LOW | L | FIXED | 15 | Verdict/tooltips now distinguish SWR nest egg funding from Monte Carlo survival mechanics and income offsets |
 | NEW-68 | Collapsed Investments badges could wrap under the header row | LOW | L | FIXED | 15 | Compacted contribution/over-savings badges and kept the collapsed header on one row without overlapping growth controls |
-| NEW-69 | Runway slider visuals had inconsistent neutral track/fill behavior and asymmetric return bounds | LOW | L | FIXED | 15 | Added custom range track styling; pessimistic fill is right-anchored and both return offsets use 8pp bounds |
+| NEW-69 | Runway slider visuals had inconsistent neutral track/fill behavior and asymmetric return bounds | LOW | L | FIXED | 15 | Symmetric 8pp bounds kept; implementation superseded by NEW-72 native RTL magnitude slider after custom styling regressed UI behavior |
 | NEW-70 | Chart year selectors lacked quick milestone-year switching | LOW | L | FIXED | 15 | Added compact shared selector with editable year, age, and Today/Ret/Life quick chips where relevant |
+| NEW-71 | Chart year selectors were not applied to Net Worth, Assets Over Time, or Retirement Runway | LOW | M | FIXED | 16 | Added shared year controls to the remaining chart surfaces and persisted the new target-year state |
+| NEW-72 | Custom runway range styling regressed thumb alignment and live fill behavior | LOW | M | FIXED | 16 | Removed `.nwn-range`; restored native range sizing while preserving pessimistic right-anchored semantics via an RTL magnitude slider |
+| NEW-73 | Investment over-savings warning only checked the contribution start year | MEDIUM | M | FIXED | 16 | Warning now scans all pre-retirement years and reports the first year where planned contributions exceed projected savings surplus |
+| NEW-74 | Dynamic contribution warning lacked regression coverage | LOW | M | FIXED | 16 | Added a Playwright regression for a future OTE-driven affordability breach and updated capture/coverage handling for RTL pessimistic slider semantics |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -1129,3 +1133,72 @@ Applied to Asset Allocation, Cash Flow, Pre-retirement Expenses, and Project to 
 **Findings blocked:** 0
 **Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Follow-up UI/messaging backlog closed; release verification passed.
+
+---
+
+## SESSION 16 - 2026-05-16 - Codex
+
+**Picking up from:** User follow-up on GPT 5.5 scenario/messaging validation, chart year controls, runway slider regression screenshots, and investment contribution affordability warnings.
+**Open findings at session start:** NEW-71 through NEW-74.
+**Session goal:** Preserve the corrected Retirement Health semantics, extend chart horizon controls to the remaining chart surfaces, restore runway slider UI behavior, and make investment contribution affordability warnings future-aware.
+
+### NEW-71 - Chart year selectors were not applied to Net Worth, Assets Over Time, or Retirement Runway (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added the shared `ChartYearSelector` to Net Worth Over Time, Assets Over Time, and Retirement Runway. Each chart now filters through the selected year, exposes milestone quick chips where valid, and hides out-of-range reference markers. Added autosave, export, import, and reset wiring for the new chart target-year state.
+**Verification:** `npm run lint`; `npm run test:release`; regenerated user-capture and full-element coverage artifacts.
+**Verification result:** PASS
+**Files changed:** `src/App.jsx`, `_dev/artifacts/user_scenario_capture.json`, `_dev/artifacts/user_scenario_extracted.json`, `_dev/artifacts/full_element_coverage_report.json`
+
+### NEW-72 - Custom runway range styling regressed thumb alignment and live fill behavior (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Removed the custom `.nwn-range` CSS and `rangeTrackBackground` helper. Restored native range dimensions and live browser fill behavior. Preserved the pessimistic return mental model by storing the UI control as a positive magnitude slider with `direction: rtl`, while the application state remains the semantic negative offset.
+**Verification:** User-scenario capture asserts perturbed pessimistic return as `-5.5pp`; full-element coverage confirms reset/perturbed runway control parity.
+**Verification result:** PASS
+**Files changed:** `src/App.jsx`, `src/index.css`, `_dev/e2e/user-scenario-capture.spec.js`, `_dev/tests/verify_full_element_coverage.mjs`
+
+### NEW-73 - Investment over-savings warning only checked the contribution start year (MEDIUM -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Replaced the start-year-only contribution check with a pre-retirement year scan. The Investments header now reports the first future year where aggregate planned investment contributions exceed projected savings surplus, including salary growth, expense inflation, planned expenses/OTEs, contribution start years, and contribution growth. Updated app/report/docs copy to explain that contributions are informationally warned but not capped.
+**Verification:** Added a Playwright regression scenario where a future one-time expense causes the first contribution affordability breach after the contribution start year.
+**Verification result:** PASS
+**Files changed:** `src/App.jsx`, `_dev/e2e/regression-and-scenarios.spec.js`, `_dev/docs/core/FINANCIAL_MODEL.md`, `README.md`
+
+### NEW-74 - Dynamic contribution warning lacked regression coverage (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Extended the regression scenario builder to accept custom investment items and added a targeted test for the new future warning badge year. Updated runway capture/coverage helpers to translate the RTL pessimistic slider's positive DOM value back into the semantic negative offset.
+**Verification:** `npx playwright test _dev/e2e/regression-and-scenarios.spec.js -g "investment warning flags" --reporter=list` -> PASS.
+**Verification result:** PASS
+**Files changed:** `_dev/e2e/regression-and-scenarios.spec.js`, `_dev/e2e/user-scenario-capture.spec.js`, `_dev/tests/verify_full_element_coverage.mjs`
+
+### Verification Chain (Session 16)
+
+- `npm run lint` -> PASS
+- `npm run build` -> PASS
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` -> PASS
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+- `npx playwright test _dev/e2e/regression-and-scenarios.spec.js -g "investment warning flags" --reporter=list` -> PASS
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS
+  - `npm run test:smoke` -> PASS (13 Playwright tests)
+- Final artifact refresh: `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 16 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 4 - NEW-71, NEW-72, NEW-73, NEW-74
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Follow-up UI/control regression and dynamic investment-affordability warning backlog closed; release verification passed.
+
+**Key observations this session:**
+- Custom range styling can regress native browser range alignment and live fill behavior; use native controls unless the visual requirement cannot be represented semantically.
+- Chart filter controls are user-visible state and must be persisted/imported/exported/reset with the same discipline as financial inputs.
+- Contribution affordability should be checked across the projected pre-retirement timeline, not only at the contribution start year, because future OTEs and expense growth can change surplus capacity.
+
+**Next session priority:**
+1. Address prior intentional deferrals only if product requirements change (NEW-21, NEW-25, NEW-27, NEW-43).

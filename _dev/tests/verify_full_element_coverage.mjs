@@ -528,22 +528,29 @@ const runwayMetaValue = (meta) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const runwayPessimisticOffsetValue = (meta) => {
+  const value = runwayMetaValue(meta);
+  if (value === null) return null;
+  const min = Number(meta?.min);
+  return Number.isFinite(min) && min >= 0 ? -value : value;
+};
+
 const runwayBeforeControls = {
-  pessimisticReturn: runwayMetaValue(runwayDebug.runwayBefore?.pessimisticReturn),
+  pessimisticReturn: runwayPessimisticOffsetValue(runwayDebug.runwayBefore?.pessimisticReturn),
   pessimisticSpend: runwayMetaValue(runwayDebug.runwayBefore?.pessimisticSpend),
   optimisticReturn: runwayMetaValue(runwayDebug.runwayBefore?.optimisticReturn),
   optimisticSpend: runwayMetaValue(runwayDebug.runwayBefore?.optimisticSpend),
 };
 
 const runwayPerturbedControls = {
-  pessimisticReturn: runwayMetaValue(runwayDebug.runwayPerturbed?.pessimisticReturn),
+  pessimisticReturn: runwayPessimisticOffsetValue(runwayDebug.runwayPerturbed?.pessimisticReturn),
   pessimisticSpend: runwayMetaValue(runwayDebug.runwayPerturbed?.pessimisticSpend),
   optimisticReturn: runwayMetaValue(runwayDebug.runwayPerturbed?.optimisticReturn),
   optimisticSpend: runwayMetaValue(runwayDebug.runwayPerturbed?.optimisticSpend),
 };
 
 const runwayResetControls = {
-  pessimisticReturn: runwayMetaValue(runwayDebug.runwayReset?.pessimisticReturn),
+  pessimisticReturn: runwayPessimisticOffsetValue(runwayDebug.runwayReset?.pessimisticReturn),
   pessimisticSpend: runwayMetaValue(runwayDebug.runwayReset?.pessimisticSpend),
   optimisticReturn: runwayMetaValue(runwayDebug.runwayReset?.optimisticReturn),
   optimisticSpend: runwayMetaValue(runwayDebug.runwayReset?.optimisticSpend),

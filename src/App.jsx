@@ -151,7 +151,7 @@ const TOOLTIPS = {
   retirementAge: "The age you plan to stop working. Income stops and retirement expenses begin at this age.",
   lifeExpectancy: "Expected age of death for planning purposes. Standard is 90-95 years.",
   cash: "Liquid cash in bank accounts, emergency funds. Low/no growth expected.",
-  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution field to model planned ongoing additions; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts.",
+  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution field to model planned ongoing additions; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the first warning year.",
   realEstate: "Property value (your home + investment properties). Appreciates based on real estate rate.",
   otherAssets: "Other valuable assets: business equity, collectibles, precious metals, vehicles, etc. Treated as illiquid — this category appreciates at the Other growth rate but does not contribute to SWR drawdown capacity. Only Investments and Cash are considered liquid for retirement funding purposes.",
   mortgage: "Outstanding mortgage balance on all properties. This affects net worth only; it does not create a cashflow expense. To reflect the payment in savings, enter the full annual principal + interest payment as a Pre-Retirement expense category with 0% growth and a phase-out year matching the loan payoff year. Keep the liability here for net worth accuracy. Avoid double-counting if that payment is already included in another expense category.",
@@ -535,16 +535,6 @@ const runMonteCarloSimulation = (portfolioAssets, yearsToProject, annualContribu
   }
   
   return (successCount / simulations) * 100;
-};
-
-const rangeTrackBackground = (value, min, max, activeColor, fillFromMax) => {
-  const trackColor = 'rgba(232,233,237,0.9)';
-  const span = max - min || 1;
-  const pct = Math.max(0, Math.min(100, ((value - min) / span) * 100));
-  if (fillFromMax) {
-    return `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${pct}%, ${activeColor} ${pct}%, ${activeColor} 100%)`;
-  }
-  return `linear-gradient(to right, ${activeColor} 0%, ${activeColor} ${pct}%, ${trackColor} ${pct}%, ${trackColor} 100%)`;
 };
 
 // Stable target year input
@@ -1090,6 +1080,18 @@ const NetWorthNavigator = () => {
     return y + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge);
   });
   const [assetAllocTargetYear, setAssetAllocTargetYear] = useState(() => new Date().getFullYear());
+  const [netWorthTargetYear, setNetWorthTargetYear] = useState(() => {
+    const y = new Date().getFullYear();
+    return y + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge);
+  });
+  const [assetsOverTimeTargetYear, setAssetsOverTimeTargetYear] = useState(() => {
+    const y = new Date().getFullYear();
+    return y + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge);
+  });
+  const [runwayTargetYear, setRunwayTargetYear] = useState(() => {
+    const y = new Date().getFullYear();
+    return y + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge);
+  });
   const [hiddenCalcLines, setHiddenCalcLines] = useState({});
   const [hiddenAssetLines, setHiddenAssetLines] = useState({});
   const [selectedChartCats, setSelectedChartCats] = useState([]);
@@ -1284,6 +1286,9 @@ const NetWorthNavigator = () => {
           preRetChartTargetYear,
           cashFlowTargetYear,
           assetAllocTargetYear,
+          netWorthTargetYear,
+          assetsOverTimeTargetYear,
+          runwayTargetYear,
         };
         localStorage.setItem('nwn_autosave', JSON.stringify(dataToSave));
       } catch (e) {
@@ -1295,7 +1300,8 @@ const NetWorthNavigator = () => {
       expenseCategories, expenseCalculator, retirementBudget, expenseGrowthRates,
       expenseTags, expensePhaseOutYears, retExpensePhaseOutYears, retExpenseGrowthRates,
       lifeEvents, assumptions, normalizedOneTimeExpenses, nestEggSwr, surplusSplitInvest, surplusSplitDebt,
-      runwayConservativeOffset, runwayOptimisticOffset, runwayPessSpend, runwayOptSpend, preRetChartTargetYear, cashFlowTargetYear, assetAllocTargetYear]);
+      runwayConservativeOffset, runwayOptimisticOffset, runwayPessSpend, runwayOptSpend, preRetChartTargetYear, cashFlowTargetYear, assetAllocTargetYear,
+      netWorthTargetYear, assetsOverTimeTargetYear, runwayTargetYear]);
 
   // Auto-restore from localStorage on mount
   useEffect(() => {
@@ -1334,6 +1340,9 @@ const NetWorthNavigator = () => {
       if (data.preRetChartTargetYear !== undefined) setPreRetChartTargetYear(data.preRetChartTargetYear);
       if (data.cashFlowTargetYear !== undefined) setCashFlowTargetYear(data.cashFlowTargetYear);
       if (data.assetAllocTargetYear !== undefined) setAssetAllocTargetYear(data.assetAllocTargetYear);
+      if (data.netWorthTargetYear !== undefined) setNetWorthTargetYear(data.netWorthTargetYear);
+      if (data.assetsOverTimeTargetYear !== undefined) setAssetsOverTimeTargetYear(data.assetsOverTimeTargetYear);
+      if (data.runwayTargetYear !== undefined) setRunwayTargetYear(data.runwayTargetYear);
     } catch (e) {
       // Corrupted or unavailable — start with defaults
     }
@@ -1410,6 +1419,9 @@ const NetWorthNavigator = () => {
       preRetChartTargetYear,
       cashFlowTargetYear,
       assetAllocTargetYear,
+      netWorthTargetYear,
+      assetsOverTimeTargetYear,
+      runwayTargetYear,
     };
     
     const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
@@ -2271,7 +2283,7 @@ const NetWorthNavigator = () => {
       <p>The projections are sensitive to the following assumptions, which are user-defined and applied consistently across all scenarios unless otherwise stated:</p>
       <ul>
         <li><strong>Investment return (${assumptions.investmentReturn}% p.a.).</strong> Applied to the liquid investment portfolio (pre- and post-retirement). This is a nominal, pre-fee return. Adviser fees, fund management charges, and transaction costs are not deducted.</li>
-        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If a start year is set, that item begins in that calendar year; contribution growth compounds from the start year forward. The model does not cap contributions to calculated surplus, so users should enter affordable amounts.</li>
+        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If a start year is set, that item begins in that calendar year; contribution growth compounds from the start year forward. The model does not cap contributions to calculated surplus; the app flags the first pre-retirement year where planned contributions exceed projected savings so users can review affordability.</li>
         <li><strong>Real estate appreciation (${assumptions.realEstateAppreciation}% p.a.).</strong> Applied uniformly to the entire real estate portfolio. Regional, property-type, and leverage effects are not modelled.</li>
         <li><strong>Salary growth (${assumptions.salaryGrowth}% p.a.).</strong> Applied to earned income until the stated retirement age, after which salary is assumed to cease.</li>
         <li><strong>Passive income growth (${assumptions.passiveGrowth}% p.a.) and other income growth (${assumptions.otherIncomeGrowth}% p.a.).</strong> Continued post-retirement unless an end year is specified on the income sub-item.</li>
@@ -2375,8 +2387,8 @@ const NetWorthNavigator = () => {
       <p>The three scenarios share the same retirement expense base but apply independent adjustments:</p>
       <ul>
         <li><strong>Base.</strong> No adjustments — uses the configured investment return and the full retirement budget as entered. This is identical to the main wealthProjection drawdown.</li>
-        <li><strong>Pessimistic.</strong> Return offset slider (default −3pp) reduces the investment return. Spend increase slider (default Off) inflates annual retirement withdrawals by an additional percentage. Both adjustments compound over the retirement horizon.</li>
-        <li><strong>Optimistic.</strong> Return offset slider (default +3pp) increases the investment return. Spend cut slider (default −25%) reduces annual withdrawals. Models a scenario where returns beat expectations and the retiree spends less than planned.</li>
+        <li><strong>Pessimistic.</strong> Return offset slider (default 0pp, adjustable down to −8pp) reduces the investment return. Spend increase slider (default Off) inflates annual retirement withdrawals by an additional percentage. Both adjustments compound over the retirement horizon.</li>
+        <li><strong>Optimistic.</strong> Return offset slider (default 0pp, adjustable up to +8pp) increases the investment return. Spend cut slider (default Off) reduces annual withdrawals. Models a scenario where returns beat expectations and the retiree spends less than planned.</li>
       </ul>
       <p>All three scenarios net passive and other income against withdrawals before drawing from investments — consistent with the main projection. Sliders affect only the Runway visualisation and do not modify any other metric or the base projection.</p>
     </div>
@@ -2606,6 +2618,9 @@ new Chart(document.getElementById('allocChart'),{
           if (imported.preRetChartTargetYear !== undefined) setPreRetChartTargetYear(imported.preRetChartTargetYear);
           if (imported.cashFlowTargetYear !== undefined) setCashFlowTargetYear(imported.cashFlowTargetYear);
           if (imported.assetAllocTargetYear !== undefined) setAssetAllocTargetYear(imported.assetAllocTargetYear);
+          if (imported.netWorthTargetYear !== undefined) setNetWorthTargetYear(imported.netWorthTargetYear);
+          if (imported.assetsOverTimeTargetYear !== undefined) setAssetsOverTimeTargetYear(imported.assetsOverTimeTargetYear);
+          if (imported.runwayTargetYear !== undefined) setRunwayTargetYear(imported.runwayTargetYear);
           alert('Data imported successfully! All values are in AED — switch currency above if needed.');
         } else {
           alert('Incompatible file format. Please use a file exported from NetWorth Navigator.');
@@ -3312,34 +3327,79 @@ const mIdx = cols.findIndex(c =>
     return Math.max(y, Math.min(assetAllocTargetYear, max));
   }, [assetAllocTargetYear, profile.currentAge, profile.lifeExpectancy]);
 
+  const clampedNetWorthTargetYear = useMemo(() => {
+    const y = new Date().getFullYear();
+    const max = y + (profile.lifeExpectancy - profile.currentAge);
+    return Math.max(y, Math.min(netWorthTargetYear, max));
+  }, [netWorthTargetYear, profile.currentAge, profile.lifeExpectancy]);
+
+  const clampedAssetsOverTimeTargetYear = useMemo(() => {
+    const y = new Date().getFullYear();
+    const max = y + (profile.lifeExpectancy - profile.currentAge);
+    return Math.max(y, Math.min(assetsOverTimeTargetYear, max));
+  }, [assetsOverTimeTargetYear, profile.currentAge, profile.lifeExpectancy]);
+
+  const clampedRunwayTargetYear = useMemo(() => {
+    const y = new Date().getFullYear();
+    const retirementYear = y + (profile.retirementAge - profile.currentAge);
+    const max = y + (profile.lifeExpectancy - profile.currentAge);
+    return Math.max(retirementYear, Math.min(runwayTargetYear, max));
+  }, [runwayTargetYear, profile.currentAge, profile.retirementAge, profile.lifeExpectancy]);
+
   const assetAllocData = useMemo(() => {
     const row = wealthProjection.find(d => d.year === clampedAssetAllocTargetYear);
     if (!row) return null;
     return { investments: row.investments, realEstate: row.realEstate, cash: row.cash, other: row.other };
   }, [wealthProjection, clampedAssetAllocTargetYear]);
 
-  // Per-item over-savings check: compare each item's contribution against projected savings
-  // at the item's own start year (not current year). Placed after wealthProjection.
+  const netWorthChartData = useMemo(() => {
+    return wealthProjection.filter((d) => d.year <= clampedNetWorthTargetYear);
+  }, [wealthProjection, clampedNetWorthTargetYear]);
+
+  const assetsOverTimeBaseData = useMemo(() => {
+    return wealthProjection.filter((d) => d.year <= clampedAssetsOverTimeTargetYear);
+  }, [wealthProjection, clampedAssetsOverTimeTargetYear]);
+
+  // Informational affordability check: first pre-retirement year where planned
+  // investment contributions exceed the projected savings surplus.
   const overSavingsItems = useMemo(() => {
+    const contribItems = (assets.investmentItems || []).filter((item) => (item.annualContrib || 0) > 0);
+    if (contribItems.length === 0 || profile.currentAge >= profile.retirementAge) return [];
+
     const cy = new Date().getFullYear();
-    return (assets.investmentItems || []).reduce((acc, item) => {
-      if (!(item.annualContrib > 0)) return acc;
-      const startYear = item.contribStartYear || cy;
-      const row = wealthProjection.find(d => d.year === startYear);
-      const projectedSavings = row ? row.savings : annualSavings;
-      if (item.annualContrib > projectedSavings) {
-        acc.push({ id: item.id, name: item.name, annualContrib: item.annualContrib, startYear, projectedSavings, shortfall: item.annualContrib - projectedSavings });
+    const retirementYear = cy + (profile.retirementAge - profile.currentAge);
+    const rowsByYear = new Map(wealthProjection.map((row) => [row.year, row]));
+
+    for (let year = cy; year < retirementYear; year++) {
+      const annualContrib = contribItems.reduce((sum, item) => {
+        const startYear = item.contribStartYear || cy;
+        if (year < startYear) return sum;
+        const growthRate = (item.contribGrowthRate || 0) / 100;
+        return sum + (item.annualContrib || 0) * Math.pow(1 + growthRate, year - startYear);
+      }, 0);
+      if (annualContrib <= 0) continue;
+
+      const row = rowsByYear.get(year);
+      const projectedSavings = row ? row.savings : (year === cy ? annualSavings : 0);
+      if (annualContrib > projectedSavings) {
+        return [{
+          id: 'planned-contributions',
+          name: 'Planned contributions',
+          annualContrib,
+          startYear: year,
+          breachYear: year,
+          age: row ? row.age : profile.currentAge + (year - cy),
+          projectedSavings,
+          shortfall: annualContrib - projectedSavings,
+        }];
       }
-      return acc;
-    }, []);
-  }, [assets.investmentItems, wealthProjection, annualSavings]);
+    }
+
+    return [];
+  }, [assets.investmentItems, wealthProjection, annualSavings, profile.currentAge, profile.retirementAge]);
 
   const investmentContributionExceedsCurrentSavings = useMemo(() => {
     return overSavingsItems.length > 0;
-  }, [overSavingsItems]);
-
-  const investmentContributionSavingsShortfall = useMemo(() => {
-    return overSavingsItems.reduce((sum, i) => sum + i.shortfall, 0);
   }, [overSavingsItems]);
 
   const cashFlowTargetAge = useMemo(() => {
@@ -4194,7 +4254,7 @@ const mIdx = cols.findIndex(c =>
               position: 'relative',
               zIndex: 10
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <h3 style={{ fontSize: '1.3rem', fontWeight: '600', display: 'flex', alignItems: 'center', margin: 0 }}>
                   Net Worth Over Time
                   <InfoTooltip text={`${TOOLTIPS.netWorth}${assumptions.enableDrawdown ? ' · Drawdown mode is active: post-retirement, your investment balance is drawn down each year by your inflation-adjusted retirement expenses. Real estate and other assets continue to grow passively and are not drawn from.' : ''}`} />
@@ -4204,15 +4264,26 @@ const mIdx = cols.findIndex(c =>
                     📉 Drawdown Active
                   </div>
                 )}
+                <ChartYearSelector
+                  mode="through"
+                  value={clampedNetWorthTargetYear}
+                  onChange={setNetWorthTargetYear}
+                  minYear={currentCalendarYear}
+                  maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                  currentYear={currentCalendarYear}
+                  retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                  lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                  currentAge={profile.currentAge}
+                />
               </div>
               <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '0.5rem' }}>
-                Your wealth trajectory from age {profile.currentAge} to {profile.lifeExpectancy}
+                Your wealth trajectory from age {profile.currentAge} to {profile.currentAge + (clampedNetWorthTargetYear - currentCalendarYear)}
               </p>
               <p style={{ fontSize: '0.78rem', color: '#4b5563', marginBottom: '1.25rem' }}>
                 ⚠ Only investment-item annual contributions are included in the base projection. Any remaining surplus stays undeployed unless modeled in Surplus Deployment below.
               </p>
               <ResponsiveContainer width="100%" height={450} style={{ overflow: 'visible' }}>
-                <AreaChart data={wealthProjection} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
+                <AreaChart data={netWorthChartData} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
                   <defs>
                     <linearGradient id="netWorthGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.3}/>
@@ -4227,7 +4298,7 @@ const mIdx = cols.findIndex(c =>
                     contentStyle={{ background: 'rgba(10,22,40,0.96)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: '10px', backdropFilter: 'blur(8px)', color: '#e8e9ed', padding: '0.75rem 1rem' }}
                     content={({ active, payload, label }) => {
                       if (!active || !payload || !payload.length) return null;
-                      const pt = wealthProjection.find(d => d.age === label);
+                      const pt = netWorthChartData.find(d => d.age === label);
                       const currentYear = new Date().getFullYear();
                       const year = pt?.year ?? (currentYear + (label - profile.currentAge));
                       const wealthMilestone = wealthMilestones.find(m => m.age === label);
@@ -4316,13 +4387,15 @@ const mIdx = cols.findIndex(c =>
                   />
                   
                   {/* Retirement marker */}
+                  {profile.retirementAge <= profile.currentAge + (clampedNetWorthTargetYear - currentCalendarYear) && (
                   <ReferenceLine
                     x={profile.retirementAge}
                     stroke="#a78bfa" strokeDasharray="3 3" strokeWidth={2}
                     label={(props) => <RotatedRefLabel {...props} value="Retirement" fill="#a78bfa" />}
                   />
+                  )}
                   {/* Portfolio Exhaustion marker */}
-                  {wealthProjection.exhaustionAge && (
+                  {wealthProjection.exhaustionAge && wealthProjection.exhaustionAge <= profile.currentAge + (clampedNetWorthTargetYear - currentCalendarYear) && (
                     <ReferenceLine
                       x={wealthProjection.exhaustionAge}
                       stroke="#f87171" strokeDasharray="4 3" strokeWidth={2}
@@ -4330,7 +4403,7 @@ const mIdx = cols.findIndex(c =>
                     />
                   )}
                   {/* FI Age marker */}
-                  {fiAge && (
+                  {fiAge && fiAge <= profile.currentAge + (clampedNetWorthTargetYear - currentCalendarYear) && (
                     <ReferenceLine
                       x={fiAge}
                       stroke="#fbbf24" strokeDasharray="5 3" strokeWidth={2}
@@ -4573,19 +4646,18 @@ const mIdx = cols.findIndex(c =>
               // to the total investments balance from wealthProjection (which already has drawdown applied)
               // so sub-items track the actual depleted balance rather than pure compound growth.
               const investmentsStartAmount = assets.investments || 1; // avoid divide-by-zero
-              const assetChartData = wealthProjection.map((d, i) => {
+              const assetChartData = assetsOverTimeBaseData.map((d) => {
                 const row = { ...d };
+                const yearsAhead = d.year - currentYear;
                 allSubItems.forEach(sub => {
                   if (sub.parentKey === 'investments' && assumptions.enableDrawdown) {
                     // Scale the sub-item proportionally to how total investments have moved
                     // (captures both growth AND drawdown withdrawals from wealthProjection)
-                    const investmentScaleFactor = d.investments / Math.max(1, investmentsStartAmount);
-                    const pureGrowthValue = sub.startAmount * Math.pow(1 + sub.rate / 100, i);
                     // Weight: proportional share of starting investments * actual total
                     const subShare = sub.startAmount / investmentsStartAmount;
                     row[sub.key] = Math.round(Math.max(0, subShare * d.investments));
                   } else {
-                    row[sub.key] = Math.round(sub.startAmount * Math.pow(1 + sub.rate / 100, i));
+                    row[sub.key] = Math.round(sub.startAmount * Math.pow(1 + sub.rate / 100, yearsAhead));
                   }
                 });
                 return row;
@@ -4605,10 +4677,21 @@ const mIdx = cols.findIndex(c =>
                   zIndex: 10
                 }}>
                   {/* Header row with title + drill-down dropdown */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.3rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.3rem', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: 0 }}>
                       Assets Over Time
                     </h3>
+                    <ChartYearSelector
+                      mode="through"
+                      value={clampedAssetsOverTimeTargetYear}
+                      onChange={setAssetsOverTimeTargetYear}
+                      minYear={currentCalendarYear}
+                      maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                      currentYear={currentCalendarYear}
+                      retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                      lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                      currentAge={profile.currentAge}
+                    />
                     <div style={{ position: 'relative' }}>
                       <button
                         onClick={() => setAssetDropdownOpen(prev => !prev)}
@@ -4680,7 +4763,7 @@ const mIdx = cols.findIndex(c =>
                     </div>
                   </div>
                   <p style={{ fontSize: '0.85rem', color: '#9ca3af', marginBottom: '0.75rem' }}>
-                    How your wealth grows across asset classes
+                    How your wealth grows across asset classes through {clampedAssetsOverTimeTargetYear}
                   </p>
 
                   {/* Toggle pills - main categories */}
@@ -4796,13 +4879,15 @@ const mIdx = cols.findIndex(c =>
                           );
                         }}
                       />
+                      {profile.retirementAge <= profile.currentAge + (clampedAssetsOverTimeTargetYear - currentCalendarYear) && (
                       <ReferenceLine
                         x={profile.retirementAge}
                         stroke="#a78bfa" strokeDasharray="3 3" strokeWidth={2}
                         label={(props) => <RotatedRefLabel {...props} value="Retirement" fill="#a78bfa" />}
                       />
+                      )}
                       {/* Portfolio Exhaustion marker */}
-                      {wealthProjection.exhaustionAge && (
+                      {wealthProjection.exhaustionAge && wealthProjection.exhaustionAge <= profile.currentAge + (clampedAssetsOverTimeTargetYear - currentCalendarYear) && (
                         <ReferenceLine
                           x={wealthProjection.exhaustionAge}
                           stroke="#f87171" strokeDasharray="4 3" strokeWidth={2}
@@ -6043,6 +6128,8 @@ const mIdx = cols.findIndex(c =>
                   optimistic: o ? o.balance : null,
                 };
               });
+              const runwayTargetAge = profile.currentAge + (clampedRunwayTargetYear - currentCalendarYear);
+              const filteredRunwayChartData = runwayChartData.filter(function(d) { return d.age <= runwayTargetAge; });
 
               const exPessimistic = findExhaustion(pessimisticData);
               const exBase = findExhaustion(baseData);
@@ -6092,7 +6179,21 @@ const mIdx = cols.findIndex(c =>
                       🛬 Retirement Runway
                       <InfoTooltip text={`Each year in retirement your investment balance compounds at the scenario return, then inflation-adjusted expenses are withdrawn (Investments only — real estate and other assets are treated as illiquid). Three lines show your portfolio through retirement — pessimistic (lower return + higher spend), base (your assumptions), and optimistic (higher return + lower spend). Adjust the sliders below to change each scenario's assumptions. When a line hits zero the portfolio is exhausted. The spending reduction slider models a more frugal retirement.`} />
                     </h3>
-                    <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>How long your investment portfolio survives under three return scenarios</p>
+                    <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>How long your investment portfolio survives through age {runwayTargetAge}</p>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                    <ChartYearSelector
+                      mode="through"
+                      value={clampedRunwayTargetYear}
+                      onChange={setRunwayTargetYear}
+                      minYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                      maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                      currentYear={currentCalendarYear}
+                      retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                      lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                      currentAge={profile.currentAge}
+                    />
                   </div>
 
                   {/* Stat cards */}
@@ -6113,20 +6214,21 @@ const mIdx = cols.findIndex(c =>
                           {/* Return slider */}
                           <div style={{ marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
                             {(() => {
-                              const pessMin = -8;
-                              const clampedOffset = Math.max(pessMin, Math.min(0, runwayConservativeOffset));
+                              const pessMax = 8;
+                              const clampedOffset = Math.max(-pessMax, Math.min(0, runwayConservativeOffset));
                               if (clampedOffset !== runwayConservativeOffset) setRunwayConservativeOffset(clampedOffset);
                               const isAdjusted = runwayConservativeOffset < 0;
+                              const pessMagnitude = Math.abs(runwayConservativeOffset);
                               return (
                                 <>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
                                     <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Return offset</span>
                                     <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: isAdjusted ? '#f87171' : '#4b5563', fontWeight: '700' }}>{runwayConservativeOffset}pp</span>
                                   </div>
-                                  <input className="nwn-range" type="range" min={pessMin} max={0} step={0.5} value={runwayConservativeOffset}
-                                    onChange={function(e) { setRunwayConservativeOffset(parseRangeInputValue(e.target, runwayConservativeOffset)); }}
-                                    style={{ '--range-thumb': isAdjusted ? '#f87171' : '#94a3b8', background: rangeTrackBackground(runwayConservativeOffset, pessMin, 0, '#f87171', true) }} />
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>{pessMin}pp</span><span>0pp</span></div>
+                                  <input type="range" min={0} max={pessMax} step={0.5} value={pessMagnitude}
+                                    onChange={function(e) { setRunwayConservativeOffset(-parseRangeInputValue(e.target, pessMagnitude)); }}
+                                    style={{ width: '100%', accentColor: isAdjusted ? '#ef4444' : '#6b7280', direction: 'rtl' }} />
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>-{pessMax}pp</span><span>0pp</span></div>
                                 </>
                               );
                             })()}
@@ -6137,9 +6239,9 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Spend increase</span>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayPessSpend > 0 ? '#f87171' : '#4b5563', fontWeight: '700' }}>{runwayPessSpend > 0 ? '+' + runwayPessSpend + '%' : 'Off'}</span>
                             </div>
-                            <input className="nwn-range" type="range" min={0} max={50} step={5} value={runwayPessSpend}
+                            <input type="range" min={0} max={50} step={5} value={runwayPessSpend}
                               onChange={function(e) { setRunwayPessSpend(parseRangeInputValue(e.target, runwayPessSpend)); }}
-                              style={{ '--range-thumb': runwayPessSpend > 0 ? '#f87171' : '#94a3b8', background: rangeTrackBackground(runwayPessSpend, 0, 50, '#f87171') }} />
+                              style={{ width: '100%', accentColor: runwayPessSpend > 0 ? '#ef4444' : '#6b7280' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>+50%</span></div>
                           </div>
                         </div>
@@ -6184,9 +6286,9 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Return offset</span>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayOptimisticOffset > 0 ? '#34d399' : '#4b5563', fontWeight: '700' }}>{runwayOptimisticOffset > 0 ? `+${runwayOptimisticOffset}pp` : '0pp'}</span>
                             </div>
-                            <input className="nwn-range" type="range" min={0} max={8} step={0.5} value={runwayOptimisticOffset}
+                            <input type="range" min={0} max={8} step={0.5} value={runwayOptimisticOffset}
                               onChange={function(e) { setRunwayOptimisticOffset(parseRangeInputValue(e.target, runwayOptimisticOffset)); }}
-                              style={{ '--range-thumb': runwayOptimisticOffset > 0 ? '#34d399' : '#94a3b8', background: rangeTrackBackground(runwayOptimisticOffset, 0, 8, '#34d399') }} />
+                              style={{ width: '100%', accentColor: runwayOptimisticOffset > 0 ? '#22c55e' : '#6b7280' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0pp</span><span>+8pp</span></div>
                           </div>
                           {/* Spend slider */}
@@ -6195,9 +6297,9 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Spend cut</span>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayOptSpend > 0 ? '#34d399' : '#4b5563', fontWeight: '700' }}>{runwayOptSpend > 0 ? '−' + runwayOptSpend + '%' : 'Off'}</span>
                             </div>
-                            <input className="nwn-range" type="range" min={0} max={50} step={5} value={runwayOptSpend}
+                            <input type="range" min={0} max={50} step={5} value={runwayOptSpend}
                               onChange={function(e) { setRunwayOptSpend(parseRangeInputValue(e.target, runwayOptSpend)); }}
-                              style={{ '--range-thumb': runwayOptSpend > 0 ? '#34d399' : '#94a3b8', background: rangeTrackBackground(runwayOptSpend, 0, 50, '#34d399') }} />
+                              style={{ width: '100%', accentColor: runwayOptSpend > 0 ? '#22c55e' : '#6b7280' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>−50%</span></div>
                           </div>
                         </div>
@@ -6207,7 +6309,7 @@ const mIdx = cols.findIndex(c =>
 
                   {/* Chart */}
                   <ResponsiveContainer width="100%" height={380} style={{ overflow: 'visible' }}>
-                    <LineChart data={runwayChartData} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
+                    <LineChart data={filteredRunwayChartData} margin={{ top: 40, right: 20, bottom: 20, left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="age" stroke="#9ca3af" tick={{ fill: '#9ca3af', fontSize: 11 }} label={{ value: 'Age', position: 'insideBottomRight', offset: -5, fill: '#6b7280', fontSize: 11 }} />
                       <YAxis stroke="#9ca3af" tickFormatter={function(v) { return formatCurrencyDecimal(v, currency, exchangeRates); }} tick={{ fill: '#9ca3af', fontSize: 11 }} width={80} />
@@ -6322,11 +6424,13 @@ const mIdx = cols.findIndex(c =>
                         label={function(props) { return <RotatedRefLabel {...props} value="Retirement" fill="#a78bfa" />; }}
                       />
                       {/* Life expectancy marker */}
+                      {profile.lifeExpectancy <= runwayTargetAge && (
                       <ReferenceLine
                         x={profile.lifeExpectancy}
                         stroke="#6b7280" strokeDasharray="4 3" strokeWidth={1.5}
                         label={function(props) { return <RotatedRefLabel {...props} value={"Age " + profile.lifeExpectancy} fill="#6b7280" />; }}
                       />
+                      )}
 
 
 
@@ -7406,7 +7510,7 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.34rem', flexWrap: 'nowrap', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
                         <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flex: '0 0 auto' }}>
                           Investments
-                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution start year. Annual contrib is the planned addition each year starting from the 'from' year; growth compounds from that start year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus — keep them affordable." />
+                          <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution start year. Annual contrib is the planned addition each year starting from the 'from' year; growth compounds from that start year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the first year to review in Cash Flow Over Time." />
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace', flex: '0 0 auto' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
                         {annualInvestmentContribution > 0 && (() => {
@@ -7432,10 +7536,10 @@ const mIdx = cols.findIndex(c =>
                             </span>
                           );
                         })()}
-                        {investmentContributionExceedsCurrentSavings && (
+                        {investmentContributionExceedsCurrentSavings && overSavingsItems[0] && (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.16rem', fontSize: '0.58rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.08rem 0.26rem', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
-                            ⚠ over
-                            <InfoTooltip text={overSavingsItems.length === 1 ? `"${overSavingsItems[0].name}" contribution (${formatCurrencyDecimal(overSavingsItems[0].annualContrib, currency, exchangeRates)}/yr starting ${overSavingsItems[0].startYear}) exceeds projected savings in ${overSavingsItems[0].startYear} (${formatCurrencyDecimal(Math.max(0, overSavingsItems[0].projectedSavings), currency, exchangeRates)}/yr) by ${formatCurrencyDecimal(overSavingsItems[0].shortfall, currency, exchangeRates)}/yr. This is allowed; treat it as a stretch target unless you plan to reallocate cashflow.` : `${overSavingsItems.length} contributions exceed projected savings at their respective start years (${overSavingsItems.map(i => i.name).join(', ')}). These are allowed; treat them as stretch targets unless you plan to reallocate cashflow.`} />
+                            ⚠ over {overSavingsItems[0].breachYear}
+                            <InfoTooltip text={`Planned investment contributions first exceed projected pre-retirement surplus in ${overSavingsItems[0].breachYear} (Age ${overSavingsItems[0].age}): ${formatCurrencyDecimal(overSavingsItems[0].annualContrib, currency, exchangeRates)}/yr contributions vs ${formatCurrencyDecimal(overSavingsItems[0].projectedSavings, currency, exchangeRates)}/yr projected surplus, a ${formatCurrencyDecimal(overSavingsItems[0].shortfall, currency, exchangeRates)}/yr gap. This includes salary growth, expense inflation, planned expenses/OTEs, contribution start years, and contribution growth. Contributions are still allowed and are not capped; use the Cash Flow Over Time chart to review year-by-year surplus before setting a fixed contribution.`} />
                           </span>
                         )}
                       </div>
@@ -8454,6 +8558,9 @@ const mIdx = cols.findIndex(c =>
                   setPreRetChartTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.retirementAge - DEFAULT_STATE.profile.currentAge));
                   setCashFlowTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge));
                   setAssetAllocTargetYear(new Date().getFullYear());
+                  setNetWorthTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge));
+                  setAssetsOverTimeTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge));
+                  setRunwayTargetYear(new Date().getFullYear() + (DEFAULT_STATE.profile.lifeExpectancy - DEFAULT_STATE.profile.currentAge));
                   setSurplusSplitInvest(100);
                   setSurplusSplitDebt(0);
                   setExpenseViewMode('annual');

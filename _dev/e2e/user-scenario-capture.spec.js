@@ -197,6 +197,13 @@ const toFinite = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const readPessimisticReturnOffset = (meta) => {
+  const value = toFinite(meta?.value);
+  if (value === null) return null;
+  const min = toFinite(meta?.min);
+  return min !== null && min >= 0 ? -value : value;
+};
+
 const readRunwayYears = (text, label) => {
   if (!text) return null;
   const m = text.match(new RegExp(`${label}[\\s\\S]*?(\\d+)yrs`, 'i'));
@@ -210,7 +217,7 @@ const parseRunwayYearsSnapshot = (text) => ({
 });
 
 const assertRunwayControls = (state, expected, label) => {
-  expect(toFinite(state?.pessimisticReturn?.value), `${label}: pessimistic return`).toBeCloseTo(expected.pessimisticReturn, 6);
+  expect(readPessimisticReturnOffset(state?.pessimisticReturn), `${label}: pessimistic return`).toBeCloseTo(expected.pessimisticReturn, 6);
   expect(toFinite(state?.pessimisticSpend?.value), `${label}: pessimistic spend`).toBeCloseTo(expected.pessimisticSpend, 6);
   expect(toFinite(state?.optimisticReturn?.value), `${label}: optimistic return`).toBeCloseTo(expected.optimisticReturn, 6);
   expect(toFinite(state?.optimisticSpend?.value), `${label}: optimistic spend`).toBeCloseTo(expected.optimisticSpend, 6);
@@ -419,7 +426,7 @@ test('capture user scenario outputs across tabs', async ({ page }) => {
       optimisticSpend: await readRangeMeta(optSpendSlider),
     };
 
-    await setRangeValue(pessReturnSlider, -5.5); // pessimistic return offset (valid step from -5.5)
+    await setRangeValue(pessReturnSlider, 5.5); // pessimistic return offset magnitude; UI stores it as -5.5pp
     await setRangeValue(pessSpendSlider, 20); // pessimistic spend increase
     await setRangeValue(optReturnSlider, 6);  // optimistic return offset
     await setRangeValue(optSpendSlider, 40); // optimistic spend cut
@@ -456,7 +463,7 @@ test('capture user scenario outputs across tabs', async ({ page }) => {
       optimisticSpend: await readRangeMeta(optSpendSliderReset),
     };
     const baselineControls = {
-      pessimisticReturn: toFinite(capture.debug.runwayBefore?.pessimisticReturn?.value),
+      pessimisticReturn: readPessimisticReturnOffset(capture.debug.runwayBefore?.pessimisticReturn),
       pessimisticSpend: toFinite(capture.debug.runwayBefore?.pessimisticSpend?.value),
       optimisticReturn: toFinite(capture.debug.runwayBefore?.optimisticReturn?.value),
       optimisticSpend: toFinite(capture.debug.runwayBefore?.optimisticSpend?.value),

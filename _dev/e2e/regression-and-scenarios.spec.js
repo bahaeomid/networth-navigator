@@ -54,7 +54,7 @@ const buildScenarioData = (scenario) => {
       realEstate: scenario.assets.realEstate,
       other: scenario.assets.other,
       cashItems: [{ id: 1, name: 'Cash', amount: scenario.assets.cash }],
-      investmentItems: [{ id: 1, name: 'Portfolio', amount: scenario.assets.investments }],
+      investmentItems: scenario.investmentItems || [{ id: 1, name: 'Portfolio', amount: scenario.assets.investments }],
       realEstateItems: [{ id: 1, name: 'Property', amount: scenario.assets.realEstate }],
       otherItems: [{ id: 1, name: 'Other', amount: scenario.assets.other }],
     },
@@ -350,6 +350,38 @@ test('regression: CSV Uncategorized category captures unmatched OTE mapping', as
 
   const orangeDots = await page.locator('svg circle[fill="#f59e0b"]').count();
   expect(orangeDots).toBeGreaterThan(0);
+});
+
+test('regression: investment warning flags first future contribution affordability breach', async ({ page }) => {
+  attachDialogHandler(page);
+  await page.goto('/');
+
+  const breachYear = CURRENT_YEAR + 2;
+  const scenario = buildScenarioData({
+    name: 'future-contribution-warning',
+    currentAge: 35,
+    retirementAge: 40,
+    lifeExpectancy: 85,
+    currency: 'AED',
+    assets: { cash: 50000, investments: 100000, realEstate: 0, other: 0 },
+    liabilities: { mortgage: 0, loans: 0, other: 0 },
+    income: { salary: 200000, passive: 0, other: 0 },
+    preExpenses: { housing: 60000, bills: 20000, groceries: 20000, healthBasic: 0, travel: 0, entertainment: 0 },
+    retExpenses: { housing: 30000, bills: 15000, groceries: 15000, healthBasic: 10000, travel: 0, entertainment: 0 },
+    preRates: { housing: 0, bills: 0, groceries: 0, healthBasic: 0, travel: 0, entertainment: 0 },
+    retRates: { housing: 0, bills: 0, groceries: 0, healthBasic: 0, travel: 0, entertainment: 0 },
+    assumptions: { salaryGrowth: 0, passiveGrowth: 0, otherIncomeGrowth: 0, investmentReturn: 5, investmentStdDev: 12, realEstateAppreciation: 0, realEstateStdDev: 0, otherAssetGrowth: 0, otherAssetStdDev: 0 },
+    investmentItems: [{ id: 1, name: 'Portfolio', amount: 100000, annualContrib: 80000, contribGrowthRate: 0, contribStartYear: CURRENT_YEAR }],
+    oneTimeExpenses: [
+      { id: 1, year: breachYear, description: 'School fee spike', amount: 60000, category: 'housing', endYear: null },
+    ],
+    nestEggSwr: 4,
+  });
+  await importJsonPayload(page, scenario);
+
+  await tabByName(page, 'Finances').click();
+  const investmentsHeader = page.locator('div').filter({ hasText: 'Investments' }).filter({ hasText: new RegExp(`over\\s*${breachYear}`) }).first();
+  await expect(investmentsHeader).toBeVisible();
 });
 
 test('regression: retire-later recommendation is reproducible and runway percentages are normalized', async ({ page }) => {

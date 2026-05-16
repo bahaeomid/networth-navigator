@@ -29,7 +29,7 @@ A comprehensive personal financial planning and retirement projection applicatio
 - **Detailed Expense Tracking** - 15 pre-configured expense categories (essential and discretionary) with customizable growth rates
 - **Income Projection** - Track salary, passive income, and other income streams with individual growth rates
 - **Asset/Liability Management** - Add sub-items for detailed tracking of each asset and liability category
-- **Investment Contributions** - Model ongoing annual contributions, future start years, and contribution growth on individual investment items
+- **Investment Contributions** - Model ongoing annual contributions, future start years, contribution growth, and projected affordability warnings on individual investment items
 - **One-Time Expenses** - Plan for major purchases (cars, home renovations) with recurring expense support
 - **Life Events** - Mark significant financial events on your timeline
 
