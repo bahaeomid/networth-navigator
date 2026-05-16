@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-05-16T15:01:08.060Z",
-  "sourceCaptureGeneratedAt": "2026-05-16T14:58:29.449Z",
-  "sourceExtractedGeneratedAt": "2026-05-16T14:58:29.449Z",
+  "generatedAt": "2026-05-16T20:03:04.991Z",
+  "sourceCaptureGeneratedAt": "2026-05-16T20:02:07.567Z",
+  "sourceExtractedGeneratedAt": "2026-05-16T20:02:07.567Z",
   "totals": {
     "checks": 44,
     "passed": 44,
@@ -235,8 +235,8 @@
     {
       "element": "Surplus Deployment",
       "metric": "Clear Debt First Debt-Free Age",
-      "expected": 43,
-      "observed": 43,
+      "expected": 41,
+      "observed": 41,
       "pass": true
     },
     {
@@ -249,8 +249,8 @@
     {
       "element": "Surplus Deployment",
       "metric": "Custom Split 0/100 FI Age",
-      "expected": 78,
-      "observed": 78,
+      "expected": 74,
+      "observed": 74,
       "pass": true
     },
     {

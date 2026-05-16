@@ -94,12 +94,33 @@ cash(y)          = constant (earns 0%, not compounded)
 
 Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year and can optionally end before retirement. The entered contribution amount is nominal in the From year; contribution growth compounds from that From year forward, not from today, and applies only through the inclusive To year. If no To year is set, the contribution continues through the final pre-retirement contribution year. Projection charts are annual opening snapshots: a contribution made during calendar year 2030 is included in `investments(2031)`, not the opening 2030 plotted point. This is consistent with drawdown timing, where the retirement-age plotted point is the opening balance before that year's retirement drawdown is applied into the next plotted point. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, Assets Over Time drilldown overlays, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning when planned investment contributions exceed projected savings surplus in any pre-retirement year, summarizes the affected range and examples, and directs users to the Cash Flow Over Time chart for full year-by-year context.
 
+### Income Phasing (Salary, Passive, Other)
+
+Income sub-items use an inclusive From/To window:
+
+```
+start = startYear || currentYear
+end   = max(start, endYear || fallbackEndYear)
+
+active in year y when start ≤ y ≤ end
+income(y) = baseAmount × (1 + growthRate)^(y - start)
+```
+
+- Salary fallback end year is the final pre-retirement calendar year and is always capped at retirement.
+- Passive and Other income fallback end year is the life-expectancy calendar year, so they can continue through retirement unless a To year is set.
+- Entered base amounts are nominal in the From year.
+
 ### Liability Amortization (Linear)
 
 ```
-For each liability sub-item with endYear:
-  term = endYear − currentYear
-  balance(y) = max(0, originalAmount × (endYear − calendarYear) / term)
+For each liability sub-item:
+  start  = startYear || currentYear
+  payoff = max(start + 1, endYear || (start + defaultTermYears))
+
+  if calendarYear < start or calendarYear ≥ payoff: balance(y) = 0
+  else:
+    termYears = payoff − start
+    balance(y) = max(0, originalAmount × (payoff − calendarYear) / termYears)
 
 If no sub-items: total amortized linearly over default term (25yr mortgage, 5yr loans)
 ```
@@ -244,6 +265,8 @@ Future-starting investment contributions do not reduce current-year undeployed s
 
 Surplus Deployment is separate: its tiles deploy each year's full dynamic surplus or a selected split of that surplus as standalone alternatives. They do not add full surplus on top of fixed investment-item contributions already in the base plan.
 
+For debt-first/custom-debt surplus scenarios, debt allocation is applied only to liability balances active in that same pre-retirement year (respecting each liability row's From and payoff years). If no liability is active in a given year, that year's debt-allocation slice is redirected to investments.
+
 ### Lever 2: Retire Later
 
 ```
@@ -283,6 +306,7 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 | **Cash earns 0%** | Pragmatic — emergency fund, not income-generating | Cash balance is constant across projection |
 | **Linear amortization** | Simplification accepted by owner | Slightly overestimates debt in early years vs actual amortization schedule |
 | **Liability balances do not imply payments** | Balance sheet and cashflow are deliberately separate | Keep liabilities for net worth; enter full debt-service payments as expenses to affect savings |
+| **Life Events are visual-only overlays** | Milestones provide timeline context, not cashflow drivers | Life-event start/end years render chart markers/bands only and do not alter financial calculations |
 | **NW Multiple uses salary only** | Fidelity standard benchmark | Passive/other income excluded from denominator |
 | **Higher Return lever keeps the base projection unchanged except return** | Solves required return after current balances and entered annual contributions are reflected in projected wealth | Gives an isolated return-lever estimate with actionable parity to changing the return assumption |
 | **Drawdown timing: age >= retirementAge** | Drawdown starts in the retirement-age transition year, aligned across deterministic, runway, and Monte Carlo engines | Consistent cross-surface timing semantics |

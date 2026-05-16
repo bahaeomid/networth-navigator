@@ -69,37 +69,92 @@ const pushCheck = ({ element, metric, expected, observed, absTol = 0, relTol = 0
   results.push({ element, metric, expected, observed, pass });
 };
 
+const parseYearOrNull = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const year = parseInt(value, 10);
+  return Number.isFinite(year) ? year : null;
+};
+
+const isYearWithinInclusiveRange = (year, startYear, endYear) => year >= startYear && year <= endYear;
+
+const getIncomeStartYear = (item, nowYear) => parseYearOrNull(item.startYear) || nowYear;
+
+const getIncomeEndYear = (item, nowYear, fallbackEndYear) => {
+  const startYear = getIncomeStartYear(item, nowYear);
+  const rawEndYear = parseYearOrNull(item.endYear);
+  const resolvedEndYear = rawEndYear == null ? fallbackEndYear : rawEndYear;
+  return Math.max(startYear, resolvedEndYear);
+};
+
+const getIncomeAmountForYear = (item, year, nowYear, growthRatePct, fallbackEndYear) => {
+  const base = toNum(item.amount);
+  if (base <= 0) return 0;
+  const startYear = getIncomeStartYear(item, nowYear);
+  const endYear = getIncomeEndYear(item, nowYear, fallbackEndYear);
+  if (!isYearWithinInclusiveRange(year, startYear, endYear)) return 0;
+  const growthRate = toNum(growthRatePct) / 100;
+  return base * Math.pow(1 + growthRate, year - startYear);
+};
+
+const getLiabilityStartYear = (item, nowYear) => parseYearOrNull(item.startYear) || nowYear;
+
+const getLiabilityPayoffYear = (item, nowYear, defaultTermYears) => {
+  const startYear = getLiabilityStartYear(item, nowYear);
+  const explicitPayoffYear = parseYearOrNull(item.endYear);
+  const fallbackPayoffYear = startYear + defaultTermYears;
+  const resolvedPayoffYear = explicitPayoffYear == null ? fallbackPayoffYear : explicitPayoffYear;
+  return Math.max(startYear + 1, resolvedPayoffYear);
+};
+
+const getLiabilityBalanceForYear = (item, year, nowYear, defaultTermYears) => {
+  const amount = toNum(item.amount);
+  if (amount <= 0) return 0;
+  const startYear = getLiabilityStartYear(item, nowYear);
+  const payoffYear = getLiabilityPayoffYear(item, nowYear, defaultTermYears);
+  if (year < startYear || year >= payoffYear) return 0;
+  const termYears = payoffYear - startYear;
+  if (termYears <= 0) return 0;
+  return Math.max(0, amount * ((payoffYear - year) / termYears));
+};
+
+const getLiabilityCategoryBalanceForYear = (items, fallbackTotal, year, nowYear, defaultTermYears) => {
+  if (!items || items.length === 0) {
+    const principal = toNum(fallbackTotal);
+    const yearsFromCurrent = Math.max(0, year - nowYear);
+    return Math.max(0, principal - (principal / defaultTermYears) * yearsFromCurrent);
+  }
+  return items.reduce((sum, item) => sum + getLiabilityBalanceForYear(item, year, nowYear, defaultTermYears), 0);
+};
+
 const annualIncomeAtYear = (year, i, age) => {
   const salItems = income.salaryItems && income.salaryItems.length > 0 ? income.salaryItems : null;
   const passItems = income.passiveItems && income.passiveItems.length > 0 ? income.passiveItems : null;
   const otherItems = income.otherIncomeItems && income.otherIncomeItems.length > 0 ? income.otherIncomeItems : null;
 
-  const salaryGrowth = toNum(assumptions.salaryGrowth) / 100;
-  const passiveGrowth = toNum(assumptions.passiveGrowth) / 100;
-  const otherGrowth = toNum(assumptions.otherIncomeGrowth) / 100;
+  const finalSalaryYear = Math.max(currentYear, retirementCalYear - 1);
+  const passiveFallbackEndYear = currentYear + (profile.lifeExpectancy - profile.currentAge);
+  const otherFallbackEndYear = currentYear + (profile.lifeExpectancy - profile.currentAge);
 
   const salary = age < profile.retirementAge
     ? (salItems
       ? salItems.reduce((s, item) => {
-          if (item.endYear && year >= item.endYear) return s;
-          return s + toNum(item.amount) * Math.pow(1 + salaryGrowth, i);
+          if (year > finalSalaryYear) return s;
+          return s + getIncomeAmountForYear(item, year, currentYear, assumptions.salaryGrowth, finalSalaryYear);
         }, 0)
-      : toNum(income.salary) * Math.pow(1 + salaryGrowth, i))
+      : toNum(income.salary) * Math.pow(1 + toNum(assumptions.salaryGrowth) / 100, i))
     : 0;
 
   const passive = passItems
     ? passItems.reduce((s, item) => {
-        if (item.endYear && year >= item.endYear) return s;
-        return s + toNum(item.amount) * Math.pow(1 + passiveGrowth, i);
+        return s + getIncomeAmountForYear(item, year, currentYear, assumptions.passiveGrowth, passiveFallbackEndYear);
       }, 0)
-    : toNum(income.passive) * Math.pow(1 + passiveGrowth, i);
+    : toNum(income.passive) * Math.pow(1 + toNum(assumptions.passiveGrowth) / 100, i);
 
   const otherIncome = otherItems
     ? otherItems.reduce((s, item) => {
-        if (item.endYear && year >= item.endYear) return s;
-        return s + toNum(item.amount) * Math.pow(1 + otherGrowth, i);
+        return s + getIncomeAmountForYear(item, year, currentYear, assumptions.otherIncomeGrowth, otherFallbackEndYear);
       }, 0)
-    : toNum(income.other) * Math.pow(1 + otherGrowth, i);
+    : toNum(income.other) * Math.pow(1 + toNum(assumptions.otherIncomeGrowth) / 100, i);
 
   return { salary, passive, otherIncome, total: salary + passive + otherIncome };
 };
@@ -174,19 +229,6 @@ const getOneTimeExpenseForYear = (year) => {
   return total;
 };
 
-const amortizeLiability = (items, fallbackTotal, defaultTerm, year, i) => {
-  if (!items || items.length === 0) {
-    return Math.max(0, toNum(fallbackTotal) - (toNum(fallbackTotal) / defaultTerm) * i);
-  }
-  return items.reduce((sum, item) => {
-    const term = item.endYear ? item.endYear - currentYear : defaultTerm;
-    if (term <= 0) return sum;
-    const endYr = item.endYear || (currentYear + defaultTerm);
-    if (year >= endYr) return sum;
-    return sum + Math.max(0, toNum(item.amount) * ((endYr - year) / term));
-  }, 0);
-};
-
 const buildWealthProjection = () => {
   const projectionYears = Math.max(0, profile.lifeExpectancy - profile.currentAge);
 
@@ -212,9 +254,9 @@ const buildWealthProjection = () => {
 
     const totalAssets = investmentBalance + realEstateValue + cash + otherAssetValue;
 
-    const mortgageBalance = amortizeLiability(liabilities.mortgageItems, liabilities.mortgage, 25, year, i);
-    const loansBalance = amortizeLiability(liabilities.loanItems, liabilities.loans, 5, year, i);
-    const otherLiabilities = amortizeLiability(liabilities.otherLiabilityItems, liabilities.other, 5, year, i);
+    const mortgageBalance = getLiabilityCategoryBalanceForYear(liabilities.mortgageItems, liabilities.mortgage, year, currentYear, 25);
+    const loansBalance = getLiabilityCategoryBalanceForYear(liabilities.loanItems, liabilities.loans, year, currentYear, 5);
+    const otherLiabilities = getLiabilityCategoryBalanceForYear(liabilities.otherLiabilityItems, liabilities.other, year, currentYear, 5);
 
     const totalLiabilities = round(mortgageBalance + loansBalance + otherLiabilities);
 
@@ -293,8 +335,17 @@ const fiAgeExpected = findFiAge(wealthProjection, nestEggSwr);
 const simulateSurplus = () => {
   const r = toNum(assumptions.investmentReturn) / 100;
   const baseInvestAtRet = (wealthProjection.find((d) => d.age === profile.retirementAge) || {}).investments || 0;
-  const totalDebtToday = toNum(liabilities.mortgage) + toNum(liabilities.loans) + toNum(liabilities.other);
-
+  const preRetLiabilityRows = wealthProjection.filter((wp) => wp.age < profile.retirementAge && wp.age <= profile.lifeExpectancy);
+  const preRetLiabilityIndexByAge = new Map(preRetLiabilityRows.map((wp, idx) => [wp.age, idx]));
+  const futurePeakLiabilitiesByIndex = (() => {
+    const peaks = new Array(preRetLiabilityRows.length).fill(0);
+    let runningPeak = 0;
+    for (let idx = preRetLiabilityRows.length - 1; idx >= 0; idx -= 1) {
+      runningPeak = Math.max(runningPeak, toNum(preRetLiabilityRows[idx].totalLiabilities));
+      peaks[idx] = runningPeak;
+    }
+    return peaks;
+  })();
   const fiThresholdForAge = (age) => {
     if (nestEggSwr <= 0) return Number.POSITIVE_INFINITY;
     const calYear = currentYear + (age - profile.currentAge);
@@ -327,7 +378,7 @@ const simulateSurplus = () => {
   // Clear debt first
   {
     let bal = toNum(assets.investments);
-    let remainingDebt = totalDebtToday;
+    let debtOffset = 0;
     let debtFreeAt = null;
     let fi = null;
     for (const wp of wealthProjection) {
@@ -338,14 +389,15 @@ const simulateSurplus = () => {
       }
       const yearSurplus = toNum(wp.savings);
       bal = bal * (1 + r);
-      if (remainingDebt > 0) {
-        const debtPayment = Math.max(0, Math.min(yearSurplus, remainingDebt));
-        remainingDebt -= debtPayment;
-        const leftover = yearSurplus - debtPayment;
-        bal += leftover;
-        if (remainingDebt <= 0 && debtFreeAt === null) debtFreeAt = wp.age + 1;
-      } else {
-        bal += yearSurplus;
+      const preRetIdx = preRetLiabilityIndexByAge.get(wp.age);
+      const scheduledDebt = preRetIdx === undefined ? 0 : toNum(preRetLiabilityRows[preRetIdx].totalLiabilities);
+      const remainingDebtForYear = Math.max(0, scheduledDebt - debtOffset);
+      const debtPayment = Math.max(0, Math.min(yearSurplus, remainingDebtForYear));
+      debtOffset += debtPayment;
+      bal += yearSurplus - debtPayment;
+      if (debtFreeAt === null && preRetIdx !== undefined) {
+        const futurePeakDebt = toNum(futurePeakLiabilitiesByIndex[preRetIdx]);
+        if (futurePeakDebt > 0 && debtOffset >= futurePeakDebt) debtFreeAt = wp.age + 1;
       }
     }
     var clearDebtFirst = { fiAge: fi, debtFreeAge: debtFreeAt };
@@ -356,7 +408,7 @@ const simulateSurplus = () => {
     const effDebt = Math.min(splitDebt, 100 - effInvest);
 
     let bal = toNum(assets.investments);
-    let remainingDebt = totalDebtToday;
+    let debtOffset = 0;
     let fi = null;
 
     for (const wp of wealthProjection) {
@@ -370,13 +422,12 @@ const simulateSurplus = () => {
       const toDebt = yearSurplus * effDebt / 100;
 
       bal = bal * (1 + r) + toInvest;
-      if (remainingDebt > 0) {
-        const debtPayment = Math.max(0, Math.min(toDebt, remainingDebt));
-        remainingDebt -= debtPayment;
-        bal += toDebt - debtPayment;
-      } else {
-        bal += toDebt;
-      }
+      const preRetIdx = preRetLiabilityIndexByAge.get(wp.age);
+      const scheduledDebt = preRetIdx === undefined ? 0 : toNum(preRetLiabilityRows[preRetIdx].totalLiabilities);
+      const remainingDebtForYear = Math.max(0, scheduledDebt - debtOffset);
+      const debtPayment = Math.max(0, Math.min(toDebt, remainingDebtForYear));
+      debtOffset += debtPayment;
+      bal += toDebt - debtPayment;
     }
 
     return fi;
@@ -419,22 +470,20 @@ const simulateRunway = (returnRateOffset, spendMultiplier) => {
     }, 0);
 
     const yearsTotal = yearsToRetirement + yearsIn;
-    const passiveGrowth = toNum(assumptions.passiveGrowth) / 100;
-    const otherGrowth = toNum(assumptions.otherIncomeGrowth) / 100;
+    const passiveFallbackEndYear = currentYear + (profile.lifeExpectancy - profile.currentAge);
+    const otherFallbackEndYear = currentYear + (profile.lifeExpectancy - profile.currentAge);
 
     const passiveInRet = (income.passiveItems && income.passiveItems.length > 0
       ? income.passiveItems.reduce((sum, item) => {
-          if (item.endYear && calYear >= item.endYear) return sum;
-          return sum + toNum(item.amount) * Math.pow(1 + passiveGrowth, yearsTotal);
+          return sum + getIncomeAmountForYear(item, calYear, currentYear, assumptions.passiveGrowth, passiveFallbackEndYear);
         }, 0)
-      : toNum(income.passive) * Math.pow(1 + passiveGrowth, yearsTotal));
+      : toNum(income.passive) * Math.pow(1 + toNum(assumptions.passiveGrowth) / 100, yearsTotal));
 
     const otherInRet = (income.otherIncomeItems && income.otherIncomeItems.length > 0
       ? income.otherIncomeItems.reduce((sum, item) => {
-          if (item.endYear && calYear >= item.endYear) return sum;
-          return sum + toNum(item.amount) * Math.pow(1 + otherGrowth, yearsTotal);
+          return sum + getIncomeAmountForYear(item, calYear, currentYear, assumptions.otherIncomeGrowth, otherFallbackEndYear);
         }, 0)
-      : toNum(income.other) * Math.pow(1 + otherGrowth, yearsTotal));
+      : toNum(income.other) * Math.pow(1 + toNum(assumptions.otherIncomeGrowth) / 100, yearsTotal));
 
     const netWithdrawal = Math.max(0, inflationAdjusted + oneTime - passiveInRet - otherInRet);
 
@@ -467,15 +516,21 @@ const runwayExpected = {
   },
 };
 
-const annualIncomeNow = annualIncomeAtYear(currentYear, 0, profile.currentAge).total;
+const incomeNowParts = annualIncomeAtYear(currentYear, 0, profile.currentAge);
+const annualIncomeNow = incomeNowParts.total;
+const currentSalaryNow = incomeNowParts.salary;
 const currentExpenses = toNum(scenario.totals?.current);
 const retirementExpensesToday = toNum(scenario.totals?.retirement);
 const totalAssetsNow = toNum(assets.cash) + toNum(assets.investments) + toNum(assets.realEstate) + toNum(assets.other);
-const totalLiabilitiesNow = toNum(liabilities.mortgage) + toNum(liabilities.loans) + toNum(liabilities.other);
+const totalLiabilitiesNow = round(
+  getLiabilityCategoryBalanceForYear(liabilities.mortgageItems, liabilities.mortgage, currentYear, currentYear, 25) +
+  getLiabilityCategoryBalanceForYear(liabilities.loanItems, liabilities.loans, currentYear, currentYear, 5) +
+  getLiabilityCategoryBalanceForYear(liabilities.otherLiabilityItems, liabilities.other, currentYear, currentYear, 5)
+);
 const netWorthNow = totalAssetsNow - totalLiabilitiesNow;
 const debtRatio = totalAssetsNow > 0 ? (totalLiabilitiesNow / totalAssetsNow) * 100 : 0;
 const savingsRate = annualIncomeNow > 0 ? ((annualIncomeNow - currentExpenses) / annualIncomeNow) * 100 : 0;
-const nwMultiple = toNum(income.salary) > 0 ? netWorthNow / toNum(income.salary) : null;
+const nwMultiple = currentSalaryNow > 0 ? netWorthNow / currentSalaryNow : null;
 const emergencyMonths = currentExpenses > 0 ? toNum(assets.cash) / (currentExpenses / 12) : 0;
 const investmentMix = totalAssetsNow > 0 ? (toNum(assets.investments) / totalAssetsNow) * 100 : 0;
 const retirementFunding = (() => {
@@ -488,6 +543,7 @@ const incomeReplacement = annualIncomeNow > 0 ? (retirementExpensesToday / annua
 const reqSWRToday = toNum(assets.investments) > 0 ? (getRetNominalForYear(retirementCalYear) / toNum(assets.investments)) * 100 : null;
 
 const debtFreeAgeExpected = (() => {
+  if (totalLiabilitiesNow <= 0) return null;
   const hit = wealthProjection.find((d) => d.totalLiabilities === 0);
   return hit ? hit.age : null;
 })();

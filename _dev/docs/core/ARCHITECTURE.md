@@ -72,8 +72,8 @@ All state lives in the `NetWorthNavigator` function component via 50+ `useState`
 | `exchangeRates` | object | `{AED:1, USD:3.67, ...}` | Live or cached FX rates |
 | `profile` | object | `{currentAge:35, retirementAge:55, lifeExpectancy:85}` | Life stage |
 | `assets` | object | `{cash:50K, investments:300K, realEstate:800K, ...}` | Balances + sub-items; investment sub-items may include `annualContrib`, `contribStartYear`, `contribEndYear`, and `contribGrowthRate` |
-| `liabilities` | object | `{mortgage:600K, loans:20K, ...}` | Debts + sub-items with endYear; balances affect net worth only, not cashflow |
-| `income` | object | `{salary:300K, passive:40K, other:60K, ...}` | Income + sub-items with endYear |
+| `liabilities` | object | `{mortgage:600K, loans:20K, ...}` | Debts + sub-items with `startYear` (From) and `endYear` (payoff year). Balances are zero before From, then amortize linearly to zero at the opening of payoff year. Liability balances affect net worth only, not cashflow |
+| `income` | object | `{salary:300K, passive:40K, other:60K, ...}` | Income + sub-items with inclusive `startYear`/`endYear` windows. Salary is additionally capped at retirement; passive/other can continue through retirement unless ended |
 | `expenseCalculator` | object | 15 categories | Pre-retirement monthly amounts |
 | `expenseCategories` | array | `DEFAULT_EXPENSE_CATEGORIES` | Category metadata, ordering, labels, colours |
 | `retirementBudget` | object | 15 categories | Retirement-day monthly amounts |
@@ -84,7 +84,7 @@ All state lives in the `NetWorthNavigator` function component via 50+ `useState`
 | `retExpensePhaseOutYears` | object | per-category year | Retirement category phase-outs |
 | `assumptions` | object | See below | Growth rates and MC parameters |
 | `oneTimeExpenses` | array | Planned costs | Future one-time or recurring expenses |
-| `lifeEvents` | array | Milestones | Timeline events with stages |
+| `lifeEvents` | array | Milestones | Timeline events with `startYear` and optional inclusive `endYear`; used as visual chart overlays only |
 | `nestEggSwr` | number | `4` | Safe withdrawal rate (%) |
 | `surplusSplitInvest` | number | `100` | % of surplus to investments |
 | `surplusSplitDebt` | number | `0` | % of surplus to debt reduction |

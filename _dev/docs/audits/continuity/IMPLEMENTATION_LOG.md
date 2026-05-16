@@ -1392,3 +1392,76 @@ Applied to Asset Allocation, Cash Flow, Pre-retirement Expenses, and Project to 
 **Findings blocked:** 0
 **Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Contribution timing is explicit, the investment contribution row is more balanced, and event marker legends now control chart marker visibility.
+
+---
+
+## SESSION 21 - 2026-05-16 - Codex
+
+**Picking up from:** User request to continue implementation across Finances/Profile/Phasing with consistency checks for start/end-year semantics, chart overlays, surplus deployment debt behavior, and downstream docs/tests.
+**Open findings at session start:** NEW-85 through NEW-87.
+**Session goal:** Close remaining phasing/overlay gaps, align surplus-debt logic with phased liabilities, refresh coverage verifier parity, and re-run full release validation.
+
+### NEW-85 - Life-event ranged overlays missing on some chart surfaces (MEDIUM -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Added inclusive ranged life-event `ReferenceArea` overlays (blue translucent bands) to:
+- Cash Flow Over Time (age-axis view)
+- Pre-retirement Expenses Over Time (calendar-year axis)
+
+Single-year life events remain marker dots; only multi-year life events render bands.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-86 - Surplus debt tiles ignored phased liability activation windows (HIGH -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Updated Surplus Deployment debt simulations (`Clear debt first` and custom debt split) to apply debt allocation against liabilities active in each pre-retirement year (from `wealthProjection.totalLiabilities`), rather than a static debt pool only. Added future-peak debt tracking to compute debt-free age consistently when liabilities start in future years.
+
+UI copy and tooltip text were updated to clarify:
+- debt allocation respects liability From/payoff windows,
+- liabilities affect net worth only,
+- debt-service cashflow must still be modeled via expense categories.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-87 - Full-element coverage verifier still used pre-phasing formulas (MEDIUM -> FIXED)
+
+**Status:** FIXED  
+**Fix applied:** Updated `_dev/tests/verify_full_element_coverage.mjs` to mirror current model semantics:
+- income phasing (`startYear`/inclusive `endYear` + growth from From year),
+- liability phasing (`startYear` + payoff-year opening-zero behavior),
+- current-liability calculations for debt ratio/net worth,
+- surplus-debt simulation parity with phased-liability timing,
+- retirement passive/other income phasing in runway expectations.
+
+**Files changed:** `_dev/tests/verify_full_element_coverage.mjs`
+
+### Documentation updates
+
+- `_dev/docs/core/FINANCIAL_MODEL.md`
+  - Added explicit Income Phasing section.
+  - Replaced liability amortization description with From/payoff-year semantics.
+  - Documented surplus debt-allocation behavior with phased liabilities.
+  - Added Life Events visual-only overlay decision row.
+- `_dev/docs/core/ARCHITECTURE.md`
+  - Updated state descriptions for liabilities/income/lifeEvents to reflect start/end-year phasing semantics.
+
+### Verification Chain (Session 21)
+
+- `npm run lint` -> PASS
+- `npm run build` -> PASS
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS
+  - `npm run test:smoke` -> PASS (`16/16`)
+- Post-smoke artifact refresh:
+  - `node _dev/tests/extract_user_capture_metrics.mjs` -> PASS
+  - `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 21 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 3 - NEW-85, NEW-86, NEW-87  
+**Findings blocked:** 0  
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).  
+**Overall progress:** Life-event range overlays, phased liability debt-deployment behavior, and downstream verification parity are now aligned and release-validated.
