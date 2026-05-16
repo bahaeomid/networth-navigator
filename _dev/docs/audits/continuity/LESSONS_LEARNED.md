@@ -3,7 +3,7 @@
 **Project:** NetWorth Navigator v2.0.0
 **Domain:** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 (Session 14)
+**Last updated:** 2026-05-16 (Session 15)
 
 ---
 
@@ -278,3 +278,26 @@ Findings in batch: NEW-66
 
 - The Retirement Health gap-closing solver now gates investment-item contributions by `contribStartYear`, matching the base projection.
 - The Surplus Deployment tiles use full year-by-year surplus as standalone alternatives; they are not full surplus plus entered fixed contributions.
+
+---
+
+## Batch Synthesis - Session 15 - 2026-05-16
+Findings in batch: NEW-67, NEW-68, NEW-69, NEW-70
+
+### Patterns observed
+
+1. Correct financial logic still needs careful wording when two metrics answer different questions, especially SWR nest egg funding versus Monte Carlo survival.
+2. Dense financial headers should reserve space for controls first, then compress advisory badges rather than allowing multi-line wrapping.
+3. Native range inputs are not expressive enough for reversed negative-offset fills; custom track styling is safer when the visual anchor matters.
+4. Year filters become easier to use when they expose financial milestones directly instead of forcing users to calculate calendar years.
+
+### Principles extracted
+
+- **Name the question each metric answers:** Funding target, survival probability, and gap-closing levers should not sound interchangeable.
+- **Make scenario controls match the mental model:** A negative-offset slider should fill from neutral to the selected negative value, not from the minimum bound.
+- **Promote significant years to first-class controls:** Today, retirement, and life expectancy are domain anchors and should be direct actions where valid.
+
+### Codebase-specific observations
+
+- `ChartYearSelector` now centralizes compact year/age/milestone controls for chart surfaces.
+- Retirement Runway sliders now use `.nwn-range` with explicit track backgrounds rather than relying on browser `accent-color` behavior.

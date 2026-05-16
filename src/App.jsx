@@ -537,6 +537,16 @@ const runMonteCarloSimulation = (portfolioAssets, yearsToProject, annualContribu
   return (successCount / simulations) * 100;
 };
 
+const rangeTrackBackground = (value, min, max, activeColor, fillFromMax) => {
+  const trackColor = 'rgba(232,233,237,0.9)';
+  const span = max - min || 1;
+  const pct = Math.max(0, Math.min(100, ((value - min) / span) * 100));
+  if (fillFromMax) {
+    return `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${pct}%, ${activeColor} ${pct}%, ${activeColor} 100%)`;
+  }
+  return `linear-gradient(to right, ${activeColor} 0%, ${activeColor} ${pct}%, ${trackColor} ${pct}%, ${trackColor} 100%)`;
+};
+
 // Stable target year input
 const TargetYearInput = ({ value, onChange, minYear, maxYear, compact }) => {
   const [display, setDisplay] = React.useState(value.toString());
@@ -571,8 +581,8 @@ const TargetYearInput = ({ value, onChange, minYear, maxYear, compact }) => {
       style={compact ? {
         width: '56px', padding: '0.28rem 0.3rem',
         background: 'rgba(255,255,255,0.07)',
-        border: '1px solid rgba(255,255,255,0.14)',
-        borderRadius: '6px', color: '#9ca3af',
+        border: '1px solid rgba(255,255,255,0.16)',
+        borderRadius: '7px', color: '#e8e9ed',
         fontSize: '0.82rem', fontFamily: 'JetBrains Mono, monospace',
         textAlign: 'center'
       } : {
@@ -584,6 +594,43 @@ const TargetYearInput = ({ value, onChange, minYear, maxYear, compact }) => {
         textAlign: 'center'
       }}
     />
+  );
+};
+
+const ChartYearSelector = ({ mode, value, onChange, minYear, maxYear, currentYear, retirementYear, lifeExpectancyYear, currentAge }) => {
+  const age = currentAge + (value - currentYear);
+  const seen = new Set();
+  const quickYears = [
+    { label: 'Today', year: currentYear, title: `Today (${currentYear})` },
+    { label: 'Ret', year: retirementYear, title: `Retirement (${retirementYear})` },
+    { label: 'Life', year: lifeExpectancyYear, title: `Life expectancy (${lifeExpectancyYear})` },
+  ].filter((item) => {
+    if (item.year < minYear || item.year > maxYear || seen.has(item.year)) return false;
+    seen.add(item.year);
+    return true;
+  });
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.28rem 0.42rem', background: 'linear-gradient(135deg, rgba(15,23,42,0.68), rgba(30,41,59,0.5))', border: '1px solid rgba(148,163,184,0.22)', borderRadius: '12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{mode}</span>
+      <TargetYearInput compact value={value} onChange={onChange} minYear={minYear} maxYear={maxYear} />
+      <span style={{ fontSize: '0.68rem', color: '#64748b', whiteSpace: 'nowrap' }}>Age {age}</span>
+      <span style={{ width: '1px', height: '18px', background: 'rgba(148,163,184,0.18)' }} />
+      {quickYears.map((item) => {
+        const active = value === item.year;
+        return (
+          <button
+            key={`${item.label}-${item.year}`}
+            type="button"
+            title={item.title}
+            onClick={() => onChange(item.year)}
+            style={{ padding: '0.2rem 0.42rem', background: active ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? 'rgba(96,165,250,0.42)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '999px', color: active ? '#93c5fd' : '#94a3b8', fontSize: '0.64rem', fontWeight: 700, lineHeight: 1.1, whiteSpace: 'nowrap' }}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
   );
 };
 
@@ -3893,7 +3940,7 @@ const mIdx = cols.findIndex(c =>
                   <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '1.25rem', borderTop: '2px solid rgba(251,191,36,0.5)' }}>
                     {/* Card label */}
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
-                      🎯 Retirement Health <InfoTooltip text="Three signals: FI Age (earliest age investments can sustain retirement, based on SWR) · SWR Needed Today (withdrawal rate your current portfolio requires — green when you hit your target) · Runway Survival Odds (% of 1,000 simulated scenarios where money lasts to life expectancy — unaffected by SWR). Use all three together: FI Age as the target, Survival Odds as the verification." />
+                      🎯 Retirement Health <InfoTooltip text="Three signals: FI Age (earliest age investments can sustain retirement, based on SWR) · SWR Needed Today (withdrawal rate your current portfolio requires — green when you hit your target) · Monte Carlo Survival Odds (% of 1,000 simulated scenarios where money lasts to life expectancy — unaffected by SWR). Use all three together: FI Age as the target, Survival Odds as the verification." />
                     </div>
 
                     {/* FI Age — headline */}
@@ -3919,7 +3966,7 @@ const mIdx = cols.findIndex(c =>
 
                     {/* Survival odds */}
                     <div style={rowStyle}>
-                      <span style={labelStyle}>Runway survival odds <InfoTooltip text="% of 1,000 simulated market scenarios where your portfolio still has money at life expectancy. Each scenario applies a random return (your assumed return ± volatility) then withdraws inflation-adjusted expenses, respecting phase-outs. The most reliable retirement signal — NOT affected by SWR. Above 80% = strong · 60–80% = caution · below 60% = high risk." /></span>
+                      <span style={labelStyle}>Monte Carlo survival odds <InfoTooltip text="% of 1,000 simulated market scenarios where your portfolio still has money at life expectancy. Each scenario applies a random return (your assumed return ± volatility), withdraws inflation-adjusted expenses, respects phase-outs, and nets passive/other income against withdrawals. The most reliable retirement signal — NOT affected by SWR. Above 80% = strong · 60–79% = caution · below 60% = high risk." /></span>
                       <span style={valueStyle(survivalColor)}>{Math.round(sp)}%</span>
                     </div>
 
@@ -4318,21 +4365,17 @@ const mIdx = cols.findIndex(c =>
                       {clampedAssetAllocTargetYear !== new Date().getFullYear() && <span style={{ color: '#6b7280', marginLeft: '0.4rem' }}>· Age {profile.currentAge + (clampedAssetAllocTargetYear - new Date().getFullYear())}</span>}
                     </p>
                   </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>year</span>
-                    <TargetYearInput compact
-                      value={clampedAssetAllocTargetYear}
-                      onChange={setAssetAllocTargetYear}
-                      minYear={new Date().getFullYear()}
-                      maxYear={new Date().getFullYear() + (profile.lifeExpectancy - profile.currentAge)}
-                    />
-                    {clampedAssetAllocTargetYear !== new Date().getFullYear() && (
-                      <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {profile.currentAge + (clampedAssetAllocTargetYear - new Date().getFullYear())}</span>
-                    )}
-                    {clampedAssetAllocTargetYear !== new Date().getFullYear() && (
-                      <button onClick={() => setAssetAllocTargetYear(new Date().getFullYear())} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>today</button>
-                    )}
-                  </div>
+                  <ChartYearSelector
+                    mode="as of"
+                    value={clampedAssetAllocTargetYear}
+                    onChange={setAssetAllocTargetYear}
+                    minYear={currentCalendarYear}
+                    maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                    currentYear={currentCalendarYear}
+                    retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                    lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                    currentAge={profile.currentAge}
+                  />
                 </div>
                 {(() => {
                   const allocSrc = assetAllocData || { investments: assets.investments || 0, realEstate: assets.realEstate || 0, cash: assets.cash || 0, other: assets.other || 0 };
@@ -4819,19 +4862,17 @@ const mIdx = cols.findIndex(c =>
                   <InfoTooltip text="Pre-retirement income includes salary (grows annually), passive income, and other income. At retirement, salary stops — but passive and other income (rental, dividends, etc.) continue for life. Pre-retirement expenses grow category-by-category; at retirement the model switches to your Retirement Budget, inflated each year at your assumed inflation rate." />
                 </h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>through</span>
-                    <TargetYearInput compact
-                      value={clampedCashFlowTargetYear}
-                      onChange={setCashFlowTargetYear}
-                      minYear={new Date().getFullYear()}
-                      maxYear={new Date().getFullYear() + (profile.lifeExpectancy - profile.currentAge)}
-                    />
-                    <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {cashFlowTargetAge}</span>
-                    {clampedCashFlowTargetYear !== (new Date().getFullYear() + (profile.retirementAge - profile.currentAge)) && (
-                      <button onClick={() => setCashFlowTargetYear(new Date().getFullYear() + (profile.retirementAge - profile.currentAge))} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>ret</button>
-                    )}
-                  </div>
+                  <ChartYearSelector
+                    mode="through"
+                    value={clampedCashFlowTargetYear}
+                    onChange={setCashFlowTargetYear}
+                    minYear={currentCalendarYear}
+                    maxYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                    currentYear={currentCalendarYear}
+                    retirementYear={currentCalendarYear + (profile.retirementAge - profile.currentAge)}
+                    lifeExpectancyYear={currentCalendarYear + (profile.lifeExpectancy - profile.currentAge)}
+                    currentAge={profile.currentAge}
+                  />
                 </div>
               </div>
               <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginBottom: '1.5rem' }}>
@@ -5520,9 +5561,9 @@ const mIdx = cols.findIndex(c =>
                 : isOnTrackWeak
                   ? 'High risk — survival odds are low despite meeting the nest egg target'
                 : isGapStrong
-                  ? 'Funding gap on retirement day, but survival odds are strong'
+                  ? 'Nest egg gap, but survival odds are strong'
                 : isGapMod
-                  ? 'Funding gap detected'
+                  ? 'Nest egg gap with moderate survival odds'
                   : 'High risk — funding gap and low survival odds';
               const verdictDetail = isStrong
                 ? (isCoasting
@@ -5533,9 +5574,9 @@ const mIdx = cols.findIndex(c =>
                 : isOnTrackWeak
                   ? "Your projected Investments meet the Required Nest Egg target, but survival odds are low. Consider reducing post-retirement expenses or seeking higher investment returns."
                 : isGapStrong
-                  ? "Your projected Investments fall short of the Required Nest Egg on retirement day. However, survival odds are strong — at your assumed return, your portfolio may continue growing and cover the gap over time."
+                  ? "Your projected Investments fall short of the conservative SWR nest egg target on retirement day, but Monte Carlo survival odds are strong. This means the plan can still last in most simulations because Q2 uses actual year-by-year withdrawals, phase-outs, income offsets, and market variation."
                 : isGapMod
-                  ? "Your projected Investments fall short of the Required Nest Egg. To close the gap: invest more each month, seek higher returns on your portfolio, or delay retirement to allow more time for growth."
+                  ? "Your projected Investments fall short of the conservative SWR nest egg target and Monte Carlo odds are only moderate. Use the levers below to test a flat extra contribution, later retirement, or higher return assumption; use Surplus Deployment for dynamic full-surplus scenarios."
                   : "Your projected Investments fall well short of the Required Nest Egg, and survival odds are low. A significant course correction is needed — consider all three levers together.";
 
               // Gap-closing calcs — always computed, shown as N/A when not applicable
@@ -5678,7 +5719,7 @@ const mIdx = cols.findIndex(c =>
                             style={{ width: '48px', padding: '0.25rem 0.4rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: '#e8e9ed', fontSize: '0.85rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
                           />
                           <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>%</span>
-                          <InfoTooltip text={`Safe Withdrawal Rate — the % of your nest egg you withdraw in year one of retirement, then adjust for inflation annually. The 4% rule (Trinity Study, 1998) sustains a balanced portfolio across 95%+ of 30-year windows — drop to 3–3.5% for 35+ year retirements or early retirement. Above 4% failure risk rises sharply. SWR only shifts the Required Nest Egg target (spend ÷ SWR) and FI Age — it does NOT affect Runway Survival Odds, which are driven purely by your actual investment balance and real retirement spending across 1,000 simulated scenarios, making them the more honest measure of whether your plan holds up.`} />
+                          <InfoTooltip text={`Safe Withdrawal Rate — the % of your nest egg you withdraw in year one of retirement, then adjust for inflation annually. The 4% rule (Trinity Study, 1998) sustains a balanced portfolio across 95%+ of 30-year windows — drop to 3–3.5% for 35+ year retirements or early retirement. Above 4% failure risk rises sharply. SWR only shifts the Required Nest Egg target (spend ÷ SWR) and FI Age — it does NOT affect Monte Carlo Survival Odds, which are driven by your projected retirement balance, actual retirement spending, income offsets, and return volatility across 1,000 simulated scenarios.`} />
                         </div>
                       </div>
 
@@ -5858,7 +5899,7 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ marginBottom: '1rem' }}>
                         <div style={{ fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                           Q2 — Will your money last through retirement?
-                          <InfoTooltip text={`Will your money actually last through retirement? 1,000 market scenarios run against your Investment portfolio from retirement day. Returns are normally distributed — most scenarios cluster around your assumed return, with occasional large swings in either direction. The volatility % controls how wide those swings are. Each scenario withdraws inflation-adjusted expenses respecting your phase-out years. % shown = scenarios still solvent at age ${profile.lifeExpectancy}. Above 80% = strong · 60–80% = caution · below 60% = high risk. NOT affected by SWR — only by your real balance and real spending.`} />
+                          <InfoTooltip text={`Will your money actually last through retirement? 1,000 market scenarios run against your Investment portfolio from retirement day. Returns are normally distributed — most scenarios cluster around your assumed return, with occasional large swings in either direction. The volatility % controls how wide those swings are. Each scenario withdraws inflation-adjusted expenses, respects phase-out years, and nets passive/other income against withdrawals. % shown = scenarios still solvent at age ${profile.lifeExpectancy}. Above 80% = strong · 60–79% = caution · below 60% = high risk. NOT affected by SWR — only by projected retirement balance, spending, income offsets, and volatility.`} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1.5rem', alignItems: 'center' }}>
                           <div>
@@ -6072,7 +6113,7 @@ const mIdx = cols.findIndex(c =>
                           {/* Return slider */}
                           <div style={{ marginTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
                             {(() => {
-                              const pessMin = -Math.min(8, Math.floor(assumptions.investmentReturn * 2) / 2);
+                              const pessMin = -8;
                               const clampedOffset = Math.max(pessMin, Math.min(0, runwayConservativeOffset));
                               if (clampedOffset !== runwayConservativeOffset) setRunwayConservativeOffset(clampedOffset);
                               const isAdjusted = runwayConservativeOffset < 0;
@@ -6082,9 +6123,9 @@ const mIdx = cols.findIndex(c =>
                                     <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Return offset</span>
                                     <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: isAdjusted ? '#f87171' : '#4b5563', fontWeight: '700' }}>{runwayConservativeOffset}pp</span>
                                   </div>
-                                  <input type="range" min={pessMin} max={0} step={0.5} value={runwayConservativeOffset}
+                                  <input className="nwn-range" type="range" min={pessMin} max={0} step={0.5} value={runwayConservativeOffset}
                                     onChange={function(e) { setRunwayConservativeOffset(parseRangeInputValue(e.target, runwayConservativeOffset)); }}
-                                    style={{ width: '100%', accentColor: isAdjusted ? '#ef4444' : '#6b7280' }} />
+                                    style={{ '--range-thumb': isAdjusted ? '#f87171' : '#94a3b8', background: rangeTrackBackground(runwayConservativeOffset, pessMin, 0, '#f87171', true) }} />
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>{pessMin}pp</span><span>0pp</span></div>
                                 </>
                               );
@@ -6096,9 +6137,9 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Spend increase</span>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayPessSpend > 0 ? '#f87171' : '#4b5563', fontWeight: '700' }}>{runwayPessSpend > 0 ? '+' + runwayPessSpend + '%' : 'Off'}</span>
                             </div>
-                            <input type="range" min={0} max={50} step={5} value={runwayPessSpend}
+                            <input className="nwn-range" type="range" min={0} max={50} step={5} value={runwayPessSpend}
                               onChange={function(e) { setRunwayPessSpend(parseRangeInputValue(e.target, runwayPessSpend)); }}
-                              style={{ width: '100%', accentColor: runwayPessSpend > 0 ? '#f87171' : '#6b7280' }} />
+                              style={{ '--range-thumb': runwayPessSpend > 0 ? '#f87171' : '#94a3b8', background: rangeTrackBackground(runwayPessSpend, 0, 50, '#f87171') }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>+50%</span></div>
                           </div>
                         </div>
@@ -6143,9 +6184,9 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Return offset</span>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayOptimisticOffset > 0 ? '#34d399' : '#4b5563', fontWeight: '700' }}>{runwayOptimisticOffset > 0 ? `+${runwayOptimisticOffset}pp` : '0pp'}</span>
                             </div>
-                            <input type="range" min={0} max={8} step={0.5} value={runwayOptimisticOffset}
+                            <input className="nwn-range" type="range" min={0} max={8} step={0.5} value={runwayOptimisticOffset}
                               onChange={function(e) { setRunwayOptimisticOffset(parseRangeInputValue(e.target, runwayOptimisticOffset)); }}
-                              style={{ width: '100%', accentColor: runwayOptimisticOffset > 0 ? '#34d399' : '#6b7280' }} />
+                              style={{ '--range-thumb': runwayOptimisticOffset > 0 ? '#34d399' : '#94a3b8', background: rangeTrackBackground(runwayOptimisticOffset, 0, 8, '#34d399') }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0pp</span><span>+8pp</span></div>
                           </div>
                           {/* Spend slider */}
@@ -6154,9 +6195,9 @@ const mIdx = cols.findIndex(c =>
                               <span style={{ fontSize: '0.62rem', color: '#6b7280' }}>Spend cut</span>
                               <span style={{ fontSize: '0.72rem', fontFamily: 'JetBrains Mono, monospace', color: runwayOptSpend > 0 ? '#34d399' : '#4b5563', fontWeight: '700' }}>{runwayOptSpend > 0 ? '−' + runwayOptSpend + '%' : 'Off'}</span>
                             </div>
-                            <input type="range" min={0} max={50} step={5} value={runwayOptSpend}
+                            <input className="nwn-range" type="range" min={0} max={50} step={5} value={runwayOptSpend}
                               onChange={function(e) { setRunwayOptSpend(parseRangeInputValue(e.target, runwayOptSpend)); }}
-                              style={{ width: '100%', accentColor: runwayOptSpend > 0 ? '#34d399' : '#6b7280' }} />
+                              style={{ '--range-thumb': runwayOptSpend > 0 ? '#34d399' : '#94a3b8', background: rangeTrackBackground(runwayOptSpend, 0, 50, '#34d399') }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#4b5563' }}><span>0%</span><span>−50%</span></div>
                           </div>
                         </div>
@@ -6381,8 +6422,7 @@ const mIdx = cols.findIndex(c =>
 
               // Scenario projections for selected target year
               // Low/High scenarios now use editable delta values from state
-              const targetYearsAhead = Math.max(0, projectionTargetYear - currentYear);
-              const clampedTargetYear = Math.min(projectionTargetYear, retirementYear);
+              const clampedTargetYear = Math.max(currentYear, Math.min(projectionTargetYear, retirementYear));
               const clampedTargetYearsAhead = Math.max(0, clampedTargetYear - currentYear);
               const targetAge = profile.currentAge + clampedTargetYearsAhead; // single declaration
               const baseScenario = getProjectedExpenses(clampedTargetYear, { lifestyleInflation: 0 });
@@ -6597,19 +6637,17 @@ const mIdx = cols.findIndex(c =>
                         <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>Pre-retirement only · per-category growth rates · click legend to show/hide.</p>
                       </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
-                              <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>through</span>
-                              <TargetYearInput compact
-                                value={clampedPreRetChartTargetYear}
-                                onChange={setPreRetChartTargetYear}
-                                minYear={currentYear}
-                                maxYear={retirementYear}
-                              />
-                              <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {preRetChartTargetAge}</span>
-                              {clampedPreRetChartTargetYear !== retirementYear && (
-                                <button onClick={() => setPreRetChartTargetYear(retirementYear)} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>ret</button>
-                              )}
-                            </div>
+                        <ChartYearSelector
+                          mode="through"
+                          value={clampedPreRetChartTargetYear}
+                          onChange={setPreRetChartTargetYear}
+                          minYear={currentYear}
+                          maxYear={retirementYear}
+                          currentYear={currentYear}
+                          retirementYear={retirementYear}
+                          lifeExpectancyYear={currentYear + (profile.lifeExpectancy - profile.currentAge)}
+                          currentAge={profile.currentAge}
+                        />
                         <div style={{ position: 'relative' }}>
                           <button
                             onClick={() => setChartCatDropdownOpen(o => !o)}
@@ -6939,19 +6977,17 @@ const mIdx = cols.findIndex(c =>
                         <h3 style={{ fontSize: '1.3rem', fontWeight: '600', marginBottom: '0.25rem' }}>🔭 Project to a Future Year</h3>
                         <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>See your projected expenses at any point in time</p>
                       </div>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.55rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', backdropFilter: 'blur(8px)' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>target year</span>
-                        <TargetYearInput compact
-                          value={projectionTargetYear}
-                          onChange={setProjectionTargetYear}
-                          minYear={currentYear + 1}
-                          maxYear={retirementYear}
-                        />
-                        <span style={{ fontSize: '0.72rem', color: '#4b5563' }}>Age {targetAge}</span>
-                        {projectionTargetYear !== retirementYear && (
-                          <button onClick={() => setProjectionTargetYear(retirementYear)} style={{ fontSize: '0.68rem', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', whiteSpace: 'nowrap' }}>ret</button>
-                        )}
-                      </div>
+                      <ChartYearSelector
+                        mode="at"
+                        value={clampedTargetYear}
+                        onChange={setProjectionTargetYear}
+                        minYear={currentYear}
+                        maxYear={retirementYear}
+                        currentYear={currentYear}
+                        retirementYear={retirementYear}
+                        lifeExpectancyYear={currentYear + (profile.lifeExpectancy - profile.currentAge)}
+                        currentAge={profile.currentAge}
+                      />
                     </div>
                     {/* Scenario cards */}
                     {(() => {
@@ -7366,13 +7402,13 @@ const mIdx = cols.findIndex(c =>
                 {/* Read-only total when sub-items exist */}
                 {assets.investmentItems && assets.investmentItems.length > 0 ? (
                   <div style={{ marginBottom: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.42rem', flexWrap: 'wrap', rowGap: '0.3rem', minWidth: 0, flex: '1 1 auto' }}>
-                        <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.75rem', flexWrap: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.34rem', flexWrap: 'nowrap', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flex: '0 0 auto' }}>
                           Investments
                           <InfoTooltip text="Balance is always today's current balance for that investment item — it does not change based on the contribution start year. Annual contrib is the planned addition each year starting from the 'from' year; growth compounds from that start year forward, not from today. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus — keep them affordable." />
                         </span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace', flex: '0 0 auto' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
                         {annualInvestmentContribution > 0 && (() => {
                           const cy = new Date().getFullYear();
                           const contribItems = (assets.investmentItems || []).filter(i => (i.annualContrib || 0) > 0);
@@ -7384,21 +7420,21 @@ const mIdx = cols.findIndex(c =>
                           const showFromYear = isSingle && singleStartYear > cy;
                           if (isStaged) {
                             return (
-                              <span style={{ fontSize: '0.62rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.1rem 0.32rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.18rem' }}>
-                                staged contribs
+                              <span style={{ fontSize: '0.58rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.08rem 0.26rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.16rem', flex: '0 0 auto' }}>
+                                staged
                                 <InfoTooltip text={contribItems.map(i => `${i.name}: +${formatCurrencyDecimal(i.annualContrib, currency, exchangeRates)}/yr from ${i.contribStartYear || cy}`).join(' · ')} />
                               </span>
                             );
                           }
                           return (
-                            <span style={{ fontSize: '0.62rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.1rem 0.32rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '0.58rem', fontWeight: '700', color: '#34d399', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', borderRadius: '5px', padding: '0.08rem 0.26rem', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
                               +{formatCurrencyDecimal(annualInvestmentContribution, currency, exchangeRates)}/yr{showFromYear ? ` from ${singleStartYear}` : ''}
                             </span>
                           );
                         })()}
                         {investmentContributionExceedsCurrentSavings && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.18rem', fontSize: '0.62rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.1rem 0.32rem', whiteSpace: 'nowrap' }}>
-                            ⚠ over savings
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.16rem', fontSize: '0.58rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.08rem 0.26rem', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
+                            ⚠ over
                             <InfoTooltip text={overSavingsItems.length === 1 ? `"${overSavingsItems[0].name}" contribution (${formatCurrencyDecimal(overSavingsItems[0].annualContrib, currency, exchangeRates)}/yr starting ${overSavingsItems[0].startYear}) exceeds projected savings in ${overSavingsItems[0].startYear} (${formatCurrencyDecimal(Math.max(0, overSavingsItems[0].projectedSavings), currency, exchangeRates)}/yr) by ${formatCurrencyDecimal(overSavingsItems[0].shortfall, currency, exchangeRates)}/yr. This is allowed; treat it as a stretch target unless you plan to reallocate cashflow.` : `${overSavingsItems.length} contributions exceed projected savings at their respective start years (${overSavingsItems.map(i => i.name).join(', ')}). These are allowed; treat them as stretch targets unless you plan to reallocate cashflow.`} />
                           </span>
                         )}

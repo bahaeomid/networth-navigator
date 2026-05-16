@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-16T04:18:27.102Z",
+  "generatedAt": "2026-05-16T04:58:43.960Z",
   "inputSummary": {
     "currentYear": 2026,
     "profile": {
@@ -39,7 +39,7 @@
       "retirementFunding": "15%",
       "incomeReplacement": "41%",
       "swrNeededToday": "83.2%",
-      "runwaySurvivalOdds": "0%",
+      "runwaySurvivalOdds": null,
       "investmentsExhaustedAge": "60"
     },
     "final": {
@@ -55,7 +55,7 @@
       "retirementFunding": "15%",
       "incomeReplacement": "41%",
       "swrNeededToday": "83.2%",
-      "runwaySurvivalOdds": "0%",
+      "runwaySurvivalOdds": null,
       "investmentsExhaustedAge": "60"
     }
   },

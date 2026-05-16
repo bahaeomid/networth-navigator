@@ -4,7 +4,7 @@
 **Codebase:** NetWorth Navigator v2.0.0 — single-file React 18 SPA (`src/App.jsx`, 7,668 lines)
 **Domain(s):** Personal Finance / Retirement Projection
 **Created:** 2026-04-17 by Session 1
-**Last updated:** 2026-05-16 by Session 14
+**Last updated:** 2026-05-16 by Session 15
 
 ---
 
@@ -78,6 +78,10 @@
 | NEW-64 | Verification harness drifted from runway/contribution semantics | MEDIUM | L | FIXED | 13 | User-capture selectors and full-element coverage projection/runway checks now match the implemented controls and contribution model |
 | NEW-65 | Save More undeployed surplus treated future-starting contributions as current commitments | HIGH | L | FIXED | 13 | Undeployed surplus now subtracts only active current-year investment contributions; UI/report/docs updated |
 | NEW-66 | Gap-closing lever solver ignored investment contribution start years | HIGH | L | FIXED | 14 | Save More, Retire Later, and Higher Return solvers now respect `contribStartYear`; copy clarifies Save More vs Surplus Deployment semantics |
+| NEW-67 | Retirement Health copy could still blur conservative SWR target vs Monte Carlo survival odds | LOW | L | FIXED | 15 | Verdict/tooltips now distinguish SWR nest egg funding from Monte Carlo survival mechanics and income offsets |
+| NEW-68 | Collapsed Investments badges could wrap under the header row | LOW | L | FIXED | 15 | Compacted contribution/over-savings badges and kept the collapsed header on one row without overlapping growth controls |
+| NEW-69 | Runway slider visuals had inconsistent neutral track/fill behavior and asymmetric return bounds | LOW | L | FIXED | 15 | Added custom range track styling; pessimistic fill is right-anchored and both return offsets use 8pp bounds |
+| NEW-70 | Chart year selectors lacked quick milestone-year switching | LOW | L | FIXED | 15 | Added compact shared selector with editable year, age, and Today/Ret/Life quick chips where relevant |
 <!-- Additional findings will be added during phase execution -->
 
 ---
@@ -1059,3 +1063,69 @@ Reviewed and re-validated the main connected surfaces after lever fixes:
 **Findings blocked:** 0
 **Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
 **Overall progress:** Post-`1fa1eaa` staged-contribution lever parity gap closed; release verification passed.
+
+---
+
+## SESSION 15 - 2026-05-16 - Codex
+
+**Picking up from:** User follow-up screenshots in `_dev/tmp_user` and Retirement Health messaging clarification request.
+**Open findings at session start:** NEW-67 through NEW-70.
+**Session goal:** Confirm Retirement Health message consistency and implement the remaining compact UI refinements without changing financial calculations.
+
+### NEW-67 - Retirement Health copy could still blur conservative SWR target vs Monte Carlo survival odds (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Tightened Retirement Health verdict and tooltip copy so users can distinguish:
+- Q1 funding gap = projected investments vs conservative SWR Required Nest Egg target.
+- Q2 survival odds = Monte Carlo scenarios using year-by-year withdrawals, phase-outs, passive/other income offsets, and volatility.
+- Save More = flat extra contribution lever; Surplus Deployment = separate dynamic surplus scenario.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-68 - Collapsed Investments badges could wrap under the header row (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Compacted the staged-contribution and over-savings badges, kept the header badge group on one row, and preserved the right-side growth/items controls without overlap.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-69 - Runway slider visuals had inconsistent neutral track/fill behavior and asymmetric return bounds (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Added custom range-track styling for Retirement Runway sliders:
+- Neutral sliders now share the same inactive track appearance.
+- Pessimistic return fill is anchored from `0pp` back to the selected negative offset.
+- Pessimistic and optimistic return offsets now both use symmetric 8pp bounds.
+
+**Files changed:** `src/App.jsx`, `src/index.css`
+
+### NEW-70 - Chart year selectors lacked quick milestone-year switching (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Replaced one-off target-year controls with a shared compact selector showing:
+- mode label (`through`, `as of`, or `at`),
+- editable year,
+- derived age,
+- quick chips for valid significant years (`Today`, `Ret`, `Life` where in range).
+
+Applied to Asset Allocation, Cash Flow, Pre-retirement Expenses, and Project to a Future Year.
+
+**Files changed:** `src/App.jsx`
+
+### Verification Chain (Session 15)
+
+- `npm run lint` -> PASS
+- `npx playwright test _dev/e2e/user-scenario-capture.spec.js --reporter=list` -> PASS
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS
+  - `npm run test:smoke` -> PASS (12 Playwright tests)
+- `node _dev/tests/extract_user_capture_metrics.mjs` + `node _dev/tests/verify_full_element_coverage.mjs` -> PASS (`44/44`)
+
+## SESSION 15 CLOSE - 2026-05-16
+
+**Findings resolved this session:** 4 - NEW-67, NEW-68, NEW-69, NEW-70
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Follow-up UI/messaging backlog closed; release verification passed.
