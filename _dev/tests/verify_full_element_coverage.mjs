@@ -337,15 +337,50 @@ const simulateSurplus = () => {
   const baseInvestAtRet = (wealthProjection.find((d) => d.age === profile.retirementAge) || {}).investments || 0;
   const preRetLiabilityRows = wealthProjection.filter((wp) => wp.age < profile.retirementAge && wp.age <= profile.lifeExpectancy);
   const preRetLiabilityIndexByAge = new Map(preRetLiabilityRows.map((wp, idx) => [wp.age, idx]));
-  const futurePeakLiabilitiesByIndex = (() => {
-    const peaks = new Array(preRetLiabilityRows.length).fill(0);
-    let runningPeak = 0;
-    for (let idx = preRetLiabilityRows.length - 1; idx >= 0; idx -= 1) {
-      runningPeak = Math.max(runningPeak, toNum(preRetLiabilityRows[idx].totalLiabilities));
-      peaks[idx] = runningPeak;
-    }
-    return peaks;
+  const liabilityPaydownItems = (() => {
+    const rows = [];
+    const addRows = (items, fallbackTotal, fallbackName, defaultTermYears, prefix) => {
+      if (items && items.length > 0) {
+        items.forEach((item, idx) => {
+          if (toNum(item.amount) > 0) rows.push({ key: `${prefix}-${item.id ?? idx}`, item, defaultTermYears });
+        });
+        return;
+      }
+      if (toNum(fallbackTotal) > 0) {
+        rows.push({ key: `${prefix}-fallback`, item: { name: fallbackName, amount: fallbackTotal, startYear: null, endYear: null }, defaultTermYears });
+      }
+    };
+    addRows(liabilities.mortgageItems, liabilities.mortgage, 'Mortgage', 25, 'mortgage');
+    addRows(liabilities.loanItems, liabilities.loans, 'Loan', 5, 'loan');
+    addRows(liabilities.otherLiabilityItems, liabilities.other, 'Liability', 5, 'other');
+    return rows;
   })();
+  const createDebtPaydownState = () => liabilityPaydownItems.map((row) => ({ ...row, extraPaid: 0 }));
+  const getRemainingDebtForYearFromState = (debtState, year) => debtState.reduce((sum, row) => {
+    const scheduled = getLiabilityBalanceForYear(row.item, year, currentYear, row.defaultTermYears);
+    return sum + Math.max(0, scheduled - row.extraPaid);
+  }, 0);
+  const hasRemainingDebtFromIndex = (debtState, startIdx) => {
+    for (let idx = Math.max(0, startIdx); idx < preRetLiabilityRows.length; idx += 1) {
+      if (getRemainingDebtForYearFromState(debtState, preRetLiabilityRows[idx].year) > 0) return true;
+    }
+    return false;
+  };
+  const applyDebtPaymentForYear = (debtState, year, amount) => {
+    let remainingPayment = Math.max(0, toNum(amount));
+    let paid = 0;
+    for (const row of debtState) {
+      if (remainingPayment <= 0) break;
+      const scheduled = getLiabilityBalanceForYear(row.item, year, currentYear, row.defaultTermYears);
+      const remainingDebt = Math.max(0, scheduled - row.extraPaid);
+      if (remainingDebt <= 0) continue;
+      const payment = Math.min(remainingPayment, remainingDebt);
+      row.extraPaid += payment;
+      remainingPayment -= payment;
+      paid += payment;
+    }
+    return { paid, unused: toNum(amount) - paid };
+  };
   const fiThresholdForAge = (age) => {
     if (nestEggSwr <= 0) return Number.POSITIVE_INFINITY;
     const calYear = currentYear + (age - profile.currentAge);
@@ -378,7 +413,7 @@ const simulateSurplus = () => {
   // Clear debt first
   {
     let bal = toNum(assets.investments);
-    let debtOffset = 0;
+    const debtState = createDebtPaydownState();
     let debtFreeAt = null;
     let fi = null;
     for (const wp of wealthProjection) {
@@ -390,14 +425,10 @@ const simulateSurplus = () => {
       const yearSurplus = toNum(wp.savings);
       bal = bal * (1 + r);
       const preRetIdx = preRetLiabilityIndexByAge.get(wp.age);
-      const scheduledDebt = preRetIdx === undefined ? 0 : toNum(preRetLiabilityRows[preRetIdx].totalLiabilities);
-      const remainingDebtForYear = Math.max(0, scheduledDebt - debtOffset);
-      const debtPayment = Math.max(0, Math.min(yearSurplus, remainingDebtForYear));
-      debtOffset += debtPayment;
-      bal += yearSurplus - debtPayment;
+      const debtResult = applyDebtPaymentForYear(debtState, wp.year, yearSurplus);
+      bal += yearSurplus - debtResult.paid;
       if (debtFreeAt === null && preRetIdx !== undefined) {
-        const futurePeakDebt = toNum(futurePeakLiabilitiesByIndex[preRetIdx]);
-        if (futurePeakDebt > 0 && debtOffset >= futurePeakDebt) debtFreeAt = wp.age + 1;
+        if (!hasRemainingDebtFromIndex(debtState, preRetIdx)) debtFreeAt = wp.age + 1;
       }
     }
     var clearDebtFirst = { fiAge: fi, debtFreeAge: debtFreeAt };
@@ -408,7 +439,7 @@ const simulateSurplus = () => {
     const effDebt = Math.min(splitDebt, 100 - effInvest);
 
     let bal = toNum(assets.investments);
-    let debtOffset = 0;
+    const debtState = createDebtPaydownState();
     let fi = null;
 
     for (const wp of wealthProjection) {
@@ -422,12 +453,8 @@ const simulateSurplus = () => {
       const toDebt = yearSurplus * effDebt / 100;
 
       bal = bal * (1 + r) + toInvest;
-      const preRetIdx = preRetLiabilityIndexByAge.get(wp.age);
-      const scheduledDebt = preRetIdx === undefined ? 0 : toNum(preRetLiabilityRows[preRetIdx].totalLiabilities);
-      const remainingDebtForYear = Math.max(0, scheduledDebt - debtOffset);
-      const debtPayment = Math.max(0, Math.min(toDebt, remainingDebtForYear));
-      debtOffset += debtPayment;
-      bal += toDebt - debtPayment;
+      const debtResult = applyDebtPaymentForYear(debtState, wp.year, toDebt);
+      bal += debtResult.unused;
     }
 
     return fi;

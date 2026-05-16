@@ -1511,3 +1511,58 @@ UI copy and tooltip text were updated to clarify:
   - `npm run build` -> PASS
   - `npm run test:smoke` -> PASS (`16/16`)
 - `node _dev/tests/verify_full_element_coverage.mjs` -> PASS via release chain (`44/44`)
+
+## SESSION 22 CLOSE - 2026-05-17
+
+**Findings resolved this session:** 4 - NEW-88, NEW-89, NEW-90, NEW-91
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Debt-free timing, phased salary metrics, life-event overlay toggles, and phased year-field alignment are now release-validated and committed.
+
+---
+
+## SESSION 23 - 2026-05-17 - Codex
+
+**Picking up from:** User feedback on investment contribution row alignment/blank year behavior and questions about debt-first Surplus Deployment with multiple/future-start liabilities.
+**Session goal:** Tighten the investment phasing row without changing model semantics, simplify unclear gap-lever tooltip copy, and correct surplus debt simulations so debt allocation is tracked per liability row.
+
+### NEW-92 - Investment contribution From/To fields did not match shared Finance year-input behavior (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Replaced the custom investment contribution year control with the shared `PhaseYearInput` used by Annual Income. Clearing From/To now stores `null`, showing the subtle placeholder and falling back in calculations to current year for From and the final pre-retirement contribution year for To. The row grid was tightened so the Growth cell and delete action occupy less width and align with the other controls.
+
+**Files changed:** `src/App.jsx`
+
+### NEW-93 - Surplus debt simulations used aggregate debt offset across multiple liabilities (HIGH -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Reworked `Clear debt first` and custom debt-split simulations to maintain per-liability paydown state. Debt allocation now applies only to liabilities active in the same calendar year, extra payments to one liability no longer reduce a separate future-start liability, and unused debt allocation redirects to investments.
+
+**Behavior confirmed:** When there is no active liability yet, surplus in those lead-up years is invested. Once the future liability starts, the debt allocation applies to that active balance.
+
+**Files changed:** `src/App.jsx`, `_dev/tests/verify_full_element_coverage.mjs`, `_dev/docs/core/FINANCIAL_MODEL.md`
+
+### NEW-94 - Gap-lever tooltip copy was overly broad and unclear (LOW -> FIXED)
+
+**Status:** FIXED
+**Fix applied:** Simplified the gap-lever and Retire Later tooltips to state the key model boundary: gap levers solve portfolio shortfalls through contributions, retirement age, or return assumptions; income/expense surplus is not automatically invested unless modeled through investment contribution rows or Surplus Deployment.
+
+**Files changed:** `src/App.jsx`
+
+### Verification Chain (Session 23)
+
+- `npm run lint` -> PASS
+- `git diff --check` -> PASS
+- `npm run test:release` -> PASS
+  - `npm run lint` -> PASS
+  - `npm run test:audits` -> PASS
+  - `npm run build` -> PASS (existing Vite chunk-size warning only)
+  - `npm run test:smoke` -> PASS (`16/16`)
+- `node _dev/tests/verify_full_element_coverage.mjs` -> PASS via release chain (`44/44`)
+
+## SESSION 23 CLOSE - 2026-05-17
+
+**Findings resolved this session:** 3 - NEW-92, NEW-93, NEW-94
+**Findings blocked:** 0
+**Findings deferred:** 0 new deferrals; prior intentional deferrals remain unchanged (NEW-21, NEW-25, NEW-27, NEW-43).
+**Overall progress:** Investment contribution year fields now match the shared Finance behavior, surplus debt deployment tracks multiple/future-start liabilities correctly, and gap-lever tooltip copy is clearer.

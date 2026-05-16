@@ -267,7 +267,7 @@ Future-starting investment contributions do not reduce current-year undeployed s
 
 Surplus Deployment is separate: its tiles deploy each year's full dynamic surplus or a selected split of that surplus as standalone alternatives. They do not add full surplus on top of fixed investment-item contributions already in the base plan.
 
-For debt-first/custom-debt surplus scenarios, debt allocation is applied only to liability balances active in that same pre-retirement year (respecting each liability row's From and payoff years). If no liability is active in a given year, that year's debt-allocation slice is redirected to investments.
+For debt-first/custom-debt surplus scenarios, debt allocation is tracked per liability row, respecting each row's From and payoff years. A surplus payment can reduce only liabilities that have an active balance in that calendar year; extra payments to one liability do not reduce separate future-start liabilities. If no liability is active in a given year, that year's debt-allocation slice is redirected to investments. This means surplus in years before a future-start liability is invested until that liability becomes active.
 
 ### Lever 2: Retire Later
 

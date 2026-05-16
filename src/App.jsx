@@ -785,40 +785,6 @@ const yearFieldEmptyStyle = {
   fontWeight: '400',
 };
 
-const ContribStartYearInput = ({ value, onChange, minYear, maxYear, width, style, title }) => {
-  const [display, setDisplay] = React.useState(value.toString());
-  const [isFocused, setIsFocused] = React.useState(false);
-  React.useEffect(() => { if (!isFocused) setDisplay(value.toString()); }, [value, isFocused]);
-  return (
-    <input
-      type="text"
-      value={display}
-      onChange={(e) => { if (/^\d{0,4}$/.test(e.target.value)) setDisplay(e.target.value); }}
-      onFocus={(e) => { setIsFocused(true); e.target.select(); }}
-      onBlur={() => {
-        setIsFocused(false);
-        const parsed = parseInt(display);
-        const clamped = Number.isFinite(parsed) ? Math.max(minYear, Math.min(maxYear, parsed)) : value;
-        onChange(clamped);
-        setDisplay(clamped.toString());
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.target.blur();
-        if (e.key === 'ArrowUp') onChange(Math.min(maxYear, value + 1));
-        if (e.key === 'ArrowDown') onChange(Math.max(minYear, value - 1));
-      }}
-      title={title || "Year contributions begin (arrow keys to adjust)"}
-      style={{
-        ...yearFieldBaseStyle,
-        width: width || '68px',
-        padding: '0.35rem 0.3rem',
-        fontSize: '0.72rem',
-        ...(style || {})
-      }}
-    />
-  );
-};
-
 const PhaseYearInput = ({ value, onChange, minYear, maxYear, title, placeholder = '—', width = '56px' }) => {
   const [display, setDisplay] = React.useState(value == null ? '' : value.toString());
   const [isFocused, setIsFocused] = React.useState(false);
@@ -5713,19 +5679,54 @@ const mIdx = cols.findIndex(c =>
                 const hasLiabilityInPreRetHorizon = preRetLiabilityRows.some((wp) => (wp.totalLiabilities || 0) > 0);
                 const maxPreRetLiabilityBalance = preRetLiabilityRows.reduce((max, wp) => Math.max(max, wp.totalLiabilities || 0), 0);
                 const preRetLiabilityIndexByAge = new Map(preRetLiabilityRows.map((wp, idx) => [wp.age, idx]));
-                const futurePeakLiabilitiesByIndex = (() => {
-                  const peaks = new Array(preRetLiabilityRows.length).fill(0);
-                  let runningPeak = 0;
-                  for (let idx = preRetLiabilityRows.length - 1; idx >= 0; idx -= 1) {
-                    runningPeak = Math.max(runningPeak, preRetLiabilityRows[idx].totalLiabilities || 0);
-                    peaks[idx] = runningPeak;
-                  }
-                  return peaks;
+                const liabilityPaydownItems = (() => {
+                  const rows = [];
+                  const addRows = (items, fallbackTotal, fallbackName, defaultTermYears, prefix) => {
+                    if (items && items.length > 0) {
+                      items.forEach((item, idx) => {
+                        if ((item.amount || 0) > 0) rows.push({ key: `${prefix}-${item.id ?? idx}`, item, defaultTermYears });
+                      });
+                      return;
+                    }
+                    if ((fallbackTotal || 0) > 0) {
+                      rows.push({ key: `${prefix}-fallback`, item: { name: fallbackName, amount: fallbackTotal, startYear: null, endYear: null }, defaultTermYears });
+                    }
+                  };
+                  addRows(liabilities.mortgageItems, liabilities.mortgage || 0, 'Mortgage', 25, 'mortgage');
+                  addRows(liabilities.loanItems, liabilities.loans || 0, 'Loan', 5, 'loan');
+                  addRows(liabilities.otherLiabilityItems, liabilities.other || 0, 'Liability', 5, 'other');
+                  return rows;
                 })();
+                const createDebtPaydownState = () => liabilityPaydownItems.map((row) => ({ ...row, extraPaid: 0 }));
+                const getRemainingDebtForYearFromState = (debtState, year) => debtState.reduce((sum, row) => {
+                  const scheduled = getLiabilityBalanceForYear(row.item, year, currentCalendarYear, row.defaultTermYears);
+                  return sum + Math.max(0, scheduled - row.extraPaid);
+                }, 0);
+                const hasRemainingDebtFromIndex = (debtState, startIdx) => {
+                  for (let idx = Math.max(0, startIdx); idx < preRetLiabilityRows.length; idx += 1) {
+                    if (getRemainingDebtForYearFromState(debtState, preRetLiabilityRows[idx].year) > 0) return true;
+                  }
+                  return false;
+                };
+                const applyDebtPaymentForYear = (debtState, year, amount) => {
+                  let remainingPayment = Math.max(0, amount || 0);
+                  let paid = 0;
+                  for (const row of debtState) {
+                    if (remainingPayment <= 0) break;
+                    const scheduled = getLiabilityBalanceForYear(row.item, year, currentCalendarYear, row.defaultTermYears);
+                    const remainingDebt = Math.max(0, scheduled - row.extraPaid);
+                    if (remainingDebt <= 0) continue;
+                    const payment = Math.min(remainingPayment, remainingDebt);
+                    row.extraPaid += payment;
+                    remainingPayment -= payment;
+                    paid += payment;
+                  }
+                  return { paid, unused: (amount || 0) - paid };
+                };
                 const t2Sim = (() => {
                   let bal = assets.investments || 0;
                   const r = assumptions.investmentReturn / 100;
-                  let debtOffset = 0;
+                  const debtState = createDebtPaydownState();
                   let debtFreeAge = null;
                   let fiAgeResult = null;
                   for (let i = 0; i < wealthProjection.length; i++) {
@@ -5736,16 +5737,10 @@ const mIdx = cols.findIndex(c =>
                     const yearSurplus = wp.savings || 0;
                     bal = bal * (1 + r);
                     const preRetIdx = preRetLiabilityIndexByAge.get(wp.age);
-                    const scheduledDebt = preRetIdx === undefined ? 0 : (preRetLiabilityRows[preRetIdx].totalLiabilities || 0);
-                    const remainingDebtForYear = Math.max(0, scheduledDebt - debtOffset);
-                    // debtPayment must be non-negative: if surplus is negative, it draws from investments (bal), not debt
-                    const debtPayment = Math.max(0, Math.min(yearSurplus, remainingDebtForYear));
-                    debtOffset += debtPayment;
-                    const leftover = yearSurplus - debtPayment;
-                    bal += leftover;
+                    const debtResult = applyDebtPaymentForYear(debtState, wp.year, yearSurplus);
+                    bal += yearSurplus - debtResult.paid;
                     if (debtFreeAge === null && preRetIdx !== undefined) {
-                      const futurePeakDebt = futurePeakLiabilitiesByIndex[preRetIdx] || 0;
-                      if (futurePeakDebt > 0 && debtOffset >= futurePeakDebt) debtFreeAge = wp.age + 1;
+                      if (!hasRemainingDebtFromIndex(debtState, preRetIdx)) debtFreeAge = wp.age + 1;
                     }
                   }
                   return { debtFreeAge, fiAgeResult };
@@ -5765,7 +5760,7 @@ const mIdx = cols.findIndex(c =>
                 const t3Sim = (() => {
                   let bal = assets.investments || 0;
                   const r = assumptions.investmentReturn / 100;
-                  let debtOffset = 0;
+                  const debtState = createDebtPaydownState();
                   let fiAgeResult = null;
                   for (let i = 0; i < wealthProjection.length; i++) {
                     const wp = wealthProjection[i];
@@ -5777,13 +5772,9 @@ const mIdx = cols.findIndex(c =>
                     const toDebt   = yearSurplus * effDebt   / 100;
                     // splitCash portion is deliberately held idle — not invested, not used for debt
                     bal = bal * (1 + r) + toInvest;
-                    const preRetIdx = preRetLiabilityIndexByAge.get(wp.age);
-                    const scheduledDebt = preRetIdx === undefined ? 0 : (preRetLiabilityRows[preRetIdx].totalLiabilities || 0);
-                    const remainingDebtForYear = Math.max(0, scheduledDebt - debtOffset);
-                    const debtPayment = Math.max(0, Math.min(toDebt, remainingDebtForYear));
-                    debtOffset += debtPayment;
+                    const debtResult = applyDebtPaymentForYear(debtState, wp.year, toDebt);
                     // Any unspent debt slice redirects to investment
-                    bal += (toDebt - debtPayment);
+                    bal += debtResult.unused;
                   }
                   return { fiAgeResult };
                 })();
@@ -5864,7 +5855,7 @@ const mIdx = cols.findIndex(c =>
                                   <div style={{ fontSize: '0.85rem', color: '#e8e9ed', marginBottom: '0.85rem', lineHeight: 1.5 }}>
                                     {totalDebtToday > 0
                                       ? `Pay down ${formatCurrencyDecimal(totalDebtToday, currency, exchangeRates)} debt first, then invest freed surplus.`
-                                      : `No liability balance today; future liabilities up to ${formatCurrencyDecimal(maxPreRetLiabilityBalance, currency, exchangeRates)} are paid down as they activate, then freed surplus is invested.`}
+                                      : `No liability balance today; surplus is invested until future liabilities activate, then future liabilities up to ${formatCurrencyDecimal(maxPreRetLiabilityBalance, currency, exchangeRates)} are paid down as they activate.`}
                                   </div>
                                   <div style={{ height: '1px', background: 'rgba(248,113,113,0.2)', marginBottom: '0.75rem' }} />
                                   <div style={{ marginBottom: '0.65rem' }}>
@@ -6394,7 +6385,7 @@ const mIdx = cols.findIndex(c =>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: gapOpen ? '0.85rem' : 0 }}>
                                 <div style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                   🔧 Ways to close the {formatCurrencyDecimal(absGap, currency, exchangeRates)} gap
-                                  <InfoTooltip text="Three independent levers: each shows what it would take to close the gap if that one factor changed while everything else stayed the same. They use current Investments, entered investment-item contributions, investment return, SWR, and retirement-budget phase-outs. Pre-retirement income, expenses, and planned expenses affect cashflow/surplus views, but they do not change the portfolio here unless you model the available savings as investment contributions or use Surplus Deployment." />
+                                  <InfoTooltip text="These are portfolio levers. They solve the gap by changing one of three things: extra investment contributions, retirement age, or investment return. They include investment contribution windows and retirement-budget phase-outs. They do not automatically invest surplus created by income, expense, or planned-expense changes; use Surplus Deployment or add an investment contribution for that." />
                                 </div>
                                 <button onClick={() => setExpandedCategories(p => ({...p, gapClosing: !gapOpen}))} style={{ fontSize: '0.72rem', color: '#9ca3af', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '5px', padding: '0.2rem 0.55rem', cursor: 'pointer', flexShrink: 0 }}>
                                   {gapOpen ? '▲ Hide Details' : '▼ Show Details'}
@@ -6411,7 +6402,7 @@ const mIdx = cols.findIndex(c =>
                                       {!saveMoreNA && annualUndeployedSurplus > 0 && <div style={{ fontSize: '0.62rem', color: '#60a5fa', marginTop: '0.25rem', opacity: 0.8 }}>↳ Undeployed current-year surplus of {formatCurrencyDecimal(annualUndeployedSurplus / 12, currency, exchangeRates)}/mo can offset this{currentYearInvestmentContribution > 0 ? ` · excludes ${formatCurrencyDecimal(currentYearInvestmentContribution / 12, currency, exchangeRates)}/mo active contributions` : ''}</div>}
                                     </div>
                                     <div style={{ padding: '0.85rem', background: retireLaterna ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.07)', borderRadius: '8px', border: `1px solid ${retireLaterna ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.2)'}` }}>
-                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. The solver keeps your current return assumptions and investment-item annual contributions, applying each item's configured From year/To year contribution window. Salary/passive/other income phasing affects cashflow views but does not automatically create extra portfolio savings. The recommendation is only considered actionable when the resulting retirement age is still before life expectancy." /></div>
+                                      <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📅 Retire later <InfoTooltip text="How many extra working years are needed if you change only Planned Retirement Age. Existing investment-item contributions continue only inside their configured From/To windows. Extra income or lower expenses from working longer are not automatically invested here; model that through contribution rows or Surplus Deployment." /></div>
                                       {retireLaterna ? <div style={{ fontSize: '0.8rem', color: '#4b5563', fontStyle: 'italic' }}>{retireLaterBeyondLife ? 'Would require retiring at or after life expectancy' : 'Gap too large to close by working longer'}</div>
                                         : <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace' }}>+{extraYears} yr{extraYears !== 1 ? 's' : ''}</div>}
                                       <div style={{ fontSize: '0.62rem', color: '#6b7280', marginTop: '0.2rem' }}>{retireLaterna ? '' : `retire at age ${profile.retirementAge + extraYears} · contribution windows honored`}</div>
@@ -8075,7 +8066,7 @@ const mIdx = cols.findIndex(c =>
                 {/* Sub-items list */}
                 {expandedCategories.investmentItems && (
                   <div style={{ marginTop: '0.75rem', marginLeft: '1rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 120px 260px 88px 42px', gap: '0.5rem', alignItems: 'center', marginBottom: '0.45rem', padding: '0 0.25rem', fontSize: '0.58rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 118px 246px 50px 38px', gap: '0.45rem', alignItems: 'center', marginBottom: '0.45rem', padding: '0 0.25rem', fontSize: '0.58rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
                       <span>Name</span>
                       <span>Balance</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the From year. Contributions run from the From year through the inclusive To year and default through the final pre-retirement contribution year." /></span>
@@ -8083,7 +8074,7 @@ const mIdx = cols.findIndex(c =>
                       <span />
                     </div>
                     {(assets.investmentItems || []).map((item) => (
-                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(155px, 1fr) 120px 260px 88px 42px', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center', padding: '0.7rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                      <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 118px 246px 50px 38px', gap: '0.45rem', marginBottom: '0.75rem', alignItems: 'center', padding: '0.6rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
                         <div style={{ minWidth: 0 }}>
                           <input
                             type="text"
@@ -8108,22 +8099,27 @@ const mIdx = cols.findIndex(c =>
                           />
                         </div>
                         <div>
-                          <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="120px"
+                          <SubItemAmountInput value={item.amount} rate={exchangeRates[currency]} width="118px"
                             onChange={(aed) => {
                               const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, amount: aed } : i);
                               const total = newItems.reduce((sum, i) => sum + i.amount, 0);
                               setAssets({ ...assets, investmentItems: newItems, investments: total });
                             }} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 70px' : 'minmax(0, 1fr)', columnGap: '0.45rem', rowGap: '0.25rem', alignItems: 'center' }}>
-                          {(item.annualContrib || 0) > 0 && <div style={{ gridColumn: 2, gridRow: '1 / span 2', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '0.22rem', alignSelf: 'center' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', boxSizing: 'border-box' }}>
-                              <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>From</span>
-                              <ContribStartYearInput
-                                value={item.contribStartYear || currentCalendarYear}
+                        <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 56px 56px' : 'minmax(0, 1fr)', columnGap: '0.4rem', alignItems: 'center' }}>
+                          <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="100%" style={{ minWidth: 0 }}
+                              onChange={(aed) => {
+                                const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, annualContrib: aed } : i);
+                                setAssets({ ...assets, investmentItems: newItems });
+                              }} />
+                          {(item.annualContrib || 0) > 0 && <>
+                            <div>
+                              <PhaseYearInput
+                                value={item.contribStartYear ?? null}
                                 onChange={(yr) => {
                                   const newItems = assets.investmentItems.map(i => {
                                     if (i.id !== item.id) return i;
+                                    if (yr == null) return { ...i, contribStartYear: null };
                                     const currentEndYear = i.contribEndYear || maxContributionStartYear;
                                     const nextEndYear = Math.max(yr, currentEndYear);
                                     return { ...i, contribStartYear: yr, contribEndYear: nextEndYear >= maxContributionStartYear ? null : nextEndYear };
@@ -8132,16 +8128,20 @@ const mIdx = cols.findIndex(c =>
                                 }}
                                 minYear={currentCalendarYear}
                                 maxYear={maxContributionStartYear}
-                                width="48px"
                                 title="From year: first calendar year this annual contribution is made"
-                                style={{ padding: '0.25rem 0.15rem', height: '1.45rem', fontSize: '0.65rem', lineHeight: 1, width: '100%' }}
+                                placeholder="from"
+                                width="56px"
                               />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', boxSizing: 'border-box' }}>
-                              <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>To</span>
-                              <ContribStartYearInput
-                                value={item.contribEndYear || maxContributionStartYear}
+                            <div>
+                              <PhaseYearInput
+                                value={item.contribEndYear ?? null}
                                 onChange={(yr) => {
+                                  if (yr == null) {
+                                    const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribEndYear: null } : i);
+                                    setAssets({ ...assets, investmentItems: newItems });
+                                    return;
+                                  }
                                   const startYear = item.contribStartYear || currentCalendarYear;
                                   const clampedYear = Math.max(startYear, Math.min(maxContributionStartYear, yr));
                                   const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, contribEndYear: clampedYear >= maxContributionStartYear ? null : clampedYear } : i);
@@ -8149,17 +8149,12 @@ const mIdx = cols.findIndex(c =>
                                 }}
                                 minYear={item.contribStartYear || currentCalendarYear}
                                 maxYear={maxContributionStartYear}
-                                width="48px"
                                 title="To year: final calendar year this annual contribution is made"
-                                style={{ padding: '0.25rem 0.15rem', height: '1.45rem', fontSize: '0.65rem', lineHeight: 1, width: '100%' }}
+                                placeholder="to"
+                                width="56px"
                               />
                             </div>
-                          </div>}
-                          <SubItemAmountInput value={item.annualContrib || 0} rate={exchangeRates[currency]} width="100%" style={{ minWidth: 0 }}
-                              onChange={(aed) => {
-                                const newItems = assets.investmentItems.map(i => i.id === item.id ? { ...i, annualContrib: aed } : i);
-                                setAssets({ ...assets, investmentItems: newItems });
-                              }} />
+                          </>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center' }}>
                             <input
@@ -8173,7 +8168,7 @@ const mIdx = cols.findIndex(c =>
                                 }
                               }}
                               title="Annual growth rate applied to this contribution amount"
-                              style={{ width: '100%', padding: '0.45rem 0.35rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '6px', color: '#34d399', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', boxSizing: 'border-box' }}
+                              style={{ width: '100%', padding: '0.45rem 0.25rem', background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '6px', color: '#34d399', fontSize: '0.78rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center', boxSizing: 'border-box' }}
                             />
                         </div>
                         <button
@@ -8183,7 +8178,7 @@ const mIdx = cols.findIndex(c =>
                             setAssets({ ...assets, investmentItems: newItems, investments: total });
                           }}
                           style={{
-                            padding: '0.5rem 0.75rem',
+                            padding: '0.5rem 0',
                             background: 'rgba(239, 68, 68, 0.1)',
                             border: '1px solid rgba(239, 68, 68, 0.2)',
                             borderRadius: '6px',
@@ -8191,7 +8186,7 @@ const mIdx = cols.findIndex(c =>
                             cursor: 'pointer',
                             fontSize: '0.75rem',
                             fontWeight: '600',
-                            width: '42px'
+                            width: '38px'
                           }}
                         >
                           ✕
