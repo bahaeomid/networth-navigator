@@ -5258,14 +5258,15 @@ const mIdx = cols.findIndex(c =>
                           stroke="rgba(245,158,11,0.22)"
                           strokeWidth={1}
                           strokeDasharray="3 3"
+                          isAnimationActive={false}
                           label={makeBandLabel(e.description, 'rgba(245,158,11,0.9)', myIndex)}
                         />
                       );
                     });
                   })()}
-                  <Line type="monotone" dataKey="income" stroke="#34d399" strokeWidth={2} name="Income" dot={false} hide={hiddenLines.income} />
-                  <Line type="monotone" dataKey="expenses" stroke="#f87171" strokeWidth={2} name="Expenses" dot={<CustomDotExpenses />} hide={hiddenLines.expenses} />
-                  <Line type="monotone" dataKey="savings" stroke="#60a5fa" strokeWidth={2} name="Savings" dot={false} hide={hiddenLines.savings} />
+                  <Line type="monotone" dataKey="income" stroke="#34d399" strokeWidth={2} name="Income" dot={false} hide={hiddenLines.income} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="expenses" stroke="#f87171" strokeWidth={2} name="Expenses" dot={<CustomDotExpenses />} hide={hiddenLines.expenses} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="savings" stroke="#60a5fa" strokeWidth={2} name="Savings" dot={false} hide={hiddenLines.savings} isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainer>
               <EventMarkerLegend hiddenMarkers={hiddenEventMarkers} onToggle={toggleEventMarker} includeExpense />
@@ -7703,7 +7704,7 @@ const mIdx = cols.findIndex(c =>
                         <div style={{ display: 'grid', gridTemplateColumns: (item.annualContrib || 0) > 0 ? 'minmax(0, 1fr) 66px' : 'minmax(0, 1fr)', columnGap: '0.4rem', rowGap: '0.25rem', alignItems: 'end' }}>
                           <span style={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>Annual contrib <InfoTooltip text="Planned annual addition to this investment item before retirement. This is the nominal amount as of the From year - enter what you plan to contribute in that calendar year. Contributions run from the From year through the inclusive To year, and default through the final pre-retirement contribution year. Contribution growth applies only inside that From year to To year window. Balance charts show annual opening snapshots, so the contribution affects the following year's plotted balance." /></span>
                           {(item.annualContrib || 0) > 0 && <div style={{ gridColumn: 2, gridRow: '1 / span 2', display: 'grid', gridTemplateRows: '1fr 1fr', gap: '0.18rem', alignSelf: 'end' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', minHeight: '1.42rem', maxHeight: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', boxSizing: 'border-box' }}>
                               <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>From</span>
                               <ContribStartYearInput
                                 value={item.contribStartYear || currentCalendarYear}
@@ -7720,10 +7721,10 @@ const mIdx = cols.findIndex(c =>
                                 maxYear={maxContributionStartYear}
                                 width="58px"
                                 title="From year: first calendar year this annual contribution is made"
-                                style={{ padding: 0, height: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', width: '100%' }}
+                                style={{ padding: 0, height: '1.05rem', minHeight: '1.05rem', maxHeight: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', lineHeight: 1, width: '100%', boxSizing: 'border-box' }}
                               />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr)', alignItems: 'center', gap: '0.18rem', height: '1.42rem', minHeight: '1.42rem', maxHeight: '1.42rem', padding: '0 0.18rem', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', boxSizing: 'border-box' }}>
                               <span style={{ fontSize: '0.45rem', color: '#9ca3af', fontWeight: '700', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.02em', lineHeight: 1 }}>To</span>
                               <ContribStartYearInput
                                 value={item.contribEndYear || maxContributionStartYear}
@@ -7737,7 +7738,7 @@ const mIdx = cols.findIndex(c =>
                                 maxYear={maxContributionStartYear}
                                 width="58px"
                                 title="To year: final calendar year this annual contribution is made"
-                                style={{ padding: 0, height: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', width: '100%' }}
+                                style={{ padding: 0, height: '1.05rem', minHeight: '1.05rem', maxHeight: '1.05rem', background: 'transparent', border: 'none', fontSize: '0.65rem', lineHeight: 1, width: '100%', boxSizing: 'border-box' }}
                               />
                             </div>
                           </div>}
