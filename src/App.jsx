@@ -7602,7 +7602,7 @@ const mIdx = cols.findIndex(c =>
                           const largestBreach = overSavingsItems.reduce((max, item) => item.shortfall > max.shortfall ? item : max, firstBreach);
                           const compactExamples = firstBreach === largestBreach
                             ? `First breach: ${firstBreach.breachYear}, gap ${formatCurrencyDecimal(firstBreach.shortfall, currency, exchangeRates)}/yr.`
-                            : `First breach: ${firstBreach.breachYear}, gap ${formatCurrencyDecimal(firstBreach.shortfall, currency, exchangeRates)}/yr.\nLargest gap: ${largestBreach.breachYear}, ${formatCurrencyDecimal(largestBreach.shortfall, currency, exchangeRates)}/yr.`;
+                            : `First breach: ${firstBreach.breachYear}, gap ${formatCurrencyDecimal(firstBreach.shortfall, currency, exchangeRates)}/yr.\nLargest breach: ${largestBreach.breachYear}, gap ${formatCurrencyDecimal(largestBreach.shortfall, currency, exchangeRates)}/yr.`;
                           return (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.16rem', fontSize: '0.58rem', fontWeight: '700', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '5px', padding: '0.08rem 0.26rem', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
                               ⚠ {badgeText}
