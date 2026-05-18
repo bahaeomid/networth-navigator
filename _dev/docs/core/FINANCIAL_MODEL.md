@@ -8,7 +8,7 @@
 
 1. [Core Assumptions](#1-core-assumptions)
 2. [Wealth Projection Engine](#2-wealth-projection-engine)
-3. [Monte Carlo Simulation](#3-monte-carlo-simulation)
+3. [Market Stress Test (Monte Carlo Simulation)](#3-market-stress-test-monte-carlo-simulation)
 4. [Scorecard Metrics](#4-scorecard-metrics)
 5. [Gap-Closing Levers](#5-gap-closing-levers)
 6. [Confirmed Design Decisions](#6-confirmed-design-decisions)
@@ -32,7 +32,7 @@
 | Investment std dev | 12.0% | any | annual |
 | Real estate appreciation | 3.5% | any | annual |
 | Inflation (per-category) | 3–5% | any | annual |
-| Safe withdrawal rate | 4.0% | 0.1–6.0 | % of nest egg |
+| Target safe withdrawal rate | 4.0% | 0.1–6.0 | Nest egg sizing benchmark |
 
 ### Currency
 
@@ -92,7 +92,7 @@ otherAssets(y+1)  = otherAssets(y) × (1 + otherAssetGrowth)
 cash(y)          = constant (earns 0%, not compounded)
 ```
 
-Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year and can optionally end before retirement. The entered contribution amount is nominal in the From year; contribution growth compounds from that From year forward, not from today, and applies only through the inclusive To year. If no To year is set, the contribution continues through the final pre-retirement contribution year. Projection charts are annual opening snapshots: a contribution made during calendar year 2030 is included in `investments(2031)`, not the opening 2030 plotted point. This is consistent with drawdown timing, where the retirement-age plotted point is the opening balance before that year's retirement drawdown is applied into the next plotted point. Contributions flow through the base projection, FI Age, Retirement Health, Monte Carlo starting portfolio, net worth milestones, asset-allocation projections, Assets Over Time drilldown overlays, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning when planned investment contributions exceed projected savings surplus in any pre-retirement year, summarizes the affected range and examples, and directs users to the Cash Flow Over Time chart for full year-by-year context.
+Annual investment contributions are optional fields on investment sub-items. Each item can start in the current year or a future pre-retirement year and can optionally end before retirement. The entered contribution amount is nominal in the From year; contribution growth compounds from that From year forward, not from today, and applies only through the inclusive To year. If no To year is set, the contribution continues through the final pre-retirement contribution year. Projection charts are annual opening snapshots: a contribution made during calendar year 2030 is included in `investments(2031)`, not the opening 2030 plotted point. This is consistent with drawdown timing, where the retirement-age plotted point is the opening balance before that year's retirement drawdown is applied into the next plotted point. Contributions flow through the base projection, FI Age, Retirement Health, market stress-test starting portfolio, net worth milestones, asset-allocation projections, Assets Over Time drilldown overlays, and HTML report charts. The model does not cap these contributions to calculated savings capacity. The UI shows an informational warning when planned investment contributions exceed projected savings surplus in any pre-retirement year, summarizes the affected range and examples, and directs users to the Cash Flow Over Time chart for full year-by-year context.
 
 ### Income Phasing (Salary, Passive, Other)
 
@@ -150,7 +150,7 @@ netWorth(y) = cash + investments(y) + realEstate(y) + otherAssets(y) − totalLi
 
 ---
 
-## 3. Monte Carlo Simulation
+## 3. Market Stress Test (Monte Carlo Simulation)
 
 ### Parameters
 
@@ -216,9 +216,9 @@ successProbability = successCount / 1000 × 100
 The app also presents a retirement-health section that answers two separate questions:
 
 - **Q1:** Is the portfolio large enough on retirement day? (`projectedWealth / nestEgg`)
-- **Q2:** How often does the retirement portfolio survive in 1,000 Monte Carlo runs?
+- **Q2:** How often does the retirement portfolio survive in 1,000 bumpy market paths?
 
-Monte Carlo success probability is part of this retirement-health section and the exported report KPI strip. It is **not** one of the seven Financial Health tiles shown in the main dashboard strip.
+The market stress-test result, also called Monte Carlo success probability, is part of this retirement-health section and the exported report KPI strip. It is **not** one of the seven Financial Health tiles shown in the main dashboard strip.
 
 ### Fidelity NW Multiple Targets
 
@@ -231,7 +231,7 @@ Monte Carlo success probability is part of this retirement-health section and th
 
 ### Retirement Health Verdict
 
-The retirement-health card combines Q1 and Q2 into a multi-state verdict, including "strong plan", funded-but-volatile cases, funding-gap cases with strong odds, and the worst-case combination of both a funding gap and weak survival odds.
+The retirement-health card combines Q1 and Q2 into a multi-state verdict, including "strong plan", funded-but-bumpy-market cases, funding-gap cases with strong odds, and the worst-case combination of both a funding gap and weak stress-test odds.
 
 ### Required Nest Egg
 
@@ -241,9 +241,18 @@ nestEgg = retirementExpenses(atRetirement, nominal) / (SWR / 100)
 
 Where `retirementExpenses(atRetirement)` is the sum of all 15 retirement budget categories inflated to the retirement year.
 
+`SWR` here means Target Safe Withdrawal Rate. It is a target-setting assumption, not the actual spending control. Lower Target SWR raises the required nest egg because the same retirement budget needs a larger portfolio cushion. Higher Target SWR lowers the target but does not make the plan safer. Actual retirement withdrawals are budget-driven and come from the Retirement Budget, income offsets, phase-outs, and one-time expenses.
+
 ### Financial Independence Age
 
 First age where `investments(y) ≥ retirementExpenses(y, nominal) / (SWR / 100)`.
+
+### Retirement Runway
+
+Retirement Runway is a steady-return what-if view. It assumes the selected return happens every year, then deducts planned retirement spending. A runway line can last to life expectancy while the market stress test is weak because the two views answer different questions:
+
+- Runway asks: "What happens if this return path is smooth?"
+- Market stress test asks: "How often does the plan last if yearly returns are bumpy?"
 
 ---
 
@@ -307,7 +316,7 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 
 | Decision | Rationale | Impact |
 |----------|-----------|--------|
-| **Cash excluded from Monte Carlo** | Cash is allocated annually as an emergency fund, not a growth asset | MC uses liquid investments only |
+| **Cash excluded from market stress test** | Cash is allocated annually as an emergency fund, not a growth asset | Stress test uses liquid investments only |
 | **Only explicit investment contributions enter the base projection** | Planned annual contributions belong on investment sub-items and may use a future pre-retirement start year and optional inclusive end year; unallocated surplus remains a scenario input | Base projection includes entered contributions only within their configured contribution windows; Surplus Deployment remains useful for testing additional year-by-year surplus strategies |
 | **Cash earns 0%** | Pragmatic — emergency fund, not income-generating | Cash balance is constant across projection |
 | **Linear amortization** | Simplification accepted by owner | Slightly overestimates debt in early years vs actual amortization schedule |
@@ -315,7 +324,7 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 | **Life Events are visual-only overlays** | Milestones provide timeline context, not cashflow drivers | Life-event start/end years render chart markers/bands only and do not alter financial calculations |
 | **NW Multiple uses salary only** | Fidelity standard benchmark | Passive/other income excluded from denominator |
 | **Higher Return lever keeps the base projection unchanged except return** | Solves required return after current balances and entered annual contributions are reflected in projected wealth | Gives an isolated return-lever estimate with actionable parity to changing the return assumption |
-| **Drawdown timing: age >= retirementAge** | Drawdown starts in the retirement-age transition year, aligned across deterministic, runway, and Monte Carlo engines | Consistent cross-surface timing semantics |
+| **Drawdown timing: age >= retirementAge** | Drawdown starts in the retirement-age transition year, aligned across deterministic, runway, and market stress-test engines | Consistent cross-surface timing semantics |
 
 ---
 
@@ -323,17 +332,17 @@ These items were reviewed during the audit and **confirmed as intentional** by t
 
 These are documented in the app's "Notes to Financial Statements" (HTML export Note 2):
 
-1. **IID returns** — Monte Carlo draws are independent, identically distributed, normally distributed. No modeling of return correlation, momentum, autocorrelation, or regime changes.
+1. **Simplified bumpy-return model** — The market stress test, also called Monte Carlo, draws each year's return independently from a normal distribution. It does not model return correlation, momentum, autocorrelation, or regime changes.
 
 2. **No tax modeling** — All figures are pre-tax. Actual after-tax returns will be lower depending on jurisdiction.
 
-3. **No variable withdrawal** — Only constant SWR modeled. No guardrails, CAPE-based, or dynamic strategies.
+3. **No variable withdrawal strategy** — Actual withdrawals are budget-driven. Target SWR is used for nest egg sizing and FI Age only. No guardrails, CAPE-based, or dynamic withdrawal strategies.
 
 4. **Single-asset-class MC** — No rebalancing, no multi-asset allocation within the simulation.
 
-5. **Deterministic base projection** — The year-by-year view uses expected returns only. Use Monte Carlo for probabilistic assessment.
+5. **Deterministic base projection** — The year-by-year view uses expected returns only. Use the market stress test for the chance-based assessment.
 
-6. **4% SWR caveat** — For retirements exceeding 35 years, the app's tooltip recommends dropping to 3–3.5%.
+6. **4% Target SWR caveat** — For retirements exceeding 35 years, the app's tooltip recommends considering 3-3.5% for a larger safety cushion.
 
 7. **Currency risk** — FX rates are point-in-time. No modeling of future exchange rate volatility.
 

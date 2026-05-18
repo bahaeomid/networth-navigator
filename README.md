@@ -1,6 +1,6 @@
 # NetWorth Navigator
 
-A comprehensive personal financial planning and retirement projection application built with React. NetWorth Navigator helps you track your current net worth, project your wealth over time, simulate retirement scenarios using Monte Carlo analysis, and identify actionable steps to close any retirement gaps.
+A comprehensive personal financial planning and retirement projection application built with React. NetWorth Navigator helps you track your current net worth, project your wealth over time, stress-test retirement scenarios across bumpy market paths, and identify actionable steps to close any retirement gaps.
 
 ## What It Does
 
@@ -8,9 +8,9 @@ A comprehensive personal financial planning and retirement projection applicatio
 
 **Plan Your Retirement** - Set your current age, retirement age, and life expectancy. Define your pre-retirement and retirement expense budgets across 15 categories (housing, groceries, travel, etc.), each with customizable inflation rates. The app projects your wealth trajectory year-by-year until life expectancy.
 
-**Run Monte Carlo Simulations** - The app runs 1,000 market scenarios using normally distributed returns (Box-Muller transform) with your specified expected return and volatility. This gives you a probability estimate of your retirement success — the percentage of scenarios where your portfolio survives until life expectancy.
+**Run Market Stress Tests** - The app runs 1,000 possible market paths using your expected return and return volatility. This is also called Monte Carlo. In plain language, it estimates how often your investment portfolio lasts if returns are bumpy instead of smooth.
 
-**Find Your FI Age** - Calculate the earliest age at which your investments could sustain your retirement spending (based on the Safe Withdrawal Rate). Compare this to your planned retirement age to see if you're on track.
+**Find Your FI Age** - Calculate the earliest age at which your investments reach the target nest egg (based on your Target Safe Withdrawal Rate). Compare this to your planned retirement age to see if you're on track.
 
 **Gap-Closing Levers** - When a retirement gap exists, see three independent recommendations: how much more to save monthly, how many years to delay retirement, or what return you'd need to close the gap.
 
@@ -21,7 +21,7 @@ A comprehensive personal financial planning and retirement projection applicatio
 ### Core Functionality
 - **Net Worth Tracking** - Monitor your total assets (cash, investments, real estate, other) against liabilities (mortgage, loans, other)
 - **Retirement Projections** - Calculate when you can achieve Financial Independence (FI) based on your savings and expenses
-- **Monte Carlo Simulation** - Run 1,000 simulations to estimate retirement success probability based on market volatility
+- **Market Stress Test** - Run 1,000 bumpy market paths to estimate how often retirement investments last
 - **Wealth Milestones** - Track progress toward $1M, $5M, $10M, and $25M USD thresholds
 
 ### Financial Planning Tools
@@ -144,11 +144,11 @@ The app uses the following deterministic assumptions for projections:
 | Parameter | Default Value | Description |
 |-----------|---------------|-------------|
 | Investment Return | 7% p.a. | Nominal pre-tax return on investments |
-| Investment Volatility | 12% p.a. | Standard deviation for Monte Carlo |
+| Investment Volatility | 12% p.a. | How bumpy yearly returns may be in the market stress test |
 | Real Estate Appreciation | 3.5% p.a. | Property value growth rate |
 | Salary Growth | 4% p.a. | Annual income increase |
 | Passive Income Growth | 2% p.a. | Rental/dividend income growth |
-| Safe Withdrawal Rate | 4% | Standard retirement withdrawal rate |
+| Target Safe Withdrawal Rate | 4% | Nest egg sizing benchmark; actual withdrawals come from the retirement budget |
 | Life Expectancy | 85 years | Planning horizon end point |
 
 ### Calculations
@@ -156,11 +156,14 @@ The app uses the following deterministic assumptions for projections:
 **Net Worth**: Total Assets - Total Liabilities (current snapshot)
 
 **FI Age**: Earliest age when investment portfolio ≥ Required Nest Egg
-- Required Nest Egg = Annual Retirement Expenses ÷ SWR
+- Required Nest Egg = Annual Retirement Expenses ÷ Target SWR
+- Target SWR is not a spending dial. Lower Target SWR raises the target because the same spending needs a larger cushion. Higher Target SWR lowers the target but does not make the plan safer.
 
-**Monte Carlo Simulation**: 
-- 1,000 simulations with normally distributed returns (Box-Muller transform)
-- Success = portfolio balance > 0 at life expectancy
+**Market Stress Test (Monte Carlo)**:
+- 1,000 possible market paths with uneven yearly returns
+- Success = investment portfolio balance > 0 at life expectancy
+- Uses the Retirement Budget as the actual withdrawal plan
+- Changing Target SWR alone does not change stress-test odds; edit retirement spending, projected investments, income offsets, or return assumptions to move them
 - ≥80% = strong plan, 60-79% = caution, <60% = review recommended
 
 **Expense Inflation**: Each category grows at its own rate, entered in today's terms and inflated forward.
@@ -170,7 +173,7 @@ The app uses the following deterministic assumptions for projections:
 This tool is for **informational purposes only** and does NOT provide:
 - Tax modelling (income, capital gains, inheritance taxes)
 - Currency risk modeling (exchange rates held static)
-- Sequence-of-returns risk beyond Monte Carlo
+- Market-path risk beyond the simplified stress test
 - Tax-advantaged account optimization
 - Social Security/pension integration
 
@@ -191,7 +194,7 @@ Enter your current assets, liabilities, and income streams. Use sub-items for de
 Configure your current annual expenses by category. Set individual growth rates for each expense type.
 
 ### Retirement Tab
-Define your expected retirement spending. Set the Safe Withdrawal Rate and enable/disable drawdown simulation.
+Define your expected retirement spending. Set the Target Safe Withdrawal Rate used to size the nest egg target, and enable/disable drawdown simulation. The Retirement Runway is a steady-return what-if chart; use the market stress-test odds for the chance-based view.
 
 ## License
 
@@ -278,6 +281,6 @@ Generates a self-contained **HTML report** of your complete financial plan. The 
 - Net worth snapshot and key health metrics
 - Income, expense, and savings breakdown
 - Wealth projection charts (pre- and post-retirement)
-- Retirement scenario analysis and Monte Carlo survival odds
+- Retirement scenario analysis and market stress-test odds
 
 The file requires no internet connection to view — open it in any browser and it renders fully offline. Use it to share your plan with a financial advisor, save a printable record, or embed in a document.

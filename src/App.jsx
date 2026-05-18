@@ -151,9 +151,9 @@ const TOOLTIPS = {
   retirementAge: "The age you plan to stop working. Income stops and retirement expenses begin at this age.",
   lifeExpectancy: "Expected age of death for planning purposes. Standard is 90-95 years.",
   cash: "Liquid cash in bank accounts, emergency funds. Low/no growth expected.",
-  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution fields to model planned ongoing additions over a From year/To year window; those contributions flow into the base projection, Retirement Health, FI Age, Monte Carlo starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the affected year(s).",
+  investments: "Stocks, bonds, mutual funds, ETFs. Subject to investment return assumptions. Use each investment item's annual contribution fields to model planned ongoing additions over a From year/To year window; those contributions flow into the base projection, Retirement Health, FI Age, market stress-test starting wealth, and report charts. If planned contributions exceed projected future surplus, the Investments header shows the affected year(s).",
   realEstate: "Property value (your home + investment properties). Appreciates based on real estate rate.",
-  otherAssets: "Other valuable assets: business equity, collectibles, precious metals, vehicles, etc. Treated as illiquid — this category appreciates at the Other growth rate but does not contribute to SWR drawdown capacity. Only Investments and Cash are considered liquid for retirement funding purposes.",
+  otherAssets: "Other valuable assets: business equity, collectibles, precious metals, vehicles, etc. Treated as illiquid — this category appreciates at the Other growth rate but does not contribute to retirement drawdown capacity. Only Investments and Cash are considered liquid for retirement funding purposes.",
   mortgage: "Outstanding mortgage balance on all properties. Liability rows support a From year and a payoff year. Balances are zero before From, then amortise linearly so they are zero at the opening of the payoff year. Liabilities affect net worth only; they do not create a cashflow expense. To reflect debt service in savings, enter the full annual principal + interest payment as a Pre-Retirement expense category with a matching phase-out year.",
   loans: "Car loans, personal loans, student loans, etc. Liability rows support a From year and a payoff year. Balances are zero before From, then amortise linearly so they are zero at the opening of the payoff year. Liabilities affect net worth only; they do not create cashflow expenses. To reflect debt service in savings, enter the full annual payment as a Pre-Retirement expense category with a matching phase-out year.",
   otherLiabilities: "Credit card debt, lines of credit, and other debts. Liability rows support a From year and a payoff year. Balances are zero before From, then amortise linearly so they are zero at the opening of the payoff year. Liabilities affect net worth only; they do not create cashflow expenses. To reflect debt service in savings, enter the full annual payment as a Pre-Retirement expense category with a matching phase-out year.",
@@ -168,11 +168,11 @@ const TOOLTIPS = {
   retirementExpense: "Your annual spending in retirement at the point you retire (in today's terms). This is independent of the Expense Calculator — set it to roughly 70-80% of pre-retirement spend. Once in retirement, this figure grows each year at the Retirement Expense Growth rate (under Economic Assumptions).",
   // inflationRate tooltip removed — superseded by per-category retExpenseGrowthRates
   investmentReturn: "Expected annual return on investments (stocks/bonds). Historical avg: 7-8%. Enter your after-tax return — if your gains are subject to capital gains or dividend tax, subtract the drag (typically 0.5–1.5pp) from your gross expected return.",
-  investmentStdDev: "Volatility of investment returns. Used in Monte Carlo simulation. Typical: 12-15%.",
+  investmentStdDev: "How bumpy investment returns may be year to year. Used in the market stress test, also called Monte Carlo. Typical: 12-15%.",
   realEstateAppreciation: "Annual property value growth %. Typical range: 3–6% depending on market and location.",
   savingsRate: "Current-year savings as % of gross income. Uses today's income minus current annual expenses and any planned expenses active this calendar year. Liability balances are not payments; add debt service as expense categories if you want those payments reflected in savings.",
   netWorth: "Total assets minus total liabilities. Liability balances are phased by From/payoff years: zero before From, then amortised to zero at the opening of the payoff year. Liability balances affect net worth only; debt payments must be entered as expenses to affect savings.",
-  retirementReadiness: "Survival odds: % of 1,000 market scenarios where your money lasts through your life expectancy. Above 80% = strong plan. Below 60% = review your retirement budget or savings rate. Uses your Retirement Budget (entered in today's terms, inflated to retirement day) as the annual withdrawal amount.",
+  retirementReadiness: "Market stress-test odds: % of 1,000 possible market paths where your investments last through life expectancy. Above 80% = strong plan. Below 60% = review retirement spending or savings. Uses your Retirement Budget as the actual withdrawal plan; changing Target SWR alone does not change this result.",
   yearsToRetirement: "Years until your planned retirement age. FI Age (in the Retirement Health card) shows the earliest you could theoretically retire based on current savings — ideally it lands before or at this date.",
   drawdown: "When enabled, retirement expenses are withdrawn annually from your Investments balance starting at retirement age — simulating the real depletion of your portfolio during retirement. Withdrawals are funded from Investments only (stocks, ETFs, index funds, retirement accounts), since real estate appreciates passively and other assets are treated as illiquid. The annual withdrawal equals your inflation-adjusted retirement expenses, reduced by any passive or other income continuing through retirement — only the net shortfall is withdrawn from your portfolio to cover your retirement expenses. Disable to see gross asset growth without any depletion effect.",
 };
@@ -1761,6 +1761,7 @@ const NetWorthNavigator = () => {
     // ── Helpers ──
     const fmt = (v) => formatCurrency(v, currency, exchangeRates);
     const fmtPct = (v, dp=1) => v!=null ? v.toFixed(dp)+'%' : '—';
+    const impliedWithdrawalPct = retirementWealth > 0 ? (retNominalExpense / retirementWealth) * 100 : null;
     const statusDot = (color) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;flex-shrink:0;"></span>`;
     const scoreColor = (val, thresholds, colors) => {
       for(let i=0;i<thresholds.length;i++) if(val>=thresholds[i]) return colors[i];
@@ -2065,12 +2066,12 @@ const NetWorthNavigator = () => {
     <div>
       <div class="cover-stat-label">Required Nest Egg</div>
       <div class="cover-stat-value">${fmt(requiredNestEgg)}</div>
-      <div class="cover-stat-sub">${nestEggSwr}% SWR · ${Math.min(fundingPct,999).toFixed(0)}% funded</div>
+      <div class="cover-stat-sub">${nestEggSwr}% target SWR · ${Math.min(fundingPct,999).toFixed(0)}% funded</div>
     </div>
     <div>
-      <div class="cover-stat-label">Monte Carlo</div>
+      <div class="cover-stat-label">Market Stress Test</div>
       <div class="cover-stat-value">${successProb}%</div>
-      <div class="cover-stat-sub">${successProb>=80?'Probability funds last through retirement':'⚠ Risk of running out — '+successProb+'% of scenarios succeed'}</div>
+      <div class="cover-stat-sub">${successProb>=80?'Investments last in most bumpy market paths':'⚠ Only '+successProb+'% of bumpy market paths last'}</div>
     </div>
     ${fiAge ? `<div>
       <div class="cover-stat-label">FI Age</div>
@@ -2093,10 +2094,10 @@ const NetWorthNavigator = () => {
     else if (savingsRate < 0) items.push({type:'bad', text:`Expenses exceed income by ${fmt(Math.abs(surplus))}/yr (${fmtPct(Math.abs(savingsRate))} overspend) — no savings being generated`});
     else if (savingsRate < 10) items.push({type:'bad', text:`Low current-year savings rate of ${fmtPct(savingsRate)} — target 20%+ for meaningful wealth accumulation`});
     else items.push({type:'warn', text:`Current-year savings rate of ${fmtPct(savingsRate)} — adequate but below the 20%+ wealth-building threshold`});
-    if (successProb >= 80) items.push({type:'good', text:`Monte Carlo: ${successProb}% of simulations succeed — retirement plan is robust`});
-    else if (successProb === 0) items.push({type:'bad', text:`Monte Carlo: 0 of 1,000 simulations succeed — portfolio is far too small to fund retirement as planned`});
-    else if (successProb >= MC_CAUTION_THRESHOLD) items.push({type:'warn', text:`Monte Carlo: ${successProb}% survival — caution zone (target 80%+); base-case projection survives, but volatile return sequences pose moderate risk`});
-    else items.push({type:'bad', text:`Monte Carlo: only ${successProb}% of simulations succeed — high risk of running out of money in retirement`});
+    if (successProb >= 80) items.push({type:'good', text:`Market stress test: ${successProb}% of bumpy market paths last through retirement — strong result`});
+    else if (successProb === 0) items.push({type:'bad', text:`Market stress test: 0 of 1,000 bumpy market paths last — portfolio is far too small to fund retirement as planned`});
+    else if (successProb >= MC_CAUTION_THRESHOLD) items.push({type:'warn', text:`Market stress test: ${successProb}% of bumpy market paths last — caution zone (target 80%+). A steady-return chart may still look fine, but less smooth markets create risk.`});
+    else items.push({type:'bad', text:`Market stress test: only ${successProb}% of bumpy market paths last — high risk of running out of investment money in retirement`});
     if (fundingPct >= 100) items.push({type:'good', text:`Retirement fully funded — projected ${fmt(retirementWealth)} exceeds ${fmt(requiredNestEgg)} nest egg target`});
     else if (fundingPct < 50) items.push({type:'bad', text:`Significant funding gap — projected investments are only ${Math.round(fundingPct)}% of the ${fmt(requiredNestEgg)} required nest egg`});
     else items.push({type:'warn', text:`Partially funded at ${Math.round(fundingPct)}% of the ${fmt(requiredNestEgg)} required nest egg — on a reasonable path`});
@@ -2107,7 +2108,7 @@ const NetWorthNavigator = () => {
     else if (emergencyMonths < 6) items.push({type:'warn', text:`Emergency fund of ${emergencyMonths.toFixed(1)} months — adequate but 6+ months is recommended`});
     else items.push({type:'good', text:`Emergency fund of ${emergencyMonths.toFixed(1)} months — well covered`});
     if (exhaustionAge) items.push({type:'bad', text:`Portfolio exhaustion at age ${exhaustionAge} — investments run out ${profile.lifeExpectancy-exhaustionAge} years before life expectancy`});
-    else items.push({type:'good', text:'Investments projected to last through life expectancy under current drawdown plan'});
+    else items.push({type:'good', text:'Investments last through life expectancy in the steady-return base projection'});
     if (fiAge && fiAge <= profile.retirementAge) items.push({type:'good', text:`FI Age ${fiAge} — portfolio reaches nest egg target by or before planned retirement`});
     else if (fiAge) items.push({type:'warn', text:`FI Age ${fiAge} is ${fiAge-profile.retirementAge} year${fiAge-profile.retirementAge>1?'s':''} after planned retirement — consider delaying retirement or growing investments`});
     else items.push({type:'bad', text:'FI Age not reached — investments never reach the required nest egg under current projections'});
@@ -2138,9 +2139,9 @@ const NetWorthNavigator = () => {
       <div class="kpi-sub">${fmt(surplus)}/yr · target 20%+</div>
     </div>
     <div class="kpi ${successProb>=80?'green':successProb>=60?'amber':'red'}">
-      <div class="kpi-label">Monte Carlo</div>
+      <div class="kpi-label">Market Stress Test</div>
       <div class="kpi-value">${successProb}%</div>
-      <div class="kpi-sub">${successProb>=80?'Scenarios where funds last — target 80%+':successProb===0?'All scenarios fail — portfolio far too small':successProb>=60?successProb+'% survive · caution zone — target 80%+':'Only '+successProb+'% survive · high risk — target 80%+'}</div>
+      <div class="kpi-sub">${successProb>=80?'Bumpy market paths where funds last — target 80%+':successProb===0?'All paths fail — portfolio far too small':successProb>=60?successProb+'% last · caution zone — target 80%+':'Only '+successProb+'% last · high risk — target 80%+'}</div>
     </div>
     <div class="kpi ${fundingPct>=100?'green':fundingPct>=50?'amber':'red'}">
       <div class="kpi-label">Nest Egg Funded</div>
@@ -2399,12 +2400,12 @@ const NetWorthNavigator = () => {
     <div class="kpi purple">
       <div class="kpi-label">Required Nest Egg</div>
       <div class="kpi-value">${fmt(requiredNestEgg)}</div>
-      <div class="kpi-sub">${nestEggSwr}% SWR · retirement-day expenses</div>
+      <div class="kpi-sub">${nestEggSwr}% target SWR · sizing benchmark</div>
     </div>
     <div class="kpi ${successProb>=80?'green':successProb>=60?'amber':'red'}">
-      <div class="kpi-label">Monte Carlo Success</div>
+      <div class="kpi-label">Market Stress Test</div>
       <div class="kpi-value">${successProb}%</div>
-      <div class="kpi-sub">1,000 simulations · ${assumptions.investmentStdDev}% volatility</div>
+      <div class="kpi-sub">1,000 bumpy market paths · ${assumptions.investmentStdDev}% return bumpiness</div>
     </div>
     <div class="kpi ${irrPct>=80&&irrPct<=120?'green':irrPct>120?'amber':'red'}">
       <div class="kpi-label">Income Replacement</div>
@@ -2433,8 +2434,14 @@ const NetWorthNavigator = () => {
       <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px;">See Expense Budgets section</div>
     </div>
     <div style="padding:12px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
-      <div style="font-size:0.68rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Safe Withdrawal Rate</div>
+      <div style="font-size:0.68rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Target SWR</div>
       <div style="font-size:1rem;font-weight:700;color:#1e293b;font-family:'SF Mono',monospace;">${nestEggSwr}%</div>
+      <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px;">Sizes the nest egg target; actual withdrawals come from your retirement budget</div>
+    </div>
+    <div style="padding:12px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+      <div style="font-size:0.68rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Implied First-Year Draw</div>
+      <div style="font-size:1rem;font-weight:700;color:#1e293b;font-family:'SF Mono',monospace;">${impliedWithdrawalPct !== null ? impliedWithdrawalPct.toFixed(1)+'%' : '—'}</div>
+      <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px;">Retirement-day budget ÷ projected investments</div>
     </div>
     <div style="padding:12px 14px;background:${exhaustionAge?'#fef2f2':'#f0fdf4'};border-radius:8px;border:1px solid ${exhaustionAge?'#fecaca':'#bbf7d0'};">
       <div style="font-size:0.68rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Portfolio Exhaustion</div>
@@ -2538,7 +2545,7 @@ const NetWorthNavigator = () => {
         <div class="assume-item"><div class="assume-label">Retirement Age</div><div class="assume-value">${profile.retirementAge}</div></div>
         <div class="assume-item"><div class="assume-label">Life Expectancy</div><div class="assume-value">${profile.lifeExpectancy}</div></div>
         <div class="assume-item"><div class="assume-label">Planning Horizon</div><div class="assume-value">${profile.lifeExpectancy-profile.currentAge} yrs</div></div>
-        <div class="assume-item"><div class="assume-label">Safe Withdrawal Rate</div><div class="assume-value">${nestEggSwr}%</div></div>
+        <div class="assume-item"><div class="assume-label">Target Safe Withdrawal Rate</div><div class="assume-value">${nestEggSwr}%</div></div>
         <div class="assume-item"><div class="assume-label">Drawdown Mode</div><div class="assume-value">${assumptions.enableDrawdown?'On':'Off'}</div></div>
         <div class="assume-item"><div class="assume-label">Currency</div><div class="assume-value">${currency}</div></div>
         ${currency!=='AED'?`<div class="assume-item"><div class="assume-label">Exchange Rate</div><div class="assume-value">1 ${currency} = ${(exchangeRates[currency]||1).toFixed(4)} AED</div></div>`:''}
@@ -2556,7 +2563,7 @@ const NetWorthNavigator = () => {
   <div class="note-block">
     <div class="note-heading"><span class="note-num">1.</span> Basis of Preparation</div>
     <div class="note-body">
-      <p>This report was generated by NetWorth Navigator, a personal financial planning tool. All projections are prepared on a <strong>going-concern basis</strong> using deterministic compounding for base-case scenarios and Monte Carlo simulation for retirement survival probability. All monetary values are stored internally in UAE Dirhams (AED) and converted to the display currency at the exchange rate prevailing at the time of export. Figures are rounded to the nearest whole unit of display currency.</p>
+      <p>This report was generated by NetWorth Navigator, a personal financial planning tool. All projections use two views: a steady-return base case and a market stress test that checks many bumpy return paths. All monetary values are stored internally in UAE Dirhams (AED) and converted to the display currency at the exchange rate prevailing at the time of export. Figures are rounded to the nearest whole unit of display currency.</p>
       <p>The report date is <strong>${exportDate}</strong>. All projections are forward-looking and subject to the assumptions described in Note 3.</p>
     </div>
   </div>
@@ -2569,7 +2576,7 @@ const NetWorthNavigator = () => {
       <ul>
         <li><strong>No tax modelling.</strong> Income, capital gains, inheritance, and withholding taxes are not modelled. Users should enter after-tax income figures and consult a tax adviser for jurisdiction-specific obligations.</li>
         <li><strong>No currency risk.</strong> Exchange rates are held static at the export-date snapshot. Multi-currency portfolios may be materially affected by rate fluctuations not reflected here.</li>
-        <li><strong>No sequence-of-returns risk beyond Monte Carlo.</strong> The base-case projection applies a constant annual return. The Monte Carlo simulation (Note 6) partially addresses sequence risk but assumes independent, identically distributed (IID) normally distributed returns — each year's return is drawn independently with no modelling of return correlation, momentum, or autocorrelation. This may understate tail risk in severe market dislocations.</li>
+        <li><strong>Steady-return views are not guarantees.</strong> The base-case projection and Retirement Runway apply a constant annual return. The market stress test (Note 6), also called Monte Carlo, checks many uneven market paths, but it still uses a simplified model where each year's return is drawn independently. It may understate risk in severe market dislocations.</li>
         <li><strong>Illiquid assets excluded from retirement drawdown.</strong> Real estate and other illiquid assets grow passively in the model and are not drawn upon in retirement. Only the investment portfolio services retirement withdrawals.</li>
         <li><strong>Liability amortisation defaults.</strong> Where no end year is specified on a liability sub-item, mortgages are amortised linearly over 25 years and all other liabilities over 5 years from today. Actual amortisation schedules may differ. Liability balances affect net worth only; scheduled debt payments must be entered as expense categories to affect savings, surplus, and cashflow charts.</li>
       </ul>
@@ -2583,12 +2590,12 @@ const NetWorthNavigator = () => {
       <p>The projections are sensitive to the following assumptions, which are user-defined and applied consistently across all scenarios unless otherwise stated:</p>
       <ul>
         <li><strong>Investment return (${assumptions.investmentReturn}% p.a.).</strong> Applied to the liquid investment portfolio (pre- and post-retirement). This is a nominal, pre-fee return. Adviser fees, fund management charges, and transaction costs are not deducted.</li>
-        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, Monte Carlo starting wealth, milestones, and report charts. If From year/To year values are set, that item contributes only within that inclusive pre-retirement window; contribution growth compounds from the From year forward and stops after the To year. Projection charts show annual opening snapshots, so contributions made during a calendar year first appear in the following year's plotted balance. The model does not cap contributions to calculated surplus; the app flags any pre-retirement years where planned contributions exceed projected savings so users can review affordability.</li>
+        <li><strong>Annual investment contributions (${fmt(annualInvestmentContribution)}/yr configured; ${fmt(currentYearInvestmentContribution)}/yr active in ${currentYear}).</strong> Contributions entered on investment items are added to the base projection before retirement and flow through retirement funding, FI Age, market stress-test starting wealth, milestones, and report charts. If From year/To year values are set, that item contributes only within that inclusive pre-retirement window; contribution growth compounds from the From year forward and stops after the To year. Projection charts show annual opening snapshots, so contributions made during a calendar year first appear in the following year's plotted balance. The model does not cap contributions to calculated surplus; the app flags any pre-retirement years where planned contributions exceed projected savings so users can review affordability.</li>
         <li><strong>Real estate appreciation (${assumptions.realEstateAppreciation}% p.a.).</strong> Applied uniformly to the entire real estate portfolio. Regional, property-type, and leverage effects are not modelled.</li>
         <li><strong>Salary growth (${assumptions.salaryGrowth}% p.a.).</strong> Applied to earned income until the stated retirement age, after which salary is assumed to cease.</li>
         <li><strong>Passive income growth (${assumptions.passiveGrowth}% p.a.) and other income growth (${assumptions.otherIncomeGrowth}% p.a.).</strong> Continued post-retirement unless an end year is specified on the income sub-item.</li>
         <li><strong>Expense growth.</strong> Each expense category grows at its own user-defined rate, both pre- and post-retirement. Categories with a phase-out year are set to zero from that year onwards. Amounts are entered in today's terms and inflated forward.</li>
-        <li><strong>Safe withdrawal rate (${nestEggSwr}%).</strong> Used to size the Required Nest Egg (see Note 9 for formula and caveats). A common heuristic — does not guarantee portfolio survival under all market conditions.</li>
+        <li><strong>Target safe withdrawal rate (${nestEggSwr}%).</strong> Used to size the Required Nest Egg (see Note 9 for formula and caveats). It is a target-setting assumption, not a spending control. Actual withdrawals come from the retirement budget.</li>
         <li><strong>Life expectancy (Age ${profile.lifeExpectancy}).</strong> Projections terminate at this age. Longevity beyond this point is not modelled.</li>
       </ul>
     </div>
@@ -2598,7 +2605,7 @@ const NetWorthNavigator = () => {
   <div class="note-block">
     <div class="note-heading"><span class="note-num">4.</span> One-Time and Recurring Expenses</div>
     <div class="note-body">
-      <p>One-time expenses are entered in today's terms and inflated forward using a two-segment approach: at the pre-retirement category growth rate from today to retirement, then at the post-retirement category growth rate for expenses falling within retirement. Recurring one-time expenses (those with both a start year and an end year) are expanded into per-year entries for projection and Monte Carlo purposes. One-time expenses are excluded from the milestone overlay on the net worth chart to avoid visual clutter but are fully reflected in the underlying projection data.</p>
+      <p>One-time expenses are entered in today's terms and inflated forward using a two-segment approach: at the pre-retirement category growth rate from today to retirement, then at the post-retirement category growth rate for expenses falling within retirement. Recurring one-time expenses (those with both a start year and an end year) are expanded into per-year entries for projections and the market stress test. One-time expenses are excluded from the milestone overlay on the net worth chart to avoid visual clutter but are fully reflected in the underlying projection data.</p>
     </div>
   </div>
   <hr class="note-rule"/>
@@ -2613,9 +2620,9 @@ const NetWorthNavigator = () => {
   <hr class="note-rule"/>
 
   <div class="note-block">
-    <div class="note-heading"><span class="note-num">6.</span> Monte Carlo Simulation Methodology</div>
+    <div class="note-heading"><span class="note-num">6.</span> Market Stress Test Methodology</div>
     <div class="note-body">
-      <p>Retirement survival probability is estimated using <strong>1,000 independent Monte Carlo simulations</strong>. In each simulation, annual investment returns are drawn from a normal distribution parameterised by the user's stated expected return (${assumptions.investmentReturn}% p.a.) and standard deviation (${assumptions.investmentStdDev}% p.a.) using the Box-Muller transform. The simulation:</p>
+      <p>Retirement survival probability is estimated using <strong>1,000 possible market paths</strong>. This method is often called Monte Carlo. In plain language, the report asks: if returns are not smooth every year, how often does the investment portfolio still last? Each path uses the user's stated expected return (${assumptions.investmentReturn}% p.a.) and return bumpiness (${assumptions.investmentStdDev}% p.a.). The stress test:</p>
       <ul>
         <li>Operates on the liquid investment portfolio only, starting from its projected balance at retirement date</li>
         <li>Applies per-year nominal withdrawal amounts computed from the retirement budget, including category-specific growth rates and phase-out schedules (year 0 is the retirement-age transition year)</li>
@@ -2623,7 +2630,7 @@ const NetWorthNavigator = () => {
         <li>Incorporates one-time post-retirement expenses using the two-segment inflation approach described in Note 8</li>
         <li>Records a simulation as successful if the portfolio balance remains above zero through life expectancy</li>
       </ul>
-      <p>Success probability thresholds: <strong>≥80% = strong plan</strong>; 60–79% = caution; <strong>&lt;60% = plan review recommended</strong>. These thresholds are conventional guidelines, not actuarial standards.</p>
+      <p>Success thresholds: <strong>≥80% = strong plan</strong>; 60–79% = caution; <strong>&lt;60% = plan review recommended</strong>. These thresholds are practical guidelines, not guarantees.</p>
     </div>
   </div>
   <hr class="note-rule"/>
@@ -2637,7 +2644,7 @@ const NetWorthNavigator = () => {
         <li><strong>Debt Free Age.</strong> The first projected year after the final positive liability balance in the configured schedule, based on the liability amortisation approach described in Note 2. Displayed as an age and calendar year. This accounts for future-start liabilities rather than treating a temporary zero-debt gap as permanently debt-free.</li>
         <li><strong>First $1M USD.</strong> The projected age and calendar year at which net worth first crosses USD 1,000,000, converted from AED at the export-date exchange rate. See Note 12 for the full set of wealth milestones and the rationale for USD denomination.</li>
         <li><strong>Planned Retirement.</strong> The retirement age and calendar year as entered in the Profile tab. This is a user input, not a derived value. The FI Age (earliest age at which the portfolio could support retirement) is shown separately in the Retirement Health tile and may differ.</li>
-        <li><strong>Retirement Health.</strong> A composite summary showing FI Age, SWR needed today (the withdrawal rate implied by current investments relative to the required retirement spend), Monte Carlo survival odds, and the projected portfolio exhaustion age (if drawdown is enabled and the portfolio runs out before life expectancy).</li>
+        <li><strong>Retirement Health.</strong> A composite summary showing FI Age, SWR needed today (the withdrawal rate implied by current investments relative to the required retirement spend), market stress-test odds, and the projected portfolio exhaustion age (if drawdown is enabled and the portfolio runs out before life expectancy).</li>
       </ul>
     </div>
   </div>
@@ -2654,7 +2661,7 @@ const NetWorthNavigator = () => {
         <li><strong>Emergency Fund.</strong> Formula: Cash Balance ÷ (Current Annual Expenses ÷ 12). Expressed in months of expenses covered. Thresholds: ≥6 months = green; 3–5 months = amber; &lt;3 months = red. Uses the cash asset field only — other liquid assets are excluded.</li>
         <li><strong>Investment Mix.</strong> Formula: Investments ÷ Total Assets. Thresholds: ≥40% = green; 20–39% = amber; &lt;20% = red. Measures the proportion of wealth held in liquid, growth-oriented investments versus real estate and other assets. A low mix may indicate concentration in illiquid assets.</li>
         <li><strong>Retirement Funding.</strong> Formula: Projected Investments at Retirement ÷ Required Nest Egg. Thresholds: ≥100% = green (fully funded); 85–99% = light green (approaching); 50–84% = amber; &lt;50% = red. The Required Nest Egg formula is defined in Note 9.</li>
-        <li><strong>Income Replacement Ratio.</strong> Formula: Retirement Budget (today's terms) ÷ Current Annual Income. Both values are in today's dollars for a like-for-like comparison. Thresholds: 80–120% = green (strong fit), 70–79% = amber (lean replacement), above 120% = amber (retirement lifestyle exceeds current income), below 70% = red (significant lifestyle reduction).</li>
+        <li><strong>Income Replacement Ratio.</strong> Formula: Retirement Budget (today's terms) ÷ Current Annual Income. Both values are in today's terms for a like-for-like comparison. Thresholds: 80–120% = green (strong fit), 70–79% = amber (lean replacement), above 120% = amber (retirement lifestyle exceeds current income), below 70% = red (significant lifestyle reduction).</li>
       </ul>
     </div>
   </div>
@@ -2663,11 +2670,11 @@ const NetWorthNavigator = () => {
   <div class="note-block">
     <div class="note-heading"><span class="note-num">9.</span> Retirement Health Card — Q1 and Gap-Closing Levers</div>
     <div class="note-body">
-      <p>The Retirement Health card addresses two questions. <strong>Q1</strong> assesses whether the projected investment portfolio at retirement is sufficient. <strong>Q2</strong> (Monte Carlo, Note 6) assesses whether it will last.</p>
-      <p><strong>Required Nest Egg</strong> = Day-1 Nominal Retirement Expense ÷ Safe Withdrawal Rate. Day-1 expenses are the sum of all retirement budget categories inflated from today to retirement date at each category's growth rate, with no phase-outs applied (conservative upper bound).</p>
+      <p>The Retirement Health card addresses two questions. <strong>Q1</strong> asks whether the projected investment portfolio reaches the target nest egg by retirement. <strong>Q2</strong> asks whether that portfolio lasts through retirement when markets are bumpy.</p>
+      <p><strong>Required Nest Egg</strong> = Day-1 Nominal Retirement Expense ÷ Target Safe Withdrawal Rate. Day-1 expenses are the sum of all retirement budget categories inflated from today to retirement date at each category's growth rate, with no phase-outs applied (conservative upper bound). Lowering the Target SWR raises this target because the same spending needs a larger portfolio cushion. Raising it lowers the target but does not make the plan safer.</p>
       <p><strong>Projected Investments at Retirement</strong> = the investment portfolio balance in the base-case wealthProjection at the retirement age entry. This reflects investment compounding, any annual contributions entered on investment items, and drawdown if enabled. Surplus beyond explicitly entered contributions remains undeployed unless modelled in the Surplus Deployment section.</p>
       <p><strong>Retirement Gap</strong> = Projected Investments − Required Nest Egg. Negative = shortfall.</p>
-      <p>The <strong>overall verdict</strong> is a 6-state classification combining Q1 (on track vs gap) and Q2 (≥80% strong, 60–79% caution, &lt;60% weak): Strong · Moderate risk · High risk · Gap with strong odds · Gap detected · High risk with gap and low odds.</p>
+      <p>The <strong>overall verdict</strong> combines Q1 (nest egg target vs gap) and Q2 (market stress-test result: ≥80% strong, 60–79% caution, &lt;60% weak). A steady-return runway can last to life expectancy while the stress test still shows high risk because they answer different questions.</p>
       <p>When a gap exists, three independent levers are shown — each closes the gap in isolation, holding all else constant:</p>
       <ul>
         <li><strong>Save More.</strong> The additional monthly investment required to close the gap by retirement, solved as a flat annualized investment contribution on top of any annual contributions already entered on investment items. The displayed monthly value is rounded up so entering it should close the gap rather than leave a small shortfall. This is not the dynamic full-surplus scenario; those year-by-year strategies are shown separately in Surplus Deployment. Only undeployed current-year surplus (${fmt(undeployedSurplus)}/yr in ${currentYear}, after investment contributions active this year) can offset the additional requirement.</li>
@@ -2682,8 +2689,8 @@ const NetWorthNavigator = () => {
   <div class="note-block">
     <div class="note-heading"><span class="note-num">10.</span> Retirement Runway</div>
     <div class="note-body">
-      <p>Retirement Runway shows how long the investment portfolio survives under three return and spending scenarios, measured in years from the retirement date. Requires Drawdown Mode to be enabled.</p>
-      <p><strong>Runway years</strong> = Portfolio Exhaustion Age − Retirement Age (or Life Expectancy − Retirement Age if the portfolio never exhausts). Portfolio exhaustion is the first year the investment balance reaches zero in the deterministic drawdown simulation.</p>
+      <p>Retirement Runway shows how long the investment portfolio survives under three steady-return what-if scenarios, measured in years from the retirement date. It assumes the selected return happens every year. Requires Drawdown Mode to be enabled.</p>
+      <p><strong>Runway years</strong> = Portfolio Exhaustion Age − Retirement Age (or Life Expectancy − Retirement Age if the portfolio never exhausts). Portfolio exhaustion is the first year the investment balance reaches zero in this steady-return drawdown view.</p>
       <p>The three scenarios share the same retirement expense base but apply independent adjustments:</p>
       <ul>
         <li><strong>Base.</strong> No adjustments — uses the configured investment return and the full retirement budget as entered. This is identical to the main wealthProjection drawdown.</li>
@@ -4332,7 +4339,7 @@ const mIdx = cols.findIndex(c =>
               </div>
 
             
-              {/* Retirement Health — merged: FI Age + Required SWR + Survival Odds + Exhaustion */}
+              {/* Retirement Health — merged: FI Age + Required SWR + stress-test odds + Exhaustion */}
               {(() => {
                 const sp = retirementMetrics?.successProbability || 0;
                 const retNominal = getRetNominalForYear(new Date().getFullYear() + (profile.retirementAge - profile.currentAge));
@@ -4346,8 +4353,8 @@ const mIdx = cols.findIndex(c =>
                 const reqSwrColor = reqSwr === null ? '#6b7280' : reqSwr <= nestEggSwr ? '#22c55e' : reqSwr <= nestEggSwr + 2 ? '#eab308' : '#ef4444';
                 const exhaustionAge = wealthProjection.exhaustionAge;
                 const exhaustionColor = exhaustionAge ? '#ef4444' : '#6b7280';
-                const swrTooltip = `The withdrawal rate your current investments (${formatCurrency(assets.investments, currency, exchangeRates)}) would need to fund your full retirement budget today. Target is ${nestEggSwr}% or below — based on your SWR setting in the Retirement tab, which you can adjust. A higher SWR target makes FI easier to reach; a lower one requires a larger portfolio.`;
-                const exhaustionTooltip = `Age at which your liquid investment portfolio runs to zero in the base scenario — when withdrawals outpace growth. Earlier exhaustion = lower survival odds. Address via higher savings, lower retirement spend, later retirement, or higher return assumption.`;
+                const swrTooltip = `The rate your current investments (${formatCurrency(assets.investments, currency, exchangeRates)}) would need to support the full retirement budget today. Compare this with your Target SWR in the Retirement tab. Lower Target SWR means you want a bigger safety cushion, so the required nest egg goes up. Higher Target SWR lowers the target, but it does not change what you actually plan to spend.`;
+                const exhaustionTooltip = `Age when your liquid investment portfolio reaches zero in the steady-return base projection. This view assumes the same return every year, so compare it with the market stress-test odds for a less smooth path.`;
                 const rowStyle = { display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', columnGap: '0.5rem', marginBottom: '0.28rem' };
                 const labelStyle = { fontSize: '0.67rem', color: '#6b7280', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', minWidth: 0, lineHeight: 1.2 };
                 const valueStyle = (color) => ({ fontSize: '0.8rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color, whiteSpace: 'nowrap', textAlign: 'right', minWidth: '68px' });
@@ -4355,7 +4362,7 @@ const mIdx = cols.findIndex(c =>
                   <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '1.25rem', borderTop: '2px solid rgba(251,191,36,0.5)' }}>
                     {/* Card label */}
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>
-                      🎯 Retirement Health <InfoTooltip text="Three signals: FI Age (earliest age investments can sustain retirement, based on SWR) · SWR Needed Today (withdrawal rate your current portfolio requires — green when you hit your target) · Monte Carlo Survival Odds (% of 1,000 simulated scenarios where money lasts to life expectancy — unaffected by SWR). Use all three together: FI Age as the target, Survival Odds as the verification." />
+                      🎯 Retirement Health <InfoTooltip text="Three signals: FI Age shows when investments first reach the nest egg target; SWR Needed Today shows the rate your current investments would need to support your planned retirement budget; Market Stress-Test Odds show how often the plan lasts across 1,000 bumpy market paths. Changing Target SWR moves the nest egg target, but the stress-test odds are driven by your actual retirement budget, projected investments, income offsets, and return bumpiness." />
                     </div>
 
                     {/* FI Age — headline */}
@@ -4365,7 +4372,7 @@ const mIdx = cols.findIndex(c =>
                       </div>
                       <div style={{ fontSize: '0.68rem', color: '#6b7280', marginTop: '0.15rem' }}>
                         {fiAge
-                          ? (fiAge < profile.currentAge ? 'Already FI · confirm with Survival Odds' : fiAge <= profile.retirementAge ? `FI Age · ${profile.retirementAge - fiAge}y before planned retirement` : `FI Age · ${fiAge - profile.retirementAge}y after planned retirement · check Survival Odds`)
+                          ? (fiAge < profile.currentAge ? 'Already FI · confirm with stress-test odds' : fiAge <= profile.retirementAge ? `FI Age · ${profile.retirementAge - fiAge}y before planned retirement` : `FI Age · ${fiAge - profile.retirementAge}y after planned retirement · check stress-test odds`)
                           : 'FI Age · not reached'}
                       </div>
                     </div>
@@ -4379,9 +4386,9 @@ const mIdx = cols.findIndex(c =>
                       <span style={valueStyle(reqSwrColor)}>{reqSwr !== null ? `${reqSwr.toFixed(1)}%` : '—'}</span>
                     </div>
 
-                    {/* Survival odds */}
+                    {/* Market stress-test odds */}
                     <div style={rowStyle}>
-                      <span style={labelStyle}>Monte Carlo survival odds <InfoTooltip text="% of 1,000 simulated market scenarios where your portfolio still has money at life expectancy. Each scenario applies a random return (your assumed return ± volatility), withdraws inflation-adjusted expenses, respects phase-outs, and nets passive/other income against withdrawals. The most reliable retirement signal — NOT affected by SWR. Above 80% = strong · 60–79% = caution · below 60% = high risk." /></span>
+                      <span style={labelStyle}>Market stress-test odds <InfoTooltip text="The share of 1,000 possible bumpy market paths where your investments still have money at life expectancy. Each path varies yearly returns, withdraws your planned retirement spending, respects phase-outs, and subtracts passive/other income first. Also called Monte Carlo. Not affected by Target SWR unless you also change the retirement budget or projected portfolio. Above 80% = strong; 60-79% = caution; below 60% = high risk." /></span>
                       <span style={valueStyle(survivalColor)}>{Math.round(sp)}%</span>
                     </div>
 
@@ -4484,7 +4491,7 @@ const mIdx = cols.findIndex(c =>
               // 7. Income Replacement Ratio
               // Retirement spending power (what you plan to spend) / pre-retirement income
               // Both in today's terms to avoid apples-to-oranges comparison.
-              // effectiveRetirementExpense = sum of retirement budget in today's dollars.
+              // effectiveRetirementExpense = sum of retirement budget in today's terms.
               // annualIncome = current annual income (salary + passive + other).
               const preRetIncome  = annualIncome;
               const irrVal   = preRetIncome > 0 && effectiveRetirementExpense > 0 ? (effectiveRetirementExpense / preRetIncome) * 100 : null;
@@ -4560,7 +4567,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 5. Investment Mix */}
                   <div style={tileStyle(imBg, imBdr)}>
                     <div>
-                      <div style={labelStyle}>📊 {scorecardYear} Investment Mix <InfoTooltip text={`Liquid investments (stocks, ETFs, bonds, funds) as % of total assets. Below 20% = low liquid exposure, compounding is limited · 20–40% = moderate · 40%+ = well-positioned for long-term growth. A high real estate or cash concentration limits compounding potential. Only investments count toward your SWR nest egg target — so this ratio directly affects retirement funding.`} /></div>
+                      <div style={labelStyle}>📊 {scorecardYear} Investment Mix <InfoTooltip text={`Liquid investments (stocks, ETFs, bonds, funds) as % of total assets. Below 20% = low liquid exposure, compounding is limited · 20-40% = moderate · 40%+ = well-positioned for long-term growth. A high real estate or cash concentration limits flexibility. Only investments count toward the Target SWR nest egg and retirement drawdown, so this ratio directly affects retirement funding.`} /></div>
                       {imVal !== null
                         ? <span style={valueStyle(imColor)}>{imVal.toFixed(1)}%</span>
                         : <span style={valueStyle('#6b7280')}>—</span>
@@ -4571,7 +4578,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 6. Retirement Funding */}
                   <div style={tileStyle(rfBg, rfBdr)}>
                     <div>
-                      <div style={labelStyle}>🎯 Retirement Funding <InfoTooltip text={`Projected investments at retirement ÷ Required Nest Egg (same Q1 calc in the Retirement tab). Shows how far along you are toward the nest egg target. Below 50% = significant gap · 50–85% = on a reasonable path · 85%+ = approaching target · 100%+ = on track. Denominator uses retirement-day budget ÷ SWR — adjust both in the Retirement tab. Does not include surplus deployment; model that in the Dashboard tab.`} /></div>
+                      <div style={labelStyle}>🎯 Retirement Funding <InfoTooltip text={`Projected investments at retirement divided by Required Nest Egg. Required Nest Egg is your retirement-day budget divided by Target SWR. Lower Target SWR means a bigger cushion and a larger target; higher Target SWR lowers the target but does not make the plan safer. This tile answers "am I on track to the nest egg target?" The market stress-test odds answer "how often does the plan last if markets are bumpy?" Does not include surplus deployment; model that in the Dashboard tab.`} /></div>
                       {rfVal !== null
                         ? <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                             <span style={valueStyle(rfColor)}>{Math.min(rfVal, 999).toFixed(0)}%</span>
@@ -4585,7 +4592,7 @@ const mIdx = cols.findIndex(c =>
                   {/* 7. Income Replacement Ratio */}
                   <div style={tileStyle(irrBg, irrBdr)}>
                     <div>
-                      <div style={labelStyle}>🔄 Income Replacement <InfoTooltip text={`How much of your pre-retirement income your retirement plan replaces. Calculated as: retirement budget (today's terms) ÷ current annual income — both in today's dollars for a like-for-like comparison. Thresholds: 80–120% = strong fit · 70–79% = caution (lean replacement) · above 120% = retirement costs exceed current income · below 70% = lifestyle gap risk.`} /></div>
+                      <div style={labelStyle}>🔄 Income Replacement <InfoTooltip text={`How much of your current income your retirement budget would replace. Calculated as retirement budget (today's terms) divided by current annual income, with both values in today's terms. This is the lifestyle-spending lever: lowering the retirement budget lowers actual withdrawals and can improve both funding and stress-test odds. Thresholds: 80-120% = strong fit; 70-79% = caution; above 120% = retirement costs exceed current income; below 70% = lifestyle gap risk.`} /></div>
                       {irrVal !== null
                         ? <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.3rem' }}>
                             <span style={valueStyle(irrColor)}>{Math.round(irrVal)}%</span>
@@ -4973,7 +4980,7 @@ const mIdx = cols.findIndex(c =>
                 return (
                   <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.85rem', background: highConc ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)', borderRadius: '8px', border: `1px solid ${highConc ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.07)'}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                      <span style={{ fontSize: '0.62rem', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Liquid vs Illiquid <InfoTooltip text="Liquid assets (cash + investments) can be drawn on immediately — they fund your SWR nest egg and retirement drawdown. Illiquid assets (real estate + other) appreciate passively but cannot be readily sold to fund expenses. A high illiquid concentration limits your retirement funding flexibility even if total net worth looks healthy." /></span>
+                      <span style={{ fontSize: '0.62rem', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Liquid vs Illiquid <InfoTooltip text="Liquid assets (cash + investments) can be drawn on more easily. Investments fund your Target SWR nest egg and retirement drawdown. Illiquid assets (real estate + other) grow in the model but are not automatically sold to pay retirement expenses. A high illiquid concentration can make retirement funding tighter even when total net worth looks healthy." /></span>
                       {highConc && <span style={{ fontSize: '0.62rem', color: '#f59e0b', fontWeight: 700 }}>⚠ High illiquid concentration</span>}
                     </div>
                     <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.35rem' }}>
@@ -5984,7 +5991,7 @@ const mIdx = cols.findIndex(c =>
                 <div>
                   <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     🏖️ Retirement Budget
-                    <InfoTooltip text="Plan what retirement will actually cost you, category by category — entered in today's terms, inflated forward by the model. This total drives all retirement projections: Nest Egg, Runway, and Monte Carlo. Set an end year on any category to phase it out during retirement (e.g. a mortgage ending, or school fees for a dependent). Phase-outs reduce Runway and Monte Carlo withdrawals from that year; the Required Nest Egg is always sized on your full Day 1 budget." />
+                    <InfoTooltip text="Plan what retirement will actually cost you, category by category. This is the spending lever. Amounts are entered in today's terms and inflated forward by the model. This total drives the nest egg target, the runway chart, and the market stress test. Set an end year on any category to phase it out during retirement. Phase-outs reduce runway and stress-test withdrawals from that year; the Required Nest Egg is sized on your full Day 1 budget." />
                   </h3>
                   <p style={{ fontSize: '0.9rem', color: '#9ca3af', marginTop: '0.25rem', marginBottom: '1rem' }}>
                     Enter amounts in <strong style={{ color: '#e8e9ed' }}>today's terms</strong> — projections grow them forward at each category's retirement growth rate.
@@ -6095,6 +6102,7 @@ const mIdx = cols.findIndex(c =>
               const onTrack = gap >= 0;
               const fundingPct = requiredNestEgg > 0 ? Math.min(150, (projectedWealth / requiredNestEgg) * 100) : 100;
               const absGap = Math.abs(gap);
+              const impliedWithdrawalRate = projectedWealth > 0 ? (annualNeed / projectedWealth) * 100 : null;
 
               // Verdict
               // Six verdict states based on onTrack (Q1) and successPct (Q2)
@@ -6116,27 +6124,27 @@ const mIdx = cols.findIndex(c =>
               const verdictShort = isStrong
                 ? (isCoasting ? 'Strong retirement plan · Already coasting' : 'Strong retirement plan')
                 : isOnTrackMod
-                  ? 'Moderate risk — survival odds need attention'
+                  ? 'Moderate risk — stress-test odds need attention'
                 : isOnTrackWeak
-                  ? 'High risk — survival odds are low despite meeting the nest egg target'
+                  ? 'High risk — stress-test odds are low despite meeting the nest egg target'
                 : isGapStrong
-                  ? 'Nest egg gap, but survival odds are strong'
+                  ? 'Nest egg gap, but stress-test odds are strong'
                 : isGapMod
-                  ? 'Nest egg gap with moderate survival odds'
-                  : 'High risk — funding gap and low survival odds';
+                  ? 'Nest egg gap with moderate stress-test odds'
+                  : 'High risk — funding gap and low stress-test odds';
               const verdictDetail = isStrong
                 ? (isCoasting
-                    ? "You're on track and already coasting — your current investments will grow to your Required Nest Egg by retirement without any additional savings. Any surplus you deploy only accelerates your timeline further. Survival odds are high."
-                    : "You're on track to meet your Required Nest Egg and survival odds are high. Your plan looks solid.")
+                    ? "You're on track and already coasting: your current investments are projected to reach the Required Nest Egg by retirement without extra savings. Any surplus you deploy only accelerates your timeline further. The market stress test is also strong."
+                    : "You're on track to meet your Required Nest Egg and the market stress test is strong. Your plan looks solid.")
                 : isOnTrackMod
-                  ? "Your projected Investments meet the Required Nest Egg target, but survival odds fall below 80% — consider revisiting your return assumptions or retirement spending."
+                  ? "Your projected Investments meet the Required Nest Egg target, but the market stress test falls below 80%. Consider revisiting return assumptions or retirement spending."
                 : isOnTrackWeak
-                  ? "Your projected Investments meet the Required Nest Egg target, but survival odds are low. Consider reducing post-retirement expenses or seeking higher investment returns."
+                  ? "Your projected Investments meet the Required Nest Egg target, but the market stress test is weak. Consider reducing retirement spending, increasing savings, retiring later, or reviewing return assumptions."
                 : isGapStrong
-                  ? "Your projected Investments fall short of the conservative SWR nest egg target on retirement day, but Monte Carlo survival odds are strong. This means the plan can still last in most simulations because Q2 uses actual year-by-year withdrawals, phase-outs, income offsets, and market variation."
+                  ? "Your projected Investments fall short of the Target SWR nest egg on retirement day, but the market stress test is strong. This can happen because the stress test uses the actual year-by-year retirement budget, phase-outs, income offsets, and uneven returns."
                 : isGapMod
-                  ? "Your projected Investments fall short of the conservative SWR nest egg target and Monte Carlo odds are only moderate. Use the levers below to test a flat extra contribution, later retirement, or higher return assumption; use Surplus Deployment for dynamic full-surplus scenarios."
-                  : "Your projected Investments fall well short of the Required Nest Egg, and survival odds are low. A significant course correction is needed — consider all three levers together.";
+                  ? "Your projected Investments fall short of the Target SWR nest egg and the market stress test is only moderate. Use the levers below to test extra contributions, later retirement, or higher return assumptions; use Surplus Deployment for dynamic full-surplus scenarios."
+                  : "Your projected Investments fall short of the Required Nest Egg and the market stress test is weak. A steady-return runway may still last, but less smooth markets make the plan risky. Consider spending, savings, retirement age, and return assumptions together.";
 
               // Gap-closing calcs — always computed, shown as N/A when not applicable
               const yearsToRetire = profile.retirementAge - profile.currentAge;
@@ -6250,7 +6258,7 @@ const mIdx = cols.findIndex(c =>
                   <div style={{ padding: '1.5rem 2rem 0 2rem' }}>
                     <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: '0 0 0.25rem 0' }}>
                       🏁 Retirement Health
-                      <InfoTooltip text="Two questions, one verdict: are you saving enough (Q1), and will it last (Q2)?" />
+                      <InfoTooltip text="Two questions, one verdict. Q1 asks whether your projected investments reach the nest egg target. Q2 asks whether the plan still lasts when returns are bumpy. The nest egg target is controlled by retirement spending and Target SWR; the stress test is controlled by actual spending, projected investments, income offsets, and return bumpiness." />
                     </h3>
                     <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: '0 0 1.25rem 0' }}>Are you saving enough, and will it last?</p>
                   </div>
@@ -6264,7 +6272,7 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ fontSize: '0.88rem', color: '#e8e9ed', fontWeight: '600', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>{verdictShort} <InfoTooltip text={verdictDetail} /></div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-                          <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>SWR</span>
+                          <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>Target SWR</span>
                           <input
                             type="text"
                             defaultValue={swr.toString()}
@@ -6274,7 +6282,7 @@ const mIdx = cols.findIndex(c =>
                             style={{ width: '48px', padding: '0.25rem 0.4rem', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', color: '#e8e9ed', fontSize: '0.85rem', fontFamily: 'JetBrains Mono, monospace', textAlign: 'center' }}
                           />
                           <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>%</span>
-                          <InfoTooltip text={`Safe Withdrawal Rate — the % of your nest egg you withdraw in year one of retirement, then adjust for inflation annually. The 4% rule (Trinity Study, 1998) sustains a balanced portfolio across 95%+ of 30-year windows — drop to 3–3.5% for 35+ year retirements or early retirement. Above 4% failure risk rises sharply. SWR only shifts the Required Nest Egg target (spend ÷ SWR) and FI Age — it does NOT affect Monte Carlo Survival Odds, which are driven by your projected retirement balance, actual retirement spending, income offsets, and return volatility across 1,000 simulated scenarios.`} />
+                          <InfoTooltip text={`Target SWR is the rate used to size your Required Nest Egg. Formula: retirement-day spending divided by Target SWR. Lower Target SWR means you want a bigger cushion, so the required nest egg goes up. Higher Target SWR lowers the target, but it does not change what you actually spend or make the plan safer. To change actual withdrawals, edit the Retirement Budget. The market stress-test odds are not affected by Target SWR unless spending, projected investments, income offsets, or return bumpiness also change.`} />
                         </div>
                       </div>
 
@@ -6282,14 +6290,14 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ marginBottom: '1.25rem' }}>
                         <div style={{ fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                           Q1 — How much do you need, and are you on track?
-                          <InfoTooltip text={`Will your investments be large enough to retire on the day you plan to? Required Nest Egg = retirement budget (inflated to retirement day) ÷ SWR — the lump sum needed for withdrawals to theoretically last indefinitely. Projected Investments = current portfolio compounded to retirement plus any annual contributions entered on investment items. Use Surplus Deployment in the Dashboard tab to model deploying additional surplus. The funding bar shows % covered. Note: nest egg uses Day 1 budget conservatively — Survival Odds (Q2) accounts for phase-outs and is more precise.`} />
+                          <InfoTooltip text={`Will your investments be large enough on the day you retire? Required Nest Egg = retirement budget inflated to retirement day, divided by Target SWR. Projected Investments = current investment portfolio grown to retirement, plus any annual contributions entered on investment items. Use Surplus Deployment in the Dashboard tab to model deploying additional surplus. The funding bar shows % covered. Note: the nest egg uses the full Day 1 budget as a conservative target; the stress test accounts for phase-outs and income offsets over time.`} />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', alignItems: 'stretch', marginBottom: '0.85rem' }}>
                           <div style={{ padding: '1rem', background: 'rgba(167,139,250,0.07)', borderRadius: '10px', border: '1px solid rgba(167,139,250,0.18)', textAlign: 'center', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                               Required Nest Egg
-                              <InfoTooltip text={`Annual retirement spend (${formatCurrencyDecimal(annualNeed, currency, exchangeRates)}/yr nominal at age ${profile.retirementAge}) ÷ ${swr}% SWR. Sized using your full Day 1 retirement budget — a conservative starting point that ignores any phase-outs that happen during retirement. Phase-outs reduce your actual withdrawals over time, which is reflected in the Runway chart and Monte Carlo success probability.`} />
+                              <InfoTooltip text={`Annual retirement spend (${formatCurrencyDecimal(annualNeed, currency, exchangeRates)}/yr nominal at age ${profile.retirementAge}) divided by ${swr}% Target SWR. Sized using your full Day 1 retirement budget. This is a conservative starting target because it ignores any phase-outs that happen later in retirement. Phase-outs reduce actual withdrawals over time, which is reflected in the Runway chart and market stress-test odds.`} />
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                               <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#a78bfa', fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 }}>{formatCurrencyDecimal(requiredNestEgg, currency, exchangeRates)}</div>
@@ -6317,7 +6325,7 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ padding: '1rem', background: 'rgba(96,165,250,0.07)', borderRadius: '10px', border: '1px solid rgba(96,165,250,0.18)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <div style={{ fontSize: '0.68rem', color: '#9ca3af', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                               Projected Investments at {profile.retirementAge}
-                              <InfoTooltip text={`Your projected Investment portfolio at retirement age ${profile.retirementAge}, based on your current investments compounding at your assumed return plus any annual contributions entered on investment items. Only liquid Investments count toward the SWR-based nest egg target — real estate and other illiquid assets are excluded. Any surplus beyond entered contributions is not automatically reinvested; model that via Surplus Deployment in the Dashboard tab.`} />
+                              <InfoTooltip text={`Your projected Investment portfolio at retirement age ${profile.retirementAge}, based on your current investments compounding at your assumed return plus any annual contributions entered on investment items. Only liquid Investments count toward the Target SWR nest egg target — real estate and other illiquid assets are excluded. Any surplus beyond entered contributions is not automatically reinvested; model that via Surplus Deployment in the Dashboard tab.`} />
                             </div>
                             <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#60a5fa', fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 }}>{formatCurrencyDecimal(projectedWealth, currency, exchangeRates)}</div>
                             <div style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '0.35rem' }}>on current trajectory</div>
@@ -6353,7 +6361,7 @@ const mIdx = cols.findIndex(c =>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                   <div>
                                     <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e8e9ed' }}>Nest Egg by Category</div>
-                                    <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.2rem' }}>Sorted by required nest egg · {nestEggSwr}% SWR at age {profile.retirementAge}</div>
+                                    <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.2rem' }}>Sorted by required nest egg · {nestEggSwr}% target SWR at age {profile.retirementAge}</div>
                                   </div>
                                   <button onClick={() => setNestEggBreakdownOpen(false)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#9ca3af', cursor: 'pointer', padding: '0.2rem 0.6rem', fontSize: '0.8rem' }}>✕</button>
                                 </div>
@@ -6395,6 +6403,10 @@ const mIdx = cols.findIndex(c =>
                           <div style={{ height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${Math.min(100, fundingPct)}%`, background: onTrack ? 'linear-gradient(90deg,#22c55e,#34d399)' : 'linear-gradient(90deg,#f87171,#fb923c)', borderRadius: '4px', transition: 'width 0.5s ease' }} />
                           </div>
+                        </div>
+
+                        <div style={{ fontSize: '0.7rem', color: '#6b7280', lineHeight: 1.45, marginTop: '0.65rem', padding: '0.65rem 0.8rem', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                          Target SWR sets the nest egg benchmark. Your implied first-year draw is {impliedWithdrawalRate !== null ? impliedWithdrawalRate.toFixed(1) + '%' : 'not available'} of projected retirement investments ({formatCurrencyDecimal(annualNeed, currency, exchangeRates)}/yr divided by {formatCurrencyDecimal(projectedWealth, currency, exchangeRates)}). To change actual withdrawals, edit the Retirement Budget; changing Target SWR alone only moves the benchmark.
                         </div>
 
                         {/* Ways to close gap — subsection panel, collapsed by default */}
@@ -6453,8 +6465,8 @@ const mIdx = cols.findIndex(c =>
                       {/* Q2 */}
                       <div style={{ marginBottom: '1rem' }}>
                         <div style={{ fontSize: '0.65rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          Q2 — Will your money last through retirement?
-                          <InfoTooltip text={`Will your money actually last through retirement? 1,000 market scenarios run against your Investment portfolio from retirement day. Returns are normally distributed — most scenarios cluster around your assumed return, with occasional large swings in either direction. The volatility % controls how wide those swings are. Each scenario withdraws inflation-adjusted expenses, respects phase-out years, and nets passive/other income against withdrawals. % shown = scenarios still solvent at age ${profile.lifeExpectancy}. Above 80% = strong · 60–79% = caution · below 60% = high risk. NOT affected by SWR — only by projected retirement balance, spending, income offsets, and volatility.`} />
+                          Q2 — Will your money last if markets are bumpy?
+                          <InfoTooltip text={`This is the market stress test, also called Monte Carlo. It runs 1,000 possible market paths against your Investment portfolio from retirement day. Each path varies yearly returns around your assumed return, withdraws your inflation-adjusted retirement budget, respects phase-out years, and subtracts passive/other income first. % shown = paths still solvent at age ${profile.lifeExpectancy}. Above 80% = strong; 60-79% = caution; below 60% = high risk. Not affected by Target SWR unless projected investments, spending, income offsets, or return bumpiness also change.`} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1.5rem', alignItems: 'center' }}>
                           <div>
@@ -6647,9 +6659,9 @@ const mIdx = cols.findIndex(c =>
                   <div style={{ marginBottom: '0.5rem' }}>
                     <h3 style={{ fontSize: '1.3rem', fontWeight: '600', margin: '0 0 0.25rem 0' }}>
                       🛬 Retirement Runway
-                      <InfoTooltip text={`Each year in retirement your investment balance compounds at the scenario return, then inflation-adjusted expenses are withdrawn (Investments only — real estate and other assets are treated as illiquid). Three lines show your portfolio through retirement — pessimistic (lower return + higher spend), base (your assumptions), and optimistic (higher return + lower spend). Adjust the sliders below to change each scenario's assumptions. When a line hits zero the portfolio is exhausted. The spending reduction slider models a more frugal retirement.`} />
-                    </h3>
-                    <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>How long your investment portfolio survives through age {runwayTargetAge}</p>
+                    <InfoTooltip text={`This is a steady-return what-if chart. Each year in retirement your investment balance grows at the selected scenario return, then planned retirement spending is withdrawn. It does not show the chance of success; use the Retirement Health stress-test odds for that. Three lines show pessimistic (lower return + higher spend), base (your assumptions), and optimistic (higher return + lower spend). When a line hits zero the portfolio is exhausted.`} />
+                  </h3>
+                    <p style={{ fontSize: '0.9rem', color: '#9ca3af', margin: 0 }}>Steady-return what-if: assumes the chosen return happens every year through age {runwayTargetAge}</p>
                   </div>
 
                   {/* Stat cards */}
@@ -6664,7 +6676,7 @@ const mIdx = cols.findIndex(c =>
                         <div style={{ padding: '0.85rem 1rem', background: 'rgba(248,113,113,0.05)', borderRadius: '10px', border: '1px solid rgba(248,113,113,0.3)' }}>
                           <div style={{ fontSize: '0.7rem', color: '#f87171', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>Pessimistic</div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exPessimistic)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
-                          <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exPessimistic}</div>
+                          <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? 'Lasts to age ' + profile.lifeExpectancy + ' in this scenario' : 'Runs out at age ' + exPessimistic}</div>
                           <div style={{ fontSize: '0.68rem', color: runwayConservativeOffset < 0 ? '#f87171' : '#9ca3af', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{runwayConservativeOffset < 0 ? `${formatPct(baseRate, 1)} → ${formatRatePerYear(pessimisticReturn, 1)}` : formatRatePerYear(pessimisticReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#f87171', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(baseSpend, currency, exchangeRates)}{runwayPessSpend > 0 ? ` → ${formatCurrency(baseSpend * pessSpendMult, currency, exchangeRates)}/yr` : '/yr spend'}</div>
                           {/* Return slider */}
@@ -6714,11 +6726,11 @@ const mIdx = cols.findIndex(c =>
                             <div style={{ fontSize: '0.6rem', color: '#4b5563', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.1rem 0.35rem' }}>benchmark</div>
                           </div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exBase)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
-                          <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exBase}</div>
+                          <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? 'Lasts to age ' + profile.lifeExpectancy + ' in this scenario' : 'Runs out at age ' + exBase}</div>
                           <div style={{ fontSize: '0.68rem', color: '#60a5fa', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatRatePerYear(baseReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#60a5fa', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(retYearNominalSpend, currency, exchangeRates)}/yr spend</div>
                           <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                            <div style={{ fontSize: '0.65rem', color: '#4b5563', lineHeight: 1.5 }}>Uses your configured investment return and retirement spend — no adjustments. This is your plan as entered.</div>
+                            <div style={{ fontSize: '0.65rem', color: '#4b5563', lineHeight: 1.5 }}>Uses your configured investment return and retirement spend with no adjustments. This is a steady path, not a probability.</div>
                           </div>
                         </div>
                       );
@@ -6733,7 +6745,7 @@ const mIdx = cols.findIndex(c =>
                         <div style={{ padding: '0.85rem 1rem', background: 'rgba(52,211,153,0.05)', borderRadius: '10px', border: '1px solid rgba(52,211,153,0.3)' }}>
                           <div style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>Optimistic</div>
                           <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'JetBrains Mono, monospace', color: survives ? '#34d399' : '#e8e9ed', lineHeight: 1 }}>{runwayYears(exOptimistic)}<span style={{ fontSize: '0.8rem', color: '#6b7280', fontFamily: 'system-ui', marginLeft: '0.2rem' }}>yrs</span></div>
-                          <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? '✓ Survives to ' + profile.lifeExpectancy : '⚠ Exhausted age ' + exOptimistic}</div>
+                          <div style={{ fontSize: '0.68rem', color: survives ? '#34d399' : '#9ca3af', marginTop: '0.2rem' }}>{survives ? 'Lasts to age ' + profile.lifeExpectancy + ' in this scenario' : 'Runs out at age ' + exOptimistic}</div>
                           <div style={{ fontSize: '0.68rem', color: runwayOptimisticOffset > 0 ? '#34d399' : '#9ca3af', marginTop: '0.15rem', fontFamily: 'JetBrains Mono, monospace' }}>{runwayOptimisticOffset > 0 ? `${formatPct(baseRate, 1)} → ${formatRatePerYear(optimisticReturn, 1)}` : formatRatePerYear(optimisticReturn, 1)}</div>
                           <div style={{ fontSize: '0.68rem', color: '#34d399', marginTop: '0.05rem', fontFamily: 'JetBrains Mono, monospace' }}>{formatCurrency(baseSpend, currency, exchangeRates)}{runwayOptSpend > 0 ? ` → ${formatCurrency(baseSpend * optSpendMult, currency, exchangeRates)}/yr` : '/yr spend'}</div>
                           {/* Return slider */}
@@ -6947,16 +6959,20 @@ const mIdx = cols.findIndex(c =>
                   {(() => {
                     const baseOk = exBase === null;
                     const pessOk = exPessimistic === null;
+                    const stressPct = Math.round(retirementMetrics?.successProbability || 0);
                     const lifeYrs = profile.lifeExpectancy - profile.retirementAge;
                     let footnoteText = '';
                     if (baseOk && pessOk) {
-                      footnoteText = `Portfolio survives to age ${profile.lifeExpectancy} in all three scenarios, including the pessimistic case.`;
+                      footnoteText = `Portfolio lasts to age ${profile.lifeExpectancy} in all three steady-return scenarios, including the pessimistic case.`;
                     } else if (baseOk && !pessOk) {
                       const gap = lifeYrs - runwayYears(exPessimistic);
-                      footnoteText = `Survives in the base scenario but runs ${gap} year${gap !== 1 ? 's' : ''} short in the pessimistic case. Consider a spending buffer or diversifying returns.`;
+                      footnoteText = `Lasts in the steady base scenario but runs ${gap} year${gap !== 1 ? 's' : ''} short in the pessimistic case. Consider a spending buffer or more retirement savings.`;
                     } else {
                       const baseShort = lifeYrs - runwayYears(exBase);
-                      footnoteText = `Portfolio runs short even in the base scenario — exhausted ${baseShort} year${baseShort !== 1 ? 's' : ''} before age ${profile.lifeExpectancy}. Review spending or boost retirement savings.`;
+                      footnoteText = `Portfolio runs short even in the steady base scenario: exhausted ${baseShort} year${baseShort !== 1 ? 's' : ''} before age ${profile.lifeExpectancy}. Review spending or boost retirement savings.`;
+                    }
+                    if (baseOk && stressPct < MC_CAUTION_THRESHOLD) {
+                      footnoteText += ` The market stress test is only ${stressPct}%, so this steady path should not be read as low risk.`;
                     }
                     return (
                       <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.75rem', color: '#6b7280', lineHeight: 1.55 }}>
@@ -8006,7 +8022,7 @@ const mIdx = cols.findIndex(c =>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.34rem', flexWrap: 'nowrap', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
                         <span style={{ fontSize: '1rem', fontWeight: '700', color: '#e8e9ed', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flex: '0 0 auto' }}>
                           Investments
-                          <InfoTooltip text="Balance is always today's current balance for that investment item - it does not change based on the contribution window. Annual contrib is the planned addition made in each calendar year from the From year through the inclusive To year; blank/default To year means the final pre-retirement contribution year. Balance charts show annual opening snapshots, so a contribution made during 2030 first appears in the 2031 balance point. Contribution growth applies only inside the From year to To year window. Contributions affect the base projection: FI Age, Retirement Health, Monte Carlo starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the affected year(s) to review in Cash Flow Over Time." />
+                          <InfoTooltip text="Balance is always today's current balance for that investment item - it does not change based on the contribution window. Annual contrib is the planned addition made in each calendar year from the From year through the inclusive To year; blank/default To year means the final pre-retirement contribution year. Balance charts show annual opening snapshots, so a contribution made during 2030 first appears in the 2031 balance point. Contribution growth applies only inside the From year to To year window. Contributions affect the base projection: FI Age, Retirement Health, market stress-test starting wealth, milestones, and the HTML report. The model does not cap contributions to your surplus; if planned contributions exceed projected pre-retirement surplus in any future year, an informational warning shows the affected year(s) to review in Cash Flow Over Time." />
                         </span>
                         <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#e8e9ed', fontFamily: 'JetBrains Mono, monospace', flex: '0 0 auto' }}>{formatDisplayNumber(assets.investments, exchangeRates[currency])}</span>
                         {annualInvestmentContribution > 0 && (() => {
@@ -9246,6 +9262,3 @@ const App = () => (
 );
 
 export default App;
-
-
-

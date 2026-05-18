@@ -31,7 +31,7 @@ Single-file React 18 SPA (`src/App.jsx`, 9,000+ lines). No routing, no backend, 
     Tab: Profile              ← Age, retirement, life expectancy, dependents
     Tab: Finances             ← Assets, liabilities, income (with sub-items)
     Tab: Pre-Retirement       ← 15 pre-retirement categories + growth settings
-    Tab: Retirement           ← Retirement budget, SWR, runway, retirement health
+    Tab: Retirement           ← Retirement budget, Target SWR, runway, retirement health
     Tab: Dashboard            ← Projection charts, financial health strip, import/export
 ```
 
@@ -85,7 +85,7 @@ All state lives in the `NetWorthNavigator` function component via 50+ `useState`
 | `assumptions` | object | See below | Growth rates and MC parameters |
 | `oneTimeExpenses` | array | Planned costs | Future one-time or recurring expenses |
 | `lifeEvents` | array | Milestones | Timeline events with `startYear` and optional inclusive `endYear`; used as visual chart overlays only |
-| `nestEggSwr` | number | `4` | Safe withdrawal rate (%) |
+| `nestEggSwr` | number | `4` | Target safe withdrawal rate used for nest egg sizing (%) |
 | `surplusSplitInvest` | number | `100` | % of surplus to investments |
 | `surplusSplitDebt` | number | `0` | % of surplus to debt reduction |
 
@@ -105,7 +105,7 @@ otherIncomeGrowth: 2.0   otherAssetGrowth: 2.0     enableDrawdown: true
 |----------|-----------|---------|
 | `wealthProjection` | All financial state | Year-by-year projection array |
 | `retirementMetrics` | Projection + profile | MC success probability at retirement |
-| `fiAge` | Projection + SWR | First age where investments ≥ nest egg |
+| `fiAge` | Projection + Target SWR | First age where investments ≥ nest egg |
 | `debtFreeAge` | Projection + liabilities | First age where total liabilities = 0 |
 | `wealthMilestones` | Projection + FX rates | Ages crossing $1M/$5M/$10M/$25M USD |
 | `effectiveRetirementExpense` | Retirement budget + growth | Today's-terms retirement cost |
